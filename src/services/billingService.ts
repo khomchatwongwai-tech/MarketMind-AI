@@ -1,0 +1,157 @@
+/**
+ * Client-side Billing & Subscription Service
+ */
+
+import { UserProfile } from '../types/user';
+import {
+  BillingInvoice,
+  PlanFeatureConfig,
+  SubscriptionPlanId,
+  AdminSubscriptionMetrics,
+} from '../types/subscription';
+
+export class BillingService {
+  /**
+   * Fetch all plans & configuration
+   */
+  static async getPlans(): Promise<{ trialDurationDays: number; plans: Record<SubscriptionPlanId, PlanFeatureConfig> }> {
+    try {
+      const res = await fetch('/api/billing/plans');
+      if (!res.ok) throw new Error('Failed to load subscription plans');
+      return await res.json();
+    } catch (e) {
+      console.warn('Fallback to local plans config', e);
+      const { SUBSCRIPTION_PLANS, TRIAL_DURATION_DAYS } = await import('../config/plans');
+      return { trialDurationDays: TRIAL_DURATION_DAYS, plans: SUBSCRIPTION_PLANS };
+    }
+  }
+
+  /**
+   * Start 15-Day Free Trial
+   */
+  static async startTrial(email: string, planId: SubscriptionPlanId = 'pro'): Promise<{ message: string; user: UserProfile }> {
+    const res = await fetch('/api/billing/start-trial', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ email, planId }),
+    });
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.error || 'Failed to start free trial');
+    return data;
+  }
+
+  /**
+   * Create Checkout Session (Stripe-ready Architecture)
+   */
+  static async createCheckoutSession(
+    email: string,
+    planId: SubscriptionPlanId,
+    billingCycle: 'monthly' | 'annual' = 'monthly'
+  ): Promise<{
+    connected: boolean;
+    checkoutUrl?: string;
+    message?: string;
+    providerStatus?: string;
+    disclaimer?: string;
+    simulatedPlan?: PlanFeatureConfig;
+  }> {
+    const res = await fetch('/api/billing/create-checkout-session', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ email, planId, billingCycle }),
+    });
+    return await res.json();
+  }
+
+  /**
+   * Customer Portal Session
+   */
+  static async createPortalSession(email: string): Promise<{
+    connected: boolean;
+    portalUrl?: string;
+    message?: string;
+  }> {
+    const res = await fetch('/api/billing/create-portal-session', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ email }),
+    });
+    return await res.json();
+  }
+
+  /**
+   * Upgrade or Downgrade Plan
+   */
+  static async changePlan(
+    email: string,
+    planId: SubscriptionPlanId,
+    billingCycle: 'monthly' | 'annual' = 'monthly'
+  ): Promise<{ message: string; user: UserProfile }> {
+    const res = await fetch('/api/billing/change-plan', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ email, planId, billingCycle }),
+    });
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.error || 'Failed to change plan');
+    return data;
+  }
+
+  /**
+   * Cancel Subscription with grace period retention
+   */
+  static async cancelSubscription(email: string): Promise<{
+    message: string;
+    user: UserProfile;
+    accessUntil: string;
+  }> {
+    const res = await fetch('/api/billing/cancel-subscription', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ email }),
+    });
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.error || 'Failed to cancel subscription');
+    return data;
+  }
+
+  /**
+   * Get User Invoices / Billing History
+   */
+  static async getBillingHistory(email: string): Promise<BillingInvoice[]> {
+    try {
+      const res = await fetch(`/api/billing/history?email=${encodeURIComponent(email)}`);
+      const data = await res.json();
+      return data.invoices || [];
+    } catch {
+      return [];
+    }
+  }
+
+  /**
+   * Get Admin Business Subscription Metrics
+   */
+  static async getAdminMetrics(): Promise<AdminSubscriptionMetrics> {
+    try {
+      const res = await fetch('/api/billing/admin-metrics');
+      return await res.json();
+    } catch {
+      return {
+        totalUsers: 0,
+        freeUsers: 0,
+        trialUsers: 0,
+        basicSubscribers: 0,
+        proSubscribers: 0,
+        premiumSubscribers: 0,
+        activeSubscribers: 0,
+        canceledSubscribers: 0,
+        trialConversionRate: 0,
+        monthlyRecurringRevenue: 0,
+        annualRecurringRevenue: 0,
+        churnRate: 0,
+        failedPayments: 0,
+        upcomingTrialExpirations: 0,
+      };
+    }
+  }
+}

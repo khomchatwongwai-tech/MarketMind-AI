@@ -1,0 +1,7 @@
+{
+  "name": "MarketMind AI",
+  "description": "AI-assisted stock and ETF probabilistic analysis engine explaining why assets move, calculating multi-factor probabilities, technicals, options, and market breadth.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
+

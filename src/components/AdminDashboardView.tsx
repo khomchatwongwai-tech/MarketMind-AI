@@ -15,9 +15,17 @@ import {
   TrendingUp,
   RefreshCw,
   Send,
+  Flag,
+  UserCheck,
+  UserX,
+  AlertTriangle,
+  Ban,
+  ShieldBan,
 } from 'lucide-react';
 import { SupportTicket, UserProfile } from '../types/user';
 import { UserService } from '../services/userService';
+import { CommunityService } from '../services/community/communityService';
+import { CommunityReport, CommunityModerationAction } from '../types/community';
 
 interface AdminDashboardViewProps {
   currentUser: UserProfile;
@@ -26,13 +34,19 @@ interface AdminDashboardViewProps {
 export const AdminDashboardView: React.FC<AdminDashboardViewProps> = ({
   currentUser,
 }) => {
-  const [activeTab, setActiveTab] = useState<'overview' | 'users' | 'tickets' | 'broadcast'>('overview');
+  const [activeTab, setActiveTab] = useState<'overview' | 'users' | 'tickets' | 'broadcast' | 'moderation'>('overview');
   const [tickets, setTickets] = useState<SupportTicket[]>(UserService.getSupportTickets());
   const [selectedTicket, setSelectedTicket] = useState<SupportTicket | null>(null);
   const [replyText, setReplyText] = useState('');
   const [broadcastMessage, setBroadcastMessage] = useState('CPI Report release scheduled for 08:30 AM ET tomorrow. Expect heightened index volatility.');
   const [broadcastActive, setBroadcastActive] = useState(true);
   const [broadcastSaved, setBroadcastSaved] = useState(false);
+
+  // Moderation state
+  const [reports, setReports] = useState<CommunityReport[]>(() => CommunityService.getLocalReports());
+  const [modActions, setModActions] = useState<CommunityModerationAction[]>(() => CommunityService.getLocalModerationActions());
+  const [modFilter, setModFilter] = useState<'ALL' | 'PENDING' | 'RESOLVED'>('PENDING');
+  const [modNotes, setModNotes] = useState('');
 
   // Mock user roster for admin
   const [usersList, setUsersList] = useState<Array<{ id: string; name: string; email: string; plan: string; joined: string; apiCalls: number; status: string }>>([
@@ -111,6 +125,15 @@ export const AdminDashboardView: React.FC<AdminDashboardViewProps> = ({
             }`}
           >
             Emergency Banner
+          </button>
+          <button
+            onClick={() => setActiveTab('moderation')}
+            className={`px-3 py-1 rounded transition flex items-center gap-1.5 ${
+              activeTab === 'moderation' ? 'bg-[#D4AF37] text-black font-bold' : 'text-[#F2D675] hover:text-white'
+            }`}
+          >
+            <Flag className="w-3.5 h-3.5" />
+            <span>Community Moderation ({reports.filter((r) => r.status === 'PENDING').length})</span>
           </button>
         </div>
       </div>
@@ -389,6 +412,157 @@ export const AdminDashboardView: React.FC<AdminDashboardViewProps> = ({
               </button>
             </div>
           </form>
+        </div>
+      )}
+
+      {/* COMMUNITY MODERATION TAB */}
+      {activeTab === 'moderation' && (
+        <div className="space-y-4">
+          <div className="flex items-center justify-between flex-wrap gap-2">
+            <div>
+              <h3 className="text-sm font-bold text-white uppercase tracking-wider font-mono flex items-center gap-2">
+                <Flag className="w-4 h-4 text-[#D4AF37]" />
+                Compliance &amp; Moderation Command Center
+              </h3>
+              <p className="text-xs text-slate-400">
+                Audit community reports, enforce market manipulation rules, and manage verified quantitative credentials.
+              </p>
+            </div>
+
+            {/* Filter pills */}
+            <div className="flex gap-1.5 bg-[#14161a] p-1 rounded-lg border border-[#2d3139] text-xs">
+              {(['PENDING', 'RESOLVED', 'ALL'] as const).map((status) => (
+                <button
+                  key={status}
+                  onClick={() => setModFilter(status)}
+                  className={`px-3 py-1 rounded font-bold transition ${
+                    modFilter === status
+                      ? 'bg-[#D4AF37] text-black'
+                      : 'text-slate-400 hover:text-white'
+                  }`}
+                >
+                  {status}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          {/* Reports Table / Cards */}
+          <div className="space-y-3">
+            {reports
+              .filter((r) => (modFilter === 'ALL' ? true : modFilter === 'PENDING' ? r.status === 'PENDING' : r.status !== 'PENDING'))
+              .map((report) => (
+                <div
+                  key={report.id}
+                  className="bg-[#181a1f] border border-[#2d3139] rounded-xl p-4 flex flex-col gap-3"
+                >
+                  <div className="flex items-center justify-between flex-wrap gap-2 border-b border-[#242730] pb-2">
+                    <div className="flex items-center gap-2">
+                      <span className="px-2 py-0.5 bg-rose-950/60 text-rose-300 border border-rose-500/40 rounded text-[10px] font-mono font-bold uppercase">
+                        {report.category.replace(/_/g, ' ')}
+                      </span>
+                      <span className="text-xs font-mono text-slate-400">
+                        Target: <strong className="text-white">{report.targetType}</strong> ({report.targetId})
+                      </span>
+                    </div>
+
+                    <div className="flex items-center gap-2 text-xs font-mono">
+                      <span className="text-slate-400">Reported by @{report.reporterUsername}</span>
+                      <span
+                        className={`px-2 py-0.5 rounded text-[10px] font-bold ${
+                          report.status === 'PENDING'
+                            ? 'bg-amber-950/60 text-amber-300 border border-amber-500/30'
+                            : 'bg-emerald-950/60 text-emerald-300 border border-emerald-500/30'
+                        }`}
+                      >
+                        {report.status}
+                      </span>
+                    </div>
+                  </div>
+
+                  {/* Content snippet & report notes */}
+                  <div className="bg-[#111317] p-3 rounded-lg border border-[#22242b] space-y-1">
+                    <div className="text-xs text-slate-300">
+                      <strong className="text-slate-400 block text-[10px] uppercase font-mono">Flagged Content Snippet:</strong>
+                      <span className="italic font-serif">"{report.targetContentSnippet}"</span>
+                    </div>
+                    {report.details && (
+                      <div className="text-xs text-slate-400 pt-1 border-t border-[#1d1f26]">
+                        <strong className="text-slate-500 text-[10px] uppercase font-mono mr-1">Reporter Notes:</strong>
+                        {report.details}
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Actions Bar */}
+                  {report.status === 'PENDING' && (
+                    <div className="flex items-center justify-end gap-2 pt-1">
+                      <button
+                        onClick={async () => {
+                          await CommunityService.resolveReport(
+                            report.id,
+                            'DISMISS',
+                            { id: currentUser.id, email: currentUser.email },
+                            'Reviewed and dismissed as non-violating.'
+                          );
+                          setReports(CommunityService.getLocalReports());
+                        }}
+                        className="px-3 py-1.5 bg-[#22252c] hover:bg-[#2d313a] text-slate-300 text-xs font-bold rounded-lg transition"
+                      >
+                        Dismiss Report
+                      </button>
+
+                      <button
+                        onClick={async () => {
+                          await CommunityService.resolveReport(
+                            report.id,
+                            'WARN_USER',
+                            { id: currentUser.id, email: currentUser.email },
+                            'Issued warning for financial market policy violation.'
+                          );
+                          setReports(CommunityService.getLocalReports());
+                        }}
+                        className="px-3 py-1.5 bg-amber-950/40 hover:bg-amber-950/70 text-amber-300 border border-amber-500/40 text-xs font-bold rounded-lg transition"
+                      >
+                        Issue Warning
+                      </button>
+
+                      <button
+                        onClick={async () => {
+                          await CommunityService.resolveReport(
+                            report.id,
+                            'REMOVE_CONTENT',
+                            { id: currentUser.id, email: currentUser.email },
+                            'Removed content violating community compliance rules.'
+                          );
+                          setReports(CommunityService.getLocalReports());
+                        }}
+                        className="px-3 py-1.5 bg-rose-950/60 hover:bg-rose-900 text-rose-200 border border-rose-500/50 text-xs font-bold rounded-lg transition flex items-center gap-1"
+                      >
+                        <Trash2 className="w-3.5 h-3.5" />
+                        <span>Remove Content</span>
+                      </button>
+
+                      <button
+                        onClick={async () => {
+                          await CommunityService.resolveReport(
+                            report.id,
+                            'BAN_USER',
+                            { id: currentUser.id, email: currentUser.email },
+                            'Severe compliance violation - account permanently suspended.'
+                          );
+                          setReports(CommunityService.getLocalReports());
+                        }}
+                        className="px-3 py-1.5 bg-red-600 hover:bg-red-700 text-white text-xs font-bold rounded-lg transition flex items-center gap-1"
+                      >
+                        <Ban className="w-3.5 h-3.5" />
+                        <span>Ban User</span>
+                      </button>
+                    </div>
+                  )}
+                </div>
+              ))}
+          </div>
         </div>
       )}
     </div>

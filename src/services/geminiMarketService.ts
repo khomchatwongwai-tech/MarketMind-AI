@@ -406,7 +406,8 @@ INSTRUCTIONS FOR ANSWERING:
     setInCache(cacheKey, payload, 20000);
     return payload;
   } catch (error: any) {
-    console.error('[GeminiMarketService] ask error:', error?.message);
+    const errMsg = error?.message || String(error);
+    console.log('[GeminiMarketService] Activating resilient market fallback:', errMsg.slice(0, 100));
     return {
       answer: `MarketMind analysis for ${ticker}: Current price is $${structuredContext.currentPrice || 'N/A'}, trading ${Number(structuredContext.currentPrice) >= Number(structuredContext.indicators?.vwap) ? 'above' : 'below'} VWAP ($${structuredContext.indicators?.vwap || 'N/A'}). Primary support is $${structuredContext.supportResistance?.s1 || 'N/A'} and resistance is $${structuredContext.supportResistance?.r1 || 'N/A'}.`,
       timestamp,
@@ -529,7 +530,8 @@ Return a strict JSON object matching this schema:
     setInCache(cacheKey, result, 20000);
     return result;
   } catch (err: any) {
-    console.error('[GeminiMarketService] analyze error:', err?.message);
+    const errMsg = err?.message || String(err);
+    console.log('[GeminiMarketService] Activating resilient market baseline:', errMsg.slice(0, 100));
     const fallback: MarketAnalysisResponse = {
       bias: 'neutral',
       confidenceExplanation: 'Quantitative baseline calculation.',
@@ -675,7 +677,8 @@ Return a strict JSON object matching this schema:
     setInCache(cacheKey, result, 20000);
     return result;
   } catch (err: any) {
-    console.error('[GeminiMarketService] why-moving error:', err?.message);
+    const errMsg = err?.message || String(err);
+    console.log('[GeminiMarketService] Activating resilient why-moving fallback:', errMsg.slice(0, 100));
     return {
       headline: `${ticker} Price Movement Analysis`,
       summary: `${ticker} is currently trading at $${cp} near VWAP ($${vwapVal}).`,

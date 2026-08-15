@@ -45,6 +45,9 @@ export interface PlanFeatureConfig {
     canExportAdvancedData: boolean;
     canAccessApiKeys: boolean;
     hasPrioritySupport: boolean;
+    canUseConnectedPortfolio?: boolean;
+    canUseRiskGuardian?: boolean;
+    maxConnectedAccounts?: number;
   };
 }
 
@@ -103,6 +106,9 @@ export interface FeatureEntitlements {
   canExportAdvancedData: boolean;
   canAccessApiKeys: boolean;
   hasPrioritySupport: boolean;
+  canUseConnectedPortfolio: boolean;
+  canUseRiskGuardian: boolean;
+  maxConnectedAccounts: number;
   maxAIRequestsPerDay: number;
   maxWatchlists: number;
   maxWatchlistTickers: number;

@@ -48,6 +48,9 @@ export const SUBSCRIPTION_PLANS: Record<SubscriptionPlanId, PlanFeatureConfig> =
       canExportAdvancedData: false,
       canAccessApiKeys: false,
       hasPrioritySupport: false,
+      canUseConnectedPortfolio: false,
+      canUseRiskGuardian: false,
+      maxConnectedAccounts: 0,
     },
   },
   basic: {
@@ -60,6 +63,8 @@ export const SUBSCRIPTION_PLANS: Record<SubscriptionPlanId, PlanFeatureConfig> =
     description: 'Affordable toolkit for regular investors & beginner swing traders.',
     features: [
       'Everything in Free',
+      '1 Connected Brokerage Account (Read-Only)',
+      'Basic Portfolio Intelligence & Holdings sync',
       'Expanded market data access',
       'Full technical indicators (VWAP, EMA 9/20/50/200, SMA, RSI, MACD, BB)',
       'Full support & resistance with confirmation & invalidation levels',
@@ -98,6 +103,9 @@ export const SUBSCRIPTION_PLANS: Record<SubscriptionPlanId, PlanFeatureConfig> =
       canExportAdvancedData: false,
       canAccessApiKeys: false,
       hasPrioritySupport: false,
+      canUseConnectedPortfolio: true,
+      canUseRiskGuardian: false,
+      maxConnectedAccounts: 1,
     },
   },
   pro: {
@@ -112,6 +120,10 @@ export const SUBSCRIPTION_PLANS: Record<SubscriptionPlanId, PlanFeatureConfig> =
     description: 'For active traders seeking real-time data, advanced AI & quantitative backtesting.',
     features: [
       'Everything in Basic',
+      'Up to 5 Connected Brokerage Accounts',
+      'MarketMind Connected Portfolio™ with Risk Guardian™',
+      'Portfolio "Why Is It Moving?" real-time attribution',
+      'Portfolio Correlation Matrix & Sector Concentration alerts',
       'Real-time market data stream (sub-second feeds where licensed)',
       'Advanced multi-timeframe overlays (5m, 15m, 30m, 1h, 4h, Today, Next Day, 5-Day)',
       'Advanced Bullish/Bearish probability matrix',
@@ -153,6 +165,9 @@ export const SUBSCRIPTION_PLANS: Record<SubscriptionPlanId, PlanFeatureConfig> =
       canExportAdvancedData: false,
       canAccessApiKeys: true,
       hasPrioritySupport: false,
+      canUseConnectedPortfolio: true,
+      canUseRiskGuardian: true,
+      maxConnectedAccounts: 5,
     },
   },
   premium: {
@@ -166,6 +181,11 @@ export const SUBSCRIPTION_PLANS: Record<SubscriptionPlanId, PlanFeatureConfig> =
     description: 'Institutional-grade options intelligence, dark pool gamma flow & full backtesting.',
     features: [
       'Everything in Pro',
+      'Unlimited Connected Brokerage Accounts',
+      'Full Portfolio Stress Testing & Custom Macro Scenarios',
+      'Institutional Options Greeks, Theta Burn & DTE Radar',
+      'Portfolio News & Earnings Proximity Feed',
+      'Dividend Intelligence & Projected Income Flow',
       'Advanced options intelligence: Put/Call ratios, Open Interest, IV & Expected Move',
       'Major option strike magnets & pinning levels',
       'Unusual Options Activity & Dark Pool gamma flow radar',
@@ -206,6 +226,9 @@ export const SUBSCRIPTION_PLANS: Record<SubscriptionPlanId, PlanFeatureConfig> =
       canExportAdvancedData: true,
       canAccessApiKeys: true,
       hasPrioritySupport: true,
+      canUseConnectedPortfolio: true,
+      canUseRiskGuardian: true,
+      maxConnectedAccounts: 50,
     },
   },
 };

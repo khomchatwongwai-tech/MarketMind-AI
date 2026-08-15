@@ -11,9 +11,13 @@ import {
   Zap,
   Globe,
   Radio,
+  Crown,
 } from 'lucide-react';
 import { UserProfile } from '../types/user';
 import { DEFAULT_ADMIN_EMAIL, UserService } from '../services/userService';
+import { auth, googleProvider } from '../config/firebase';
+import { signInWithPopup } from 'firebase/auth';
+import { FirestoreService } from '../services/firestoreService';
 
 interface AuthModalProps {
   isOpen: boolean;
@@ -37,25 +41,54 @@ export const AuthModal: React.FC<AuthModalProps> = ({
 
   if (!isOpen) return null;
 
-  const handleGoogleAuth = () => {
+  const handleGoogleAuth = async () => {
     setIsLoading(true);
     setError(null);
-    setTimeout(() => {
-      // Authenticate as active user (or admin)
-      const user: UserProfile = {
+    try {
+      const result = await signInWithPopup(auth, googleProvider);
+      const fbUser = result.user;
+      const userEmail = fbUser.email || DEFAULT_ADMIN_EMAIL;
+      const isMasterAdmin = userEmail.toLowerCase() === DEFAULT_ADMIN_EMAIL.toLowerCase();
+
+      // Check if profile exists in Firestore
+      let existingProfile: UserProfile | null = null;
+      try {
+        existingProfile = await FirestoreService.getUserProfile(fbUser.uid);
+      } catch (err) {
+        console.warn('Could not read existing profile from Firestore:', err);
+      }
+
+      const user: UserProfile = existingProfile || {
         ...currentUser,
-        email: email || DEFAULT_ADMIN_EMAIL,
-        name: name || 'Khomchat Wongwai',
-        role: (email || DEFAULT_ADMIN_EMAIL) === DEFAULT_ADMIN_EMAIL ? 'admin' : 'user',
+        id: fbUser.uid,
+        email: userEmail,
+        name: fbUser.displayName || name || (isMasterAdmin ? 'Khomchat Wongwai' : userEmail.split('@')[0]),
+        avatarUrl: fbUser.photoURL || currentUser.avatarUrl,
+        emailVerified: fbUser.emailVerified,
+        role: isMasterAdmin ? 'admin' : 'user',
+        plan: isMasterAdmin ? 'premium' : (currentUser.plan || 'pro'),
+        planTier: isMasterAdmin ? 'PREMIUM' : 'PRO',
+        isGuest: false,
       };
+
       UserService.saveUser(user);
+      try {
+        await FirestoreService.syncUserProfile(user);
+      } catch (err) {
+        console.warn('Firestore profile sync error:', err);
+      }
+
       onUserChange(user);
       setIsLoading(false);
       onClose();
-    }, 600);
+    } catch (err: any) {
+      console.error('Google Auth Error:', err);
+      setError(err.message || 'Google sign-in failed. Please try again.');
+      setIsLoading(false);
+    }
   };
 
-  const handleEmailAuth = (e: React.FormEvent) => {
+  const handleEmailAuth = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!email || !password) {
       setError('Please fill in both email and password.');
@@ -64,19 +97,24 @@ export const AuthModal: React.FC<AuthModalProps> = ({
     setIsLoading(true);
     setError(null);
 
-    setTimeout(() => {
+    try {
       const isAdmin = email.toLowerCase() === DEFAULT_ADMIN_EMAIL.toLowerCase();
       const updatedUser: UserProfile = {
         ...currentUser,
+        id: currentUser.id || ('usr_' + Math.random().toString(36).substring(2, 9)),
         email: email.toLowerCase(),
         name: name || (isAdmin ? 'Khomchat Wongwai' : email.split('@')[0]),
         role: isAdmin ? 'admin' : 'user',
+        isGuest: false,
       };
       UserService.saveUser(updatedUser);
       onUserChange(updatedUser);
       setIsLoading(false);
       onClose();
-    }, 600);
+    } catch (err: any) {
+      setError(err.message || 'Authentication failed.');
+      setIsLoading(false);
+    }
   };
 
   const handleGuestMode = () => {
@@ -94,24 +132,24 @@ export const AuthModal: React.FC<AuthModalProps> = ({
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm animate-in fade-in select-none">
-      <div className="bg-[#15171a] border border-[#2d3139] rounded-xl w-full max-w-md overflow-hidden shadow-2xl text-[#e2e8f0]">
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/85 backdrop-blur-md animate-in fade-in select-none">
+      <div className="bg-[#0A0A0A] border border-[#242424] rounded-2xl w-full max-w-md overflow-hidden shadow-2xl text-[#E5E5E5]">
         {/* Header */}
-        <div className="p-4 bg-[#1c1f24] border-b border-[#2d3139] flex justify-between items-center">
-          <div className="flex items-center gap-2">
-            <div className="w-8 h-8 rounded-lg bg-[#6366f1]/20 border border-[#6366f1]/40 flex items-center justify-center text-[#818cf8]">
-              <Sparkles className="w-4 h-4" />
+        <div className="p-4 bg-[#101010] border-b border-[#1C1C1C] flex justify-between items-center">
+          <div className="flex items-center gap-3">
+            <div className="w-9 h-9 rounded-lg bg-[#151515] border border-[rgba(212,175,55,0.4)] flex items-center justify-center text-[#D4AF37]">
+              <Crown className="w-5 h-5" />
             </div>
             <div>
-              <h3 className="text-sm font-black text-white uppercase tracking-wider">
-                {mode === 'signin' ? 'Sign In to MarketMind' : mode === 'signup' ? 'Create Quant Account' : 'Switch Active Account'}
+              <h3 className="text-sm font-black text-white uppercase tracking-wider font-mono">
+                {mode === 'signin' ? 'Sign In to Terminal' : mode === 'signup' ? 'Create Quant Account' : 'Switch Active Account'}
               </h3>
-              <p className="text-[10px] text-slate-400 font-mono">Institutional AI Trading Terminal</p>
+              <p className="text-[10px] text-[#9CA3AF] font-mono">MarketMind AI Intelligence Network</p>
             </div>
           </div>
           <button
             onClick={onClose}
-            className="p-1 text-slate-400 hover:text-white hover:bg-[#2d3139] rounded transition"
+            className="p-1.5 text-[#9CA3AF] hover:text-white hover:bg-[#151515] rounded-lg transition border border-transparent hover:border-[#242424]"
           >
             <X className="w-4 h-4" />
           </button>
@@ -120,7 +158,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({
         {/* Body */}
         <div className="p-5 space-y-4">
           {error && (
-            <div className="p-2.5 bg-rose-950/40 border border-rose-500/40 rounded text-rose-300 text-xs">
+            <div className="p-2.5 bg-[#EF4444]/10 border border-[#EF4444]/40 rounded-lg text-[#EF4444] text-xs font-mono">
               {error}
             </div>
           )}
@@ -130,7 +168,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({
             type="button"
             onClick={handleGoogleAuth}
             disabled={isLoading}
-            className="w-full py-2.5 px-4 bg-white hover:bg-slate-100 text-slate-900 rounded-lg text-xs font-bold flex items-center justify-center gap-2.5 transition shadow-sm"
+            className="w-full py-2.5 px-4 bg-white hover:bg-neutral-200 text-neutral-950 rounded-lg text-xs font-black flex items-center justify-center gap-2.5 transition shadow-sm"
           >
             <svg className="w-4 h-4" viewBox="0 0 24 24">
               <path
@@ -154,62 +192,62 @@ export const AuthModal: React.FC<AuthModalProps> = ({
           </button>
 
           <div className="flex items-center gap-2 my-2">
-            <div className="h-[1px] bg-[#2d3139] flex-1" />
-            <span className="text-[10px] text-slate-500 uppercase tracking-widest font-mono">OR EMAIL</span>
-            <div className="h-[1px] bg-[#2d3139] flex-1" />
+            <div className="h-[1px] bg-[#1C1C1C] flex-1" />
+            <span className="text-[10px] text-[#9CA3AF] uppercase tracking-widest font-mono">OR EMAIL AUTH</span>
+            <div className="h-[1px] bg-[#1C1C1C] flex-1" />
           </div>
 
           {/* Form */}
           <form onSubmit={handleEmailAuth} className="space-y-3">
             {mode === 'signup' && (
               <div>
-                <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1">
+                <label className="block text-[10px] font-bold text-[#9CA3AF] uppercase tracking-wider mb-1">
                   Full Name
                 </label>
                 <div className="relative">
-                  <User className="w-3.5 h-3.5 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
+                  <User className="w-3.5 h-3.5 text-[#9CA3AF] absolute left-3 top-1/2 -translate-y-1/2" />
                   <input
                     type="text"
                     value={name}
                     onChange={(e) => setName(e.target.value)}
                     placeholder="Trader Name"
-                    className="w-full bg-[#1c1f24] border border-[#2d3139] focus:border-[#6366f1] rounded-lg pl-9 pr-3 py-2 text-xs text-white placeholder-slate-500 focus:outline-none"
+                    className="w-full bg-[#050505] border border-[#242424] focus:border-[#D4AF37] rounded-lg pl-9 pr-3 py-2 text-xs text-white placeholder-[#6B7280] focus:outline-none transition font-sans"
                   />
                 </div>
               </div>
             )}
 
             <div>
-              <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1">
+              <label className="block text-[10px] font-bold text-[#9CA3AF] uppercase tracking-wider mb-1">
                 Email Address
               </label>
               <div className="relative">
-                <Mail className="w-3.5 h-3.5 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
+                <Mail className="w-3.5 h-3.5 text-[#9CA3AF] absolute left-3 top-1/2 -translate-y-1/2" />
                 <input
                   type="email"
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
-                  placeholder="name@fund.com (or admin email)"
-                  className="w-full bg-[#1c1f24] border border-[#2d3139] focus:border-[#6366f1] rounded-lg pl-9 pr-3 py-2 text-xs text-white placeholder-slate-500 focus:outline-none font-mono"
+                  placeholder="name@fund.com"
+                  className="w-full bg-[#050505] border border-[#242424] focus:border-[#D4AF37] rounded-lg pl-9 pr-3 py-2 text-xs text-white placeholder-[#6B7280] focus:outline-none transition font-mono"
                 />
               </div>
-              <p className="text-[9px] text-slate-500 mt-1">
-                Hint: Enter <code className="text-[#a5b4fc]">{DEFAULT_ADMIN_EMAIL}</code> for Administrator privileges.
+              <p className="text-[9px] text-[#9CA3AF] mt-1 font-mono">
+                Admin Email: <code className="text-[#F2D675]">{DEFAULT_ADMIN_EMAIL}</code>
               </p>
             </div>
 
             <div>
-              <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1">
+              <label className="block text-[10px] font-bold text-[#9CA3AF] uppercase tracking-wider mb-1">
                 Password
               </label>
               <div className="relative">
-                <Lock className="w-3.5 h-3.5 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
+                <Lock className="w-3.5 h-3.5 text-[#9CA3AF] absolute left-3 top-1/2 -translate-y-1/2" />
                 <input
                   type="password"
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
                   placeholder="••••••••••••"
-                  className="w-full bg-[#1c1f24] border border-[#2d3139] focus:border-[#6366f1] rounded-lg pl-9 pr-3 py-2 text-xs text-white placeholder-slate-500 focus:outline-none"
+                  className="w-full bg-[#050505] border border-[#242424] focus:border-[#D4AF37] rounded-lg pl-9 pr-3 py-2 text-xs text-white placeholder-[#6B7280] focus:outline-none transition"
                 />
               </div>
             </div>
@@ -217,10 +255,10 @@ export const AuthModal: React.FC<AuthModalProps> = ({
             <button
               type="submit"
               disabled={isLoading}
-              className="w-full py-2.5 bg-[#6366f1] hover:bg-[#4f46e5] text-white text-xs font-bold rounded-lg flex items-center justify-center gap-1.5 transition shadow-sm disabled:opacity-50"
+              className="w-full py-2.5 bg-gradient-to-r from-[#D4AF37] to-[#C9A227] hover:from-[#FFE08A] hover:to-[#D4AF37] text-black text-xs font-black rounded-lg flex items-center justify-center gap-1.5 transition shadow-md disabled:opacity-50"
             >
               {isLoading ? (
-                <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                <div className="w-4 h-4 border-2 border-black/30 border-t-black rounded-full animate-spin" />
               ) : (
                 <>
                   <span>{mode === 'signin' ? 'Sign In to Terminal' : 'Create Account'}</span>
@@ -231,12 +269,12 @@ export const AuthModal: React.FC<AuthModalProps> = ({
           </form>
 
           {/* Switcher Footer */}
-          <div className="pt-2 border-t border-[#2d3139] flex flex-wrap justify-between items-center text-[11px] text-slate-400">
+          <div className="pt-2 border-t border-[#1C1C1C] flex flex-wrap justify-between items-center text-[11px] text-[#9CA3AF]">
             {mode === 'signin' ? (
               <button
                 type="button"
                 onClick={() => setMode('signup')}
-                className="hover:text-white text-[#818cf8]"
+                className="hover:text-white text-[#F2D675]"
               >
                 Need an account? Sign up &rarr;
               </button>
@@ -244,7 +282,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({
               <button
                 type="button"
                 onClick={() => setMode('signin')}
-                className="hover:text-white text-[#818cf8]"
+                className="hover:text-white text-[#F2D675]"
               >
                 Already have an account? Sign in &rarr;
               </button>
@@ -253,7 +291,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({
             <button
               type="button"
               onClick={handleGuestMode}
-              className="text-slate-400 hover:text-slate-200 underline font-mono text-[10px]"
+              className="text-[#9CA3AF] hover:text-white underline font-mono text-[10px]"
             >
               Continue as Guest
             </button>
@@ -261,8 +299,8 @@ export const AuthModal: React.FC<AuthModalProps> = ({
         </div>
 
         {/* Security Notice */}
-        <div className="p-2.5 bg-[#121316] border-t border-[#2d3139] text-[9.5px] text-slate-400 text-center flex items-center justify-center gap-1">
-          <ShieldCheck className="w-3 h-3 text-emerald-400 shrink-0" />
+        <div className="p-3 bg-[#050505] border-t border-[#1C1C1C] text-[9.5px] text-[#9CA3AF] text-center flex items-center justify-center gap-1.5 font-mono">
+          <ShieldCheck className="w-3 h-3 text-[#D4AF37] shrink-0" />
           <span>256-bit encrypted session with hardware key & TOTP 2FA protection</span>
         </div>
       </div>

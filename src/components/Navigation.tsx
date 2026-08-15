@@ -19,10 +19,14 @@ import {
   HelpCircle,
   Activity,
   ShieldCheck,
+  Briefcase,
+  Users,
 } from 'lucide-react';
 
 export type ActiveTab =
   | 'overview'
+  | 'multi_asset_markets'
+  | 'connected_portfolio'
   | 'technicals'
   | 'support_resistance'
   | 'breadth_intermarket'
@@ -30,14 +34,15 @@ export type ActiveTab =
   | 'options'
   | 'economic_fed'
   | 'news'
+  | 'community'
   | 'chat'
-  | 'simulator'
-  | 'backtest'
-  | 'alerts_ml'
   | 'watchlists'
   | 'saved_alerts'
   | 'prediction_history'
   | 'export_reports'
+  | 'simulator'
+  | 'backtest'
+  | 'alerts_ml'
   | 'help_center'
   | 'status_page'
   | 'admin';
@@ -59,13 +64,16 @@ export const Navigation: React.FC<NavigationProps> = ({
 
   const tabs: { id: ActiveTab; label: string; icon: React.ElementType; badge?: string }[] = [
     { id: 'overview', label: t('nav.overview'), icon: LayoutDashboard },
+    { id: 'multi_asset_markets', label: 'Multi-Asset Markets', icon: Globe2, badge: 'UNIVERSAL' },
+    { id: 'connected_portfolio', label: 'Connected Accounts', icon: Briefcase, badge: 'PORTFOLIO' },
     { id: 'technicals', label: t('nav.technical'), icon: LineChart },
     { id: 'support_resistance', label: t('nav.supportResistance'), icon: Target },
     { id: 'breadth_intermarket', label: t('nav.breadth'), icon: Globe2, badge: breadthStatus.split(' ')[0] },
     { id: 'sectors', label: t('nav.heatmap'), icon: PieChart },
-    { id: 'options', label: t('nav.options'), icon: Layers },
+    { id: 'options', label: 'Options Trader', icon: Layers, badge: 'AI TRADER' },
     { id: 'economic_fed', label: t('nav.economic'), icon: Calendar },
     { id: 'news', label: t('nav.news'), icon: Newspaper },
+    { id: 'community', label: 'Community Feed', icon: Users, badge: 'SOCIAL' },
     { id: 'chat', label: t('nav.chat'), icon: BotMessageSquare, badge: 'AI' },
     { id: 'watchlists', label: t('nav.watchlists'), icon: ListPlus },
     { id: 'saved_alerts', label: t('nav.alerts'), icon: Bell },
@@ -80,7 +88,7 @@ export const Navigation: React.FC<NavigationProps> = ({
   ];
 
   return (
-    <nav className="flex items-center gap-1 overflow-x-auto pb-1 mb-2 border-b border-[#2d3139] scrollbar-none text-xs font-semibold select-none">
+    <nav className="flex items-center gap-1.5 overflow-x-auto pb-1.5 mb-3 border-b border-[#242424] scrollbar-none text-xs font-semibold select-none bg-[#050505] p-1 rounded-lg">
       {tabs.map((tab) => {
         const Icon = tab.icon;
         const isActive = activeTab === tab.id;
@@ -88,22 +96,22 @@ export const Navigation: React.FC<NavigationProps> = ({
           <button
             key={tab.id}
             onClick={() => onTabChange(tab.id)}
-            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-t whitespace-nowrap transition-colors relative ${
+            className={`flex items-center gap-2 px-3.5 py-2 rounded-lg whitespace-nowrap transition-all duration-200 relative border ${
               isActive
-                ? 'bg-[#1c1f24] text-white border-t-2 border-[#6366f1] font-bold shadow-sm'
-                : 'text-slate-400 hover:text-slate-200 hover:bg-[#15171a]'
+                ? 'bg-gradient-to-r from-[rgba(212,175,55,0.15)] to-[rgba(20,20,20,0.8)] text-white border-[#D4AF37] font-bold shadow-[0_0_12px_rgba(212,175,55,0.15)]'
+                : 'bg-[#0A0A0A] text-[#9CA3AF] border-[#1C1C1C] hover:text-[#E5E5E5] hover:border-[#242424] hover:bg-[#101010]'
             }`}
           >
-            <Icon className={`w-3.5 h-3.5 ${isActive ? 'text-[#818cf8]' : 'text-slate-500'}`} />
+            <Icon className={`w-3.5 h-3.5 ${isActive ? 'text-[#D4AF37]' : 'text-[#6B7280]'}`} />
             <span>{tab.label}</span>
             {tab.badge && (
               <span
-                className={`text-[9px] px-1.5 py-0.2 rounded font-mono font-bold uppercase ${
+                className={`text-[9px] px-1.5 py-0.5 rounded font-mono font-bold uppercase tracking-wider ${
                   tab.badge === 'ADMIN'
-                    ? 'bg-rose-500/20 text-rose-300 border border-rose-500/40'
+                    ? 'bg-[#EF4444]/15 text-[#EF4444] border border-[#EF4444]/40'
                     : tab.badge === 'AI' || tab.badge === 'PDF'
-                    ? 'bg-[#6366f1]/20 text-[#a5b4fc] border border-[#6366f1]/40'
-                    : 'bg-emerald-500/15 text-emerald-400 border border-emerald-500/30'
+                    ? 'bg-[#D4AF37]/15 text-[#F2D675] border border-[#D4AF37]/40'
+                    : 'bg-[#22C55E]/15 text-[#22C55E] border border-[#22C55E]/30'
                 }`}
               >
                 {tab.badge}

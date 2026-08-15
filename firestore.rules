@@ -1,0 +1,180 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // Global Deny Catch-all
+    match /{document=**} {
+      allow read, write: if false;
+    }
+
+    // Primitive Helpers
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    function isOwner(userId) {
+      return isSignedIn() && request.auth.uid == userId;
+    }
+
+    function isAdmin() {
+      return isSignedIn() && (
+        request.auth.token.email == 'khomchatwongwai@gmail.com' ||
+        exists(/databases/$(database)/documents/admins/$(request.auth.uid))
+      );
+    }
+
+    function isValidId(id) {
+      return id is string && id.size() > 0 && id.size() <= 128 && id.matches('^[a-zA-Z0-9_\\-]+$');
+    }
+
+    function incoming() {
+      return request.resource.data;
+    }
+
+    function existing() {
+      return resource.data;
+    }
+
+    // Entity Validation: UserProfile
+    function isValidUserProfile(data) {
+      return data.id is string && data.id.size() <= 128 &&
+             data.email is string && data.email.size() <= 150 &&
+             data.role in ['user', 'admin'] &&
+             data.plan in ['free', 'basic', 'pro', 'premium', 'institutional'];
+    }
+
+    // Entity Validation: Watchlist
+    function isValidWatchlist(data) {
+      return data.id is string && data.id.size() <= 128 &&
+             data.userId is string && data.userId == request.auth.uid &&
+             data.name is string && data.name.size() > 0 && data.name.size() <= 100 &&
+             data.tickers is list && data.tickers.size() <= 500;
+    }
+
+    // Entity Validation: SavedAlert
+    function isValidAlert(data) {
+      return data.id is string && data.id.size() <= 128 &&
+             data.userId is string && data.userId == request.auth.uid &&
+             data.ticker is string && data.ticker.size() <= 20 &&
+             data.type is string && data.type.size() <= 50 &&
+             data.status in ['active', 'paused', 'triggered'];
+    }
+
+    // Entity Validation: HistoricalPrediction
+    function isValidPrediction(data) {
+      return data.id is string && data.id.size() <= 128 &&
+             data.userId is string && data.userId == request.auth.uid &&
+             data.ticker is string && data.ticker.size() <= 20 &&
+             data.direction in ['BULLISH', 'BEARISH', 'NEUTRAL'] &&
+             data.status in ['WIN', 'LOSS', 'IN_PROGRESS', 'EXPIRED'];
+    }
+
+    // Entity Validation: SupportTicket
+    function isValidSupportTicket(data) {
+      return data.id is string && data.id.size() <= 128 &&
+             data.userId is string && data.userId == request.auth.uid &&
+             data.userEmail is string && data.userEmail.size() <= 150 &&
+             data.subject is string && data.subject.size() > 0 && data.subject.size() <= 200 &&
+             data.message is string && data.message.size() > 0 && data.message.size() <= 2000 &&
+             data.status in ['Open', 'In Review', 'Resolved', 'Closed'];
+    }
+
+    // --- USERS COLLECTION ---
+    match /users/{userId} {
+      allow get: if isOwner(userId) || isAdmin();
+      allow list: if isAdmin();
+      
+      allow create: if isOwner(userId) && isValidId(userId) && isValidUserProfile(incoming()) && (
+        // Regular users cannot elevate their role to admin
+        (incoming().role == 'user') || isAdmin()
+      );
+
+      allow update: if (isOwner(userId) || isAdmin()) && isValidUserProfile(incoming()) && (
+        isAdmin() || (
+          // Prevent role escalation by user
+          incoming().role == existing().role &&
+          incoming().id == existing().id
+        )
+      );
+
+      allow delete: if isOwner(userId) || isAdmin();
+
+      // --- USER WATCHLISTS SUBCOLLECTION ---
+      match /watchlists/{watchlistId} {
+        allow get: if isOwner(userId) || isAdmin();
+        allow list: if isOwner(userId) || isAdmin();
+
+        allow create: if isOwner(userId) && isValidId(watchlistId) && isValidWatchlist(incoming());
+        allow update: if (isOwner(userId) || isAdmin()) && isValidId(watchlistId) && isValidWatchlist(incoming()) && incoming().userId == existing().userId;
+        allow delete: if isOwner(userId) || isAdmin();
+      }
+
+      // --- USER ALERTS SUBCOLLECTION ---
+      match /alerts/{alertId} {
+        allow get: if isOwner(userId) || isAdmin();
+        allow list: if isOwner(userId) || isAdmin();
+
+        allow create: if isOwner(userId) && isValidId(alertId) && isValidAlert(incoming());
+        allow update: if (isOwner(userId) || isAdmin()) && isValidId(alertId) && isValidAlert(incoming()) && incoming().userId == existing().userId;
+        allow delete: if isOwner(userId) || isAdmin();
+      }
+
+      // --- USER PREDICTIONS SUBCOLLECTION ---
+      match /predictions/{predictionId} {
+        allow get: if isOwner(userId) || isAdmin();
+        allow list: if isOwner(userId) || isAdmin();
+
+        allow create: if isOwner(userId) && isValidId(predictionId) && isValidPrediction(incoming());
+        allow update: if (isOwner(userId) || isAdmin()) && isValidId(predictionId) && isValidPrediction(incoming()) && incoming().userId == existing().userId;
+        allow delete: if isOwner(userId) || isAdmin();
+      }
+    }
+
+    // --- SUPPORT TICKETS COLLECTION ---
+    match /supportTickets/{ticketId} {
+      allow get: if isSignedIn() && (resource.data.userId == request.auth.uid || isAdmin());
+      allow list: if isSignedIn() && (resource.data.userId == request.auth.uid || isAdmin());
+
+      allow create: if isSignedIn() && isValidId(ticketId) && isValidSupportTicket(incoming()) && incoming().status == 'Open';
+      allow update: if isSignedIn() && (
+        isAdmin() || (
+          resource.data.userId == request.auth.uid &&
+          isValidSupportTicket(incoming()) &&
+          incoming().userId == existing().userId
+        )
+      );
+      allow delete: if isAdmin();
+    }
+
+    // --- COMMUNITY POSTS COLLECTION ---
+    match /community_posts/{postId} {
+      allow read: if true;
+      allow create: if isSignedIn() && isValidId(postId) && (
+        incoming().authorId == request.auth.uid &&
+        incoming().status == 'PUBLISHED'
+      );
+      allow update: if isSignedIn() && (
+        isAdmin() || (
+          resource.data.authorId == request.auth.uid &&
+          incoming().authorId == existing().authorId
+        )
+      );
+      allow delete: if isSignedIn() && (
+        resource.data.authorId == request.auth.uid || isAdmin()
+      );
+    }
+
+    // --- COMMUNITY REPORTS COLLECTION ---
+    match /community_reports/{reportId} {
+      allow get, list: if isAdmin();
+      allow create: if isSignedIn() && isValidId(reportId) && incoming().reporterId == request.auth.uid;
+      allow update, delete: if isAdmin();
+    }
+
+    // System Health Status Document
+    match /system_health/{docId} {
+      allow read: if true;
+      allow write: if isAdmin();
+    }
+  }
+}

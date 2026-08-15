@@ -9,6 +9,8 @@ import {
   ApiKeyRecord,
 } from '../types/user';
 import { TickerSymbol } from '../types/market';
+import { FirestoreService } from './firestoreService';
+import { auth } from '../config/firebase';
 
 const STORAGE_KEYS = {
   USER: 'marketmind_user_profile',
@@ -511,12 +513,26 @@ export class UserService {
     };
     lists.push(newList);
     this.saveWatchlists(lists);
+
+    const uid = auth.currentUser?.uid;
+    if (uid) {
+      FirestoreService.saveWatchlist(uid, newList).catch((err) =>
+        console.warn('Background Firestore watchlist save error:', err)
+      );
+    }
     return newList;
   }
 
   static deleteWatchlist(id: string): void {
     const lists = this.getWatchlists().filter((l) => l.id !== id);
     this.saveWatchlists(lists);
+
+    const uid = auth.currentUser?.uid;
+    if (uid) {
+      FirestoreService.deleteWatchlist(uid, id).catch((err) =>
+        console.warn('Background Firestore watchlist delete error:', err)
+      );
+    }
   }
 
   static addTickerToWatchlist(watchlistId: string, ticker: TickerSymbol): void {
@@ -525,6 +541,13 @@ export class UserService {
     if (target && !target.tickers.includes(ticker)) {
       target.tickers.push(ticker);
       this.saveWatchlists(lists);
+
+      const uid = auth.currentUser?.uid;
+      if (uid) {
+        FirestoreService.saveWatchlist(uid, target).catch((err) =>
+          console.warn('Background Firestore watchlist update error:', err)
+        );
+      }
     }
   }
 
@@ -534,6 +557,13 @@ export class UserService {
     if (target) {
       target.tickers = target.tickers.filter((t) => t !== ticker);
       this.saveWatchlists(lists);
+
+      const uid = auth.currentUser?.uid;
+      if (uid) {
+        FirestoreService.saveWatchlist(uid, target).catch((err) =>
+          console.warn('Background Firestore watchlist update error:', err)
+        );
+      }
     }
   }
 
@@ -566,6 +596,13 @@ export class UserService {
     };
     alerts.unshift(newAlert);
     this.saveAlerts(alerts);
+
+    const uid = auth.currentUser?.uid;
+    if (uid) {
+      FirestoreService.saveAlert(uid, newAlert).catch((err) =>
+        console.warn('Background Firestore alert save error:', err)
+      );
+    }
     return newAlert;
   }
 
@@ -575,12 +612,26 @@ export class UserService {
     if (target) {
       target.status = target.status === 'active' ? 'paused' : 'active';
       this.saveAlerts(alerts);
+
+      const uid = auth.currentUser?.uid;
+      if (uid) {
+        FirestoreService.saveAlert(uid, target).catch((err) =>
+          console.warn('Background Firestore alert toggle error:', err)
+        );
+      }
     }
   }
 
   static deleteAlert(id: string): void {
     const alerts = this.getSavedAlerts().filter((a) => a.id !== id);
     this.saveAlerts(alerts);
+
+    const uid = auth.currentUser?.uid;
+    if (uid) {
+      FirestoreService.deleteAlert(uid, id).catch((err) =>
+        console.warn('Background Firestore alert delete error:', err)
+      );
+    }
   }
 
   // --- PREDICTIONS HISTORY ---
@@ -605,6 +656,13 @@ export class UserService {
     try {
       localStorage.setItem(STORAGE_KEYS.PREDICTIONS, JSON.stringify(preds));
     } catch (e) {}
+
+    const uid = auth.currentUser?.uid;
+    if (uid) {
+      FirestoreService.savePrediction(uid, newPred).catch((err) =>
+        console.warn('Background Firestore prediction save error:', err)
+      );
+    }
     return newPred;
   }
 
@@ -632,6 +690,10 @@ export class UserService {
     try {
       localStorage.setItem(STORAGE_KEYS.SUPPORT_TICKETS, JSON.stringify(tickets));
     } catch (e) {}
+
+    FirestoreService.createSupportTicket(newTicket).catch((err) =>
+      console.warn('Background Firestore support ticket save error:', err)
+    );
     return newTicket;
   }
 
@@ -645,6 +707,10 @@ export class UserService {
       try {
         localStorage.setItem(STORAGE_KEYS.SUPPORT_TICKETS, JSON.stringify(tickets));
       } catch (e) {}
+
+      FirestoreService.updateSupportTicket(ticketId, { status: 'Resolved', response: reply }).catch((err) =>
+        console.warn('Background Firestore support ticket update error:', err)
+      );
     }
   }
 

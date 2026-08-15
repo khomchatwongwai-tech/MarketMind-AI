@@ -22,6 +22,7 @@ import {
   HelpCircle,
   ShieldCheck,
   Compass,
+  Crown,
 } from 'lucide-react';
 import { MarketQuote, Probabilities, TickerSymbol, LiveMarketDataSource } from '../types/market';
 import { UserProfile } from '../types/user';
@@ -41,6 +42,7 @@ interface HeaderProps {
   onOpenReport: (type: 'morning' | 'eod') => void;
   onOpenAlerts: () => void;
   onOpenChat?: () => void;
+  onOpenUniversalSearch?: () => void;
   dataSource: LiveMarketDataSource;
   onChangeDataSource: (source: LiveMarketDataSource) => void;
   tickSpeed: number;
@@ -77,6 +79,7 @@ export const Header: React.FC<HeaderProps> = ({
   onOpenSubscription,
   onOpenSettings,
   onOpenTour,
+  onOpenUniversalSearch,
 }) => {
   const { t } = useI18n();
   const [searchInput, setSearchInput] = useState('');
@@ -89,14 +92,14 @@ export const Header: React.FC<HeaderProps> = ({
   useEffect(() => {
     if (quote.price > prevPriceRef.current) {
       setPriceFlash('up');
-      const t = setTimeout(() => setPriceFlash(null), 800);
+      const timer = setTimeout(() => setPriceFlash(null), 800);
       prevPriceRef.current = quote.price;
-      return () => clearTimeout(t);
+      return () => clearTimeout(timer);
     } else if (quote.price < prevPriceRef.current) {
       setPriceFlash('down');
-      const t = setTimeout(() => setPriceFlash(null), 800);
+      const timer = setTimeout(() => setPriceFlash(null), 800);
       prevPriceRef.current = quote.price;
-      return () => clearTimeout(t);
+      return () => clearTimeout(timer);
     }
   }, [quote.price]);
 
@@ -137,68 +140,101 @@ export const Header: React.FC<HeaderProps> = ({
       : 'NEUTRAL';
 
   return (
-    <header className="flex flex-col bg-[#15171a] border border-[#2d3139] rounded-lg p-3 mb-2 gap-3 select-none text-[#e2e8f0]">
-      {/* Top Row: Brand, Symbol Search, Live Provider Select & Controls */}
-      <div className="flex flex-wrap items-center justify-between gap-3 border-b border-[#23272f] pb-2.5">
+    <header className="flex flex-col bg-[#0A0A0A] border border-[#242424] rounded-xl p-3.5 mb-2.5 gap-3.5 select-none text-[#E5E5E5] shadow-2xl">
+      {/* Top Row: Brand, Search, Data Source, User Controls */}
+      <div className="flex flex-wrap items-center justify-between gap-3 border-b border-[#1C1C1C] pb-3">
+        {/* Left: Minimal Luxury Brand Wordmark */}
         <div className="flex items-center gap-3">
-          <div className="flex items-center gap-1.5">
-            <span className="text-xs font-black text-[#6366f1] tracking-wider uppercase flex items-center gap-1">
-              <Sparkles className="w-3.5 h-3.5 text-[#818cf8]" />
-              MarketMind AI
-            </span>
-            <span className="text-[9px] px-1.5 py-0.2 bg-[#6366f1]/20 text-[#a5b4fc] border border-[#6366f1]/40 rounded font-mono font-bold">
-              QUANT ENGINE
-            </span>
+          <div className="flex items-center gap-2">
+            {/* Geometric Gold Logo Emblem */}
+            <div className="w-7 h-7 rounded-lg bg-gradient-to-br from-[#8C6B18] via-[#D4AF37] to-[#FFE08A] p-[1px] shadow-sm flex items-center justify-center">
+              <div className="w-full h-full bg-[#0A0A0A] rounded-[7px] flex items-center justify-center">
+                <span className="gold-gradient-text font-black text-xs tracking-tighter">M</span>
+              </div>
+            </div>
+            <div className="flex flex-col">
+              <div className="flex items-center gap-1.5 leading-none">
+                <span className="text-sm font-black text-white tracking-wider">MARKETMIND</span>
+                <span className="gold-gradient-text text-sm font-black tracking-widest">AI</span>
+              </div>
+              <span className="text-[8.5px] text-[#9CA3AF] tracking-widest font-mono uppercase mt-0.5">
+                Institutional Quant Terminal
+              </span>
+            </div>
           </div>
 
+          <div className="h-6 w-[1px] bg-[#242424] hidden sm:block" />
+
           {/* Real-time Data Source Selector */}
-          <div className="flex items-center bg-[#1c1f24] border border-[#2d3139] rounded px-2 py-1 text-xs">
-            <Radio className="w-3 h-3 text-emerald-400 mr-1.5 animate-pulse" />
+          <div className="flex items-center bg-[#101010] border border-[#242424] hover:border-[rgba(212,175,55,0.4)] rounded-lg px-2.5 py-1 text-xs transition">
+            <Radio className="w-3 h-3 text-[#22C55E] mr-1.5 animate-pulse" />
             <select
               value={dataSource}
               onChange={(e) => onChangeDataSource(e.target.value as LiveMarketDataSource)}
-              className="bg-transparent text-slate-200 font-mono text-[11px] font-semibold focus:outline-none cursor-pointer"
+              className="bg-transparent text-[#E5E5E5] font-mono text-[11px] font-semibold focus:outline-none cursor-pointer"
             >
-              <option value="Massive WebSocket (Real-Time Live Feed)">🚀 Massive WebSocket (Live Stream)</option>
-              <option value="Yahoo Finance (Real-Time)">⚡ Yahoo Finance (Live)</option>
-              <option value="Google Finance Feed">🌐 Google Finance Feed</option>
-              <option value="Robinhood Multi-Feed">📱 Robinhood Stream</option>
+              <option value="Massive WebSocket (Real-Time Live Feed)" className="bg-[#101010] text-[#E5E5E5]">
+                ⚡ Massive WebSocket (Live Stream)
+              </option>
+              <option value="Yahoo Finance (Real-Time)" className="bg-[#101010] text-[#E5E5E5]">
+                📈 Yahoo Finance (Real-Time)
+              </option>
+              <option value="Google Finance Feed" className="bg-[#101010] text-[#E5E5E5]">
+                🌐 Google Finance Gateway
+              </option>
+              <option value="Robinhood Multi-Feed" className="bg-[#101010] text-[#E5E5E5]">
+                📱 Multi-Exchange Stream
+              </option>
             </select>
           </div>
 
           {/* Refresh Rate Selector */}
-          <div className="hidden sm:flex items-center bg-[#1c1f24] border border-[#2d3139] rounded px-2 py-1 text-[11px] text-slate-300 font-mono">
-            <Clock className="w-3 h-3 text-slate-400 mr-1.5" />
-            <span>Rate:</span>
+          <div className="hidden sm:flex items-center bg-[#101010] border border-[#242424] rounded-lg px-2 py-1 text-[11px] text-[#9CA3AF] font-mono">
+            <Clock className="w-3 h-3 text-[#D4AF37] mr-1.5" />
+            <span>Tick:</span>
             <select
               value={tickSpeed}
               onChange={(e) => onChangeTickSpeed(Number(e.target.value))}
-              className="bg-transparent text-emerald-400 font-bold ml-1 focus:outline-none cursor-pointer"
+              className="bg-transparent text-[#F2D675] font-bold ml-1 focus:outline-none cursor-pointer"
             >
-              <option value={1000}>1s Ultra</option>
-              <option value={3000}>3s Fast</option>
-              <option value={5000}>5s Normal</option>
-              <option value={10000}>10s</option>
+              <option value={1000} className="bg-[#101010]">1s Ultra</option>
+              <option value={3000} className="bg-[#101010]">3s Pro</option>
+              <option value={5000} className="bg-[#101010]">5s Std</option>
+              <option value={10000} className="bg-[#101010]">10s Eco</option>
             </select>
           </div>
         </div>
 
-        {/* Live Search & Symbol Search Bar and User Controls */}
+        {/* Right: Universal Search & Account Controls */}
         <div className="flex items-center gap-2">
+          {onOpenUniversalSearch && (
+            <button
+              onClick={onOpenUniversalSearch}
+              className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg bg-[#14161d] hover:bg-[#1a1d26] border border-[#2d313d] hover:border-[#D4AF37]/50 text-xs font-mono text-slate-300 transition shadow-sm"
+              title="Open Universal Multi-Asset Search Modal (Press /)"
+            >
+              <Globe className="w-3.5 h-3.5 text-[#D4AF37]" />
+              <span className="hidden xl:inline text-[11px] font-semibold text-slate-200">Cross-Asset Directory</span>
+              <kbd className="hidden sm:inline px-1 py-0.2 bg-[#0c0d11] text-[10px] text-[#D4AF37] border border-[#282c37] rounded font-mono">
+                /
+              </kbd>
+            </button>
+          )}
+
           <div className="relative flex items-center">
             <form onSubmit={handleCustomSubmit} className="relative">
-              <Search className="w-3.5 h-3.5 text-slate-400 absolute left-2.5 top-1/2 -translate-y-1/2 pointer-events-none" />
+              <Search className="w-3.5 h-3.5 text-[#D4AF37] absolute left-2.5 top-1/2 -translate-y-1/2 pointer-events-none" />
               <input
                 type="text"
-                placeholder="Search ticker (e.g. NVDA, TSLA, PLTR)..."
+                placeholder="Search stocks, ETFs, options..."
                 value={searchInput}
                 onFocus={() => setIsSearchOpen(true)}
                 onChange={(e) => setSearchInput(e.target.value)}
-                className="bg-[#1c1f24] hover:bg-[#23272f] focus:bg-[#1c1f24] border border-[#2d3139] focus:border-[#6366f1] text-xs text-white pl-8 pr-16 py-1 rounded w-52 md:w-64 font-mono transition focus:outline-none"
+                className="bg-[#101010] hover:bg-[#151515] focus:bg-[#101010] border border-[#242424] focus:border-[#D4AF37] focus:ring-1 focus:ring-[#D4AF37]/30 text-xs text-white pl-8 pr-16 py-1.5 rounded-lg w-52 md:w-64 font-mono transition focus:outline-none placeholder-[#9CA3AF]"
               />
               <button
                 type="submit"
-                className="absolute right-1.5 top-1/2 -translate-y-1/2 px-1.5 py-0.5 bg-[#6366f1]/20 hover:bg-[#6366f1]/40 border border-[#6366f1]/50 text-[10px] font-bold text-[#a5b4fc] rounded"
+                className="absolute right-1.5 top-1/2 -translate-y-1/2 px-1.5 py-0.5 bg-[#151515] hover:bg-[#242424] border border-[#242424] hover:border-[#D4AF37] text-[10px] font-mono font-bold text-[#F2D675] rounded transition"
               >
                 ENTER
               </button>
@@ -206,18 +242,18 @@ export const Header: React.FC<HeaderProps> = ({
 
             {/* Autocomplete Dropdown */}
             {isSearchOpen && searchResults.length > 0 && (
-              <div className="absolute top-full left-0 right-0 mt-1 bg-[#1a1d22] border border-[#3b404d] rounded-md shadow-2xl z-50 overflow-hidden">
-                <div className="px-2.5 py-1 text-[10px] text-slate-400 font-mono bg-[#14161a] border-b border-[#2b2f38]">
-                  YAHOO / GOOGLE SYMBOLS MATCH
+              <div className="absolute top-full left-0 right-0 mt-1 bg-[#101010] border border-[#242424] rounded-lg shadow-2xl z-50 overflow-hidden">
+                <div className="px-2.5 py-1 text-[10px] text-[#9CA3AF] font-mono bg-[#0A0A0A] border-b border-[#1C1C1C]">
+                  MATCHING MARKET SYMBOLS
                 </div>
                 {searchResults.map((res) => (
                   <button
                     key={res.symbol}
                     onClick={() => handleSelectSymbol(res.symbol)}
-                    className="w-full text-left px-3 py-1.5 hover:bg-[#282d37] flex items-center justify-between text-xs transition border-b border-[#23272f] last:border-0"
+                    className="w-full text-left px-3 py-1.5 hover:bg-[#151515] flex items-center justify-between text-xs transition border-b border-[#1C1C1C] last:border-0"
                   >
-                    <span className="font-mono font-bold text-emerald-400">{res.symbol}</span>
-                    <span className="text-[11px] text-slate-400 truncate max-w-[180px]">{res.name}</span>
+                    <span className="font-mono font-bold text-[#D4AF37]">{res.symbol}</span>
+                    <span className="text-[11px] text-[#9CA3AF] truncate max-w-[180px]">{res.name}</span>
                   </button>
                 ))}
               </div>
@@ -230,31 +266,31 @@ export const Header: React.FC<HeaderProps> = ({
           {/* Quick Tour Button */}
           <button
             onClick={onOpenTour}
-            className="p-1.5 bg-[#1c1f24] hover:bg-[#252830] border border-[#2d3139] text-slate-300 hover:text-white rounded transition"
+            className="p-1.5 bg-[#101010] hover:bg-[#151515] border border-[#242424] hover:border-[#D4AF37]/50 text-[#9CA3AF] hover:text-white rounded-lg transition"
             title="Terminal Interactive Tour"
           >
-            <Compass className="w-3.5 h-3.5 text-[#818cf8]" />
+            <Compass className="w-4 h-4 text-[#D4AF37]" />
           </button>
 
-          {/* Upgrade Plan Button */}
+          {/* Subscription / Plan Badge */}
           <button
             onClick={onOpenSubscription}
-            className="px-2.5 py-1 bg-gradient-to-r from-[#6366f1] to-[#8b5cf6] hover:from-[#4f46e5] hover:to-[#7c3aed] text-white text-[11px] font-bold rounded flex items-center gap-1 shadow-sm transition"
-            title="View Subscription Plans"
+            className="px-3 py-1.5 gold-gradient-btn rounded-lg flex items-center gap-1.5 text-xs shadow-md transition"
+            title="Manage Subscription & Entitlements"
           >
-            <CreditCard className="w-3 h-3 text-amber-300" />
-            <span className="hidden sm:inline">
-              {currentUser.planTier === 'Free' ? 'Upgrade' : `${currentUser.planTier}`}
+            <Crown className="w-3.5 h-3.5 text-[#050505]" />
+            <span className="hidden sm:inline text-[#050505] font-extrabold uppercase tracking-wide text-[11px]">
+              {currentUser.planTier === 'Free' ? 'Upgrade Plan' : `${currentUser.planTier}`}
             </span>
           </button>
 
-          {/* Account Settings / User Button */}
+          {/* Account Profile Button */}
           <button
             onClick={currentUser.isGuest ? onOpenAuth : onOpenSettings}
-            className="px-2.5 py-1 bg-[#1c1f24] hover:bg-[#252830] border border-[#2d3139] hover:border-slate-500 rounded flex items-center gap-1.5 text-xs text-slate-200 transition"
-            title={currentUser.isGuest ? 'Sign in to Account' : 'Account Settings'}
+            className="px-2.5 py-1.5 bg-[#101010] hover:bg-[#151515] border border-[#242424] hover:border-[#D4AF37]/50 rounded-lg flex items-center gap-1.5 text-xs text-[#E5E5E5] transition"
+            title={currentUser.isGuest ? 'Sign in to Account' : 'Account Profile & Preferences'}
           >
-            <User className="w-3.5 h-3.5 text-[#818cf8]" />
+            <User className="w-3.5 h-3.5 text-[#D4AF37]" />
             <span className="hidden md:inline font-semibold text-[11px] max-w-[100px] truncate">
               {currentUser.isGuest ? 'Sign In' : currentUser.name.split(' ')[0]}
             </span>
@@ -262,65 +298,65 @@ export const Header: React.FC<HeaderProps> = ({
 
           <button
             onClick={onOpenSettings}
-            className="p-1.5 bg-[#1c1f24] hover:bg-[#252830] border border-[#2d3139] text-slate-300 hover:text-white rounded transition"
+            className="p-1.5 bg-[#101010] hover:bg-[#151515] border border-[#242424] hover:border-[#D4AF37]/50 text-[#9CA3AF] hover:text-white rounded-lg transition"
             title="Terminal Settings & API Keys"
           >
-            <Settings className="w-3.5 h-3.5" />
+            <Settings className="w-4 h-4" />
           </button>
         </div>
       </div>
 
-      {/* Main Quote & Probabilities Row */}
+      {/* Main Quote & Quantitative Probabilities Row */}
       <div className="flex flex-col lg:flex-row justify-between items-start lg:items-center gap-4">
-        {/* Left: Current Active Ticker, Price & Stats */}
+        {/* Left: Active Ticker Symbol, Real-Time Price & Session Stats */}
         <div className="flex flex-wrap items-center gap-4 md:gap-6">
           <div className="flex flex-col">
             <div className="flex items-center gap-2">
               <select
                 value={selectedTicker}
                 onChange={(e) => onSelectTicker(e.target.value as TickerSymbol)}
-                className="bg-[#1c1f24] text-2xl md:text-3xl font-black text-white px-2 py-0.5 rounded border border-[#2d3139] hover:border-[#6366f1] focus:outline-none cursor-pointer"
+                className="bg-[#101010] text-2xl md:text-3xl font-black text-white px-2 py-0.5 rounded-lg border border-[#242424] hover:border-[#D4AF37] focus:outline-none cursor-pointer tracking-tight"
               >
                 {PRESET_TICKERS.map((t) => (
-                  <option key={t} value={t}>
+                  <option key={t} value={t} className="bg-[#101010] text-white">
                     {t}
                   </option>
                 ))}
                 {!PRESET_TICKERS.includes(selectedTicker) && (
-                  <option value={selectedTicker}>{selectedTicker}</option>
+                  <option value={selectedTicker} className="bg-[#101010] text-white">{selectedTicker}</option>
                 )}
               </select>
               <div className="flex flex-col">
-                <span className="text-xs font-semibold text-slate-200 truncate max-w-[200px]">
+                <span className="text-xs font-bold text-white truncate max-w-[200px]">
                   {quote.name}
                 </span>
-                <span className="text-[10px] text-slate-400 font-mono">
-                  {quote.exchange || 'US Market'} • {quote.dataSource || 'Live Feed'}
+                <span className="text-[10px] text-[#9CA3AF] font-mono">
+                  {quote.exchange || 'US Market'} • <span className="text-[#D4AF37]">{quote.dataSource || 'Live Feed'}</span>
                 </span>
               </div>
             </div>
           </div>
 
-          <div className="hidden sm:block h-10 w-[1px] bg-[#2d3139]" />
+          <div className="hidden sm:block h-10 w-[1px] bg-[#242424]" />
 
           {/* Real-Time Price with Flashing Tick */}
           <div className="flex flex-col">
             <div
               className={`text-2xl md:text-3xl font-black font-mono tracking-tight transition-colors duration-300 ${
                 priceFlash === 'up'
-                  ? 'text-emerald-300 bg-emerald-950/60 px-1 rounded'
+                  ? 'text-[#22C55E] bg-[#22C55E]/10 px-1 rounded'
                   : priceFlash === 'down'
-                  ? 'text-rose-300 bg-rose-950/60 px-1 rounded'
+                  ? 'text-[#EF4444] bg-[#EF4444]/10 px-1 rounded'
                   : isPositive
-                  ? 'text-[#10b981]'
-                  : 'text-[#f43f5e]'
+                  ? 'text-[#22C55E]'
+                  : 'text-[#EF4444]'
               }`}
             >
               ${quote.price.toFixed(2)}
             </div>
             <div
               className={`text-xs font-bold font-mono flex items-center gap-1 ${
-                isPositive ? 'text-[#10b981]' : 'text-[#f43f5e]'
+                isPositive ? 'text-[#22C55E]' : 'text-[#EF4444]'
               }`}
             >
               {isPositive ? <TrendingUp className="w-3.5 h-3.5" /> : <TrendingDown className="w-3.5 h-3.5" />}
@@ -330,10 +366,10 @@ export const Header: React.FC<HeaderProps> = ({
             </div>
           </div>
 
-          <div className="hidden lg:block h-10 w-[1px] bg-[#2d3139]" />
+          <div className="hidden lg:block h-10 w-[1px] bg-[#242424]" />
 
-          {/* Session Stats */}
-          <div className="hidden xl:grid grid-cols-3 gap-x-4 gap-y-0.5 text-[10px] text-slate-400 uppercase tracking-wider pl-2 border-l border-[#2d3139]">
+          {/* Session Metrics Bar */}
+          <div className="hidden xl:grid grid-cols-3 gap-x-4 gap-y-0.5 text-[10px] text-[#9CA3AF] uppercase tracking-wider pl-2 border-l border-[#242424]">
             <div>
               Day High: <span className="text-white font-mono font-semibold">${quote.dayHigh.toFixed(2)}</span>
             </div>
@@ -350,25 +386,25 @@ export const Header: React.FC<HeaderProps> = ({
               </span>
             </div>
             <div>
-              Rel Vol: <span className="text-emerald-400 font-mono font-semibold">{quote.relativeVolume}x</span>
+              Rel Vol: <span className="text-[#D4AF37] font-mono font-semibold">{quote.relativeVolume}x</span>
             </div>
             <div>
-              Latency: <span className="text-amber-400 font-mono font-semibold">{quote.latencyMs ?? 35}ms</span>
+              Latency: <span className="text-[#F2D675] font-mono font-semibold">{quote.latencyMs ?? 35}ms</span>
             </div>
           </div>
         </div>
 
-        {/* Right: Quant Bias, Probability Bar & Controls */}
+        {/* Right: Quant Bias, Probabilities Bar & Action Controls */}
         <div className="flex flex-wrap items-center gap-3 self-stretch lg:self-auto justify-between lg:justify-end">
           {/* Signal Badge & Confidence */}
           <div className="flex flex-col items-end">
             <div
-              className={`px-3 py-1 rounded text-xs md:text-sm font-black uppercase tracking-wider flex items-center gap-1.5 border ${
+              className={`px-3 py-1 rounded-lg text-xs md:text-sm font-black uppercase tracking-wider flex items-center gap-1.5 border ${
                 bias === 'BULLISH'
-                  ? 'bg-[#10b981]/15 text-[#10b981] border-[#10b981]/40'
+                  ? 'bg-[#22C55E]/10 text-[#22C55E] border-[#22C55E]/40'
                   : bias === 'BEARISH'
-                  ? 'bg-[#f43f5e]/15 text-[#f43f5e] border-[#f43f5e]/40'
-                  : 'bg-amber-500/15 text-amber-400 border-amber-500/40'
+                  ? 'bg-[#EF4444]/10 text-[#EF4444] border-[#EF4444]/40'
+                  : 'bg-[#A3A3A3]/10 text-[#A3A3A3] border-[#A3A3A3]/40'
               }`}
             >
               {bias === 'BULLISH' && <TrendingUp className="w-4 h-4" />}
@@ -376,31 +412,31 @@ export const Header: React.FC<HeaderProps> = ({
               {bias === 'NEUTRAL' && <Minus className="w-4 h-4" />}
               {bias} BIAS
             </div>
-            <div className="text-[10px] text-slate-400 mt-0.5 uppercase tracking-wider">
-              AI Confidence: <span className="font-bold text-white font-mono">{probabilities.aiConfidence}/100</span>
+            <div className="text-[10px] text-[#9CA3AF] mt-0.5 uppercase tracking-wider">
+              AI Confidence: <span className="font-bold text-[#F2D675] font-mono">{probabilities.aiConfidence}/100</span>
             </div>
           </div>
 
           {/* Probabilities Multi-Bar */}
-          <div className="flex flex-col bg-[#1c1f24] rounded-lg p-2 min-w-[170px] border border-[#2d3139]">
+          <div className="flex flex-col bg-[#101010] rounded-lg p-2 min-w-[170px] border border-[#242424]">
             <div className="flex justify-between text-[10px] mb-1 font-mono font-bold">
-              <span className="text-emerald-400">BULL: {probabilities.bullish}%</span>
-              <span className="text-slate-400">NEUT: {probabilities.neutral}%</span>
-              <span className="text-rose-400">BEAR: {probabilities.bearish}%</span>
+              <span className="text-[#22C55E]">BULL: {probabilities.bullish}%</span>
+              <span className="text-[#A3A3A3]">NEUT: {probabilities.neutral}%</span>
+              <span className="text-[#EF4444]">BEAR: {probabilities.bearish}%</span>
             </div>
-            <div className="h-2 w-full bg-[#2d3139] rounded-full overflow-hidden flex">
+            <div className="h-2 w-full bg-[#1C1C1C] rounded-full overflow-hidden flex">
               <div
-                className="bg-emerald-500 h-full transition-all duration-500"
+                className="bg-[#22C55E] h-full transition-all duration-500"
                 style={{ width: `${probabilities.bullish}%` }}
                 title={`Bullish: ${probabilities.bullish}%`}
               />
               <div
-                className="bg-slate-500 h-full transition-all duration-500"
+                className="bg-[#A3A3A3] h-full transition-all duration-500"
                 style={{ width: `${probabilities.neutral}%` }}
                 title={`Neutral: ${probabilities.neutral}%`}
               />
               <div
-                className="bg-rose-500 h-full transition-all duration-500"
+                className="bg-[#EF4444] h-full transition-all duration-500"
                 style={{ width: `${probabilities.bearish}%` }}
                 title={`Bearish: ${probabilities.bearish}%`}
               />
@@ -413,9 +449,9 @@ export const Header: React.FC<HeaderProps> = ({
               <button
                 onClick={onOpenChat}
                 title="Ask MarketMind AI Assistant"
-                className="px-2.5 py-1.5 bg-[#6366f1] hover:bg-[#4f46e5] text-white text-xs font-bold rounded flex items-center gap-1 shadow-sm transition"
+                className="px-3 py-1.5 gold-gradient-btn text-xs font-extrabold rounded-lg flex items-center gap-1.5 shadow-md transition"
               >
-                <Sparkles className="w-3.5 h-3.5 text-amber-300" />
+                <Sparkles className="w-3.5 h-3.5 text-[#050505]" />
                 <span className="hidden sm:inline">Ask AI</span>
               </button>
             )}
@@ -423,20 +459,20 @@ export const Header: React.FC<HeaderProps> = ({
             <button
               onClick={() => onOpenReport('morning')}
               title="Generate Morning Intelligence Report"
-              className="px-2.5 py-1.5 bg-[#1c1f24] hover:bg-[#252830] border border-[#2d3139] text-xs font-semibold rounded flex items-center gap-1 text-slate-300 hover:text-white transition"
+              className="px-2.5 py-1.5 bg-[#101010] hover:bg-[#151515] border border-[#242424] hover:border-[#D4AF37]/50 text-xs font-semibold rounded-lg flex items-center gap-1 text-[#E5E5E5] hover:text-white transition"
             >
-              <FileText className="w-3.5 h-3.5 text-[#6366f1]" />
+              <FileText className="w-3.5 h-3.5 text-[#D4AF37]" />
               <span className="hidden sm:inline">Morning Report</span>
             </button>
 
             <button
               onClick={onOpenAlerts}
-              className="relative p-2 bg-[#1c1f24] hover:bg-[#252830] border border-[#2d3139] rounded text-slate-300 hover:text-white transition"
+              className="relative p-2 bg-[#101010] hover:bg-[#151515] border border-[#242424] hover:border-[#D4AF37]/50 rounded-lg text-[#9CA3AF] hover:text-white transition"
               title="Real-time Market Alerts"
             >
               <Bell className="w-4 h-4" />
               {unreadAlertCount > 0 && (
-                <span className="absolute -top-1 -right-1 w-4 h-4 bg-rose-500 text-white font-bold text-[9px] rounded-full flex items-center justify-center">
+                <span className="absolute -top-1 -right-1 w-4 h-4 bg-[#EF4444] text-white font-bold text-[9px] rounded-full flex items-center justify-center shadow-sm">
                   {unreadAlertCount}
                 </span>
               )}
@@ -444,10 +480,10 @@ export const Header: React.FC<HeaderProps> = ({
 
             <button
               onClick={onToggleLive}
-              className={`p-2 rounded border text-xs font-bold transition flex items-center gap-1 ${
+              className={`p-2 rounded-lg border text-xs font-bold transition flex items-center gap-1 ${
                 isLive
-                  ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/40 hover:bg-emerald-500/20'
-                  : 'bg-slate-800 text-slate-400 border-slate-700 hover:bg-slate-700'
+                  ? 'bg-[#22C55E]/10 text-[#22C55E] border-[#22C55E]/40 hover:bg-[#22C55E]/20'
+                  : 'bg-[#101010] text-[#9CA3AF] border-[#242424] hover:bg-[#151515]'
               }`}
               title={isLive ? `Live Market Movement Stream Active (${tickSpeed / 1000}s)` : 'Stream Paused'}
             >
@@ -456,10 +492,10 @@ export const Header: React.FC<HeaderProps> = ({
 
             <button
               onClick={onManualRefresh}
-              className="p-2 bg-[#1c1f24] hover:bg-[#252830] border border-[#2d3139] rounded text-slate-400 hover:text-white transition"
+              className="p-2 bg-[#101010] hover:bg-[#151515] border border-[#242424] hover:border-[#D4AF37]/50 rounded-lg text-[#9CA3AF] hover:text-white transition"
               title="Force Real-Time Sync from Yahoo Finance"
             >
-              <RefreshCw className={`w-3.5 h-3.5 ${isLoadingLive ? 'animate-spin text-[#6366f1]' : ''}`} />
+              <RefreshCw className={`w-3.5 h-3.5 ${isLoadingLive ? 'animate-spin text-[#D4AF37]' : ''}`} />
             </button>
           </div>
         </div>
@@ -467,4 +503,5 @@ export const Header: React.FC<HeaderProps> = ({
     </header>
   );
 };
+
 

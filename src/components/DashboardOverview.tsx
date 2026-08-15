@@ -14,6 +14,12 @@ import {
   BotMessageSquare,
   FileText,
   LayoutGrid,
+  Crown,
+  Activity,
+  Compass,
+  ArrowUpRight,
+  ArrowDownRight,
+  DollarSign,
 } from 'lucide-react';
 import { ComprehensiveMarketData } from '../services/marketDataService';
 import { Probabilities, TickerSymbol } from '../types/market';
@@ -55,8 +61,76 @@ export const DashboardOverview: React.FC<DashboardOverviewProps> = ({
 
   const [viewMode, setViewMode] = useState<'both' | 'executive' | 'grid'>('both');
 
+  // Key Market Indices & Core Assets for Intelligence Bar
+  const keyMarketIndices = [
+    { name: 'S&P 500', symbol: 'SPX', price: '5,117.09', change: '+0.48%', isUp: true },
+    { name: 'NASDAQ 100', symbol: 'NDX', price: '18,288.40', change: '+0.62%', isUp: true },
+    { name: 'DOW JONES', symbol: 'DJI', price: '38,989.84', change: '+0.18%', isUp: true },
+    { name: 'SPY ETF', symbol: 'SPY', price: quote.price ? `$${quote.price.toFixed(2)}` : '$512.48', change: `${isPositive ? '+' : ''}${quote.changePercent.toFixed(2)}%`, isUp: isPositive },
+    { name: 'QQQ ETF', symbol: 'QQQ', price: '$443.20', change: '+0.75%', isUp: true },
+    { name: 'VIX VOLATILITY', symbol: 'VIX', price: '14.28', change: '-4.12%', isUp: false },
+    { name: '10Y TREASURY', symbol: 'US10Y', price: '4.22%', change: '-0.03', isUp: false },
+    { name: 'WTI CRUDE OIL', symbol: 'CL', price: '$78.45', change: '-0.85%', isUp: false },
+    { name: 'GOLD SPOT', symbol: 'XAU', price: '$2,342.10', change: '+0.88%', isUp: true },
+    { name: 'BITCOIN', symbol: 'BTC', price: '$67,820', change: '+2.40%', isUp: true },
+  ];
+
   return (
-    <div className="flex flex-col gap-2.5 flex-1 select-none text-[#e2e8f0]">
+    <div className="flex flex-col gap-3 flex-1 select-none text-[#E5E5E5]">
+      {/* TOP SECTION: INTELLIGENCE CENTER & GLOBAL MARKETS SNAPSHOT */}
+      <div className="bg-[#0A0A0A] border border-[#242424] rounded-xl p-3.5 shadow-xl">
+        <div className="flex flex-wrap items-center justify-between gap-3 pb-3 border-b border-[#1C1C1C]">
+          <div className="flex items-center gap-2.5">
+            <div className="p-1.5 bg-[#151515] border border-[rgba(212,175,55,0.4)] rounded-lg">
+              <Crown className="w-4 h-4 text-[#D4AF37]" />
+            </div>
+            <div>
+              <div className="flex items-center gap-2">
+                <span className="text-sm font-black text-white font-mono tracking-tight">
+                  MARKET INTELLIGENCE CENTER
+                </span>
+                <span className="px-2 py-0.5 bg-[#151515] text-[#F2D675] border border-[#D4AF37]/40 text-[10px] font-bold rounded-md font-mono">
+                  GLOBAL MACRO
+                </span>
+              </div>
+              <p className="text-[11px] text-[#9CA3AF] font-mono">
+                Institutional Overview &bull; Cross-Asset Flows &bull; Real-Time Correlation Matrix
+              </p>
+            </div>
+          </div>
+
+          <div className="flex items-center gap-2">
+            <div className="text-[10px] text-[#9CA3AF] font-mono hidden sm:block">
+              Market Status: <span className="text-[#22C55E] font-bold">REGULAR LIVE</span> &bull; Session ET
+            </div>
+          </div>
+        </div>
+
+        {/* Horizontal Scrollable Index Bar */}
+        <div className="flex items-center gap-2.5 overflow-x-auto pt-3 pb-1 no-scrollbar">
+          {keyMarketIndices.map((idx) => (
+            <div
+              key={idx.symbol}
+              className="bg-[#101010] border border-[#242424] hover:border-[rgba(212,175,55,0.4)] rounded-lg px-3 py-2 shrink-0 min-w-[130px] flex flex-col justify-between transition"
+            >
+              <div className="flex items-center justify-between text-[10px] text-[#9CA3AF] font-mono uppercase">
+                <span className="truncate">{idx.name}</span>
+              </div>
+              <div className="flex items-baseline justify-between gap-2 mt-1">
+                <span className="text-xs font-black font-mono text-white">{idx.price}</span>
+                <span
+                  className={`text-[10px] font-mono font-bold flex items-center ${
+                    idx.isUp ? 'text-[#22C55E]' : 'text-[#EF4444]'
+                  }`}
+                >
+                  {idx.isUp ? '+' : ''}{idx.change}
+                </span>
+              </div>
+            </div>
+          ))}
+        </div>
+      </div>
+
       {/* 0. MASSIVE WEBSOCKET LIVE PIPELINE BAR */}
       <MassiveLiveFeedBar
         status={wsStatus}
@@ -71,45 +145,51 @@ export const DashboardOverview: React.FC<DashboardOverviewProps> = ({
       <RealTimeStockChart ticker={quote.ticker} isLiveSimulation={true} />
 
       {/* View Switcher Controls */}
-      <div className="flex justify-between items-center bg-[#15171a] px-3 py-1.5 rounded-lg border border-[#2d3139] text-xs">
-        <div className="flex items-center gap-2">
-          <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400 flex items-center gap-1.5">
-            <Sparkles className="w-3.5 h-3.5 text-[#818cf8]" />
-            Terminal View Mode:
+      <div className="flex justify-between items-center bg-[#0A0A0A] px-3.5 py-2 rounded-xl border border-[#242424] text-xs shadow-md">
+        <div className="flex items-center gap-2.5">
+          <span className="text-[10px] font-bold uppercase tracking-wider text-[#9CA3AF] flex items-center gap-1.5">
+            <Sparkles className="w-3.5 h-3.5 text-[#D4AF37]" />
+            Terminal View:
           </span>
-          <div className="flex items-center bg-[#1c1f24] p-0.5 rounded border border-[#2d3139] text-[10px] font-semibold">
+          <div className="flex items-center bg-[#101010] p-0.5 rounded-lg border border-[#242424] text-[10px] font-semibold">
             <button
               onClick={() => setViewMode('both')}
-              className={`px-2 py-1 rounded transition flex items-center gap-1 ${
-                viewMode === 'both' ? 'bg-[#6366f1] text-white font-bold' : 'text-slate-400 hover:text-slate-200'
+              className={`px-3 py-1 rounded-md transition flex items-center gap-1.5 ${
+                viewMode === 'both'
+                  ? 'bg-[#151515] text-[#F2D675] border border-[#D4AF37]/50 font-bold shadow-sm'
+                  : 'text-[#9CA3AF] hover:text-white'
               }`}
             >
-              <LayoutGrid className="w-3 h-3" />
-              Unified Overview
+              <LayoutGrid className="w-3 h-3 text-[#D4AF37]" />
+              Unified Terminal
             </button>
             <button
               onClick={() => setViewMode('executive')}
-              className={`px-2 py-1 rounded transition flex items-center gap-1 ${
-                viewMode === 'executive' ? 'bg-[#6366f1] text-white font-bold' : 'text-slate-400 hover:text-slate-200'
+              className={`px-3 py-1 rounded-md transition flex items-center gap-1.5 ${
+                viewMode === 'executive'
+                  ? 'bg-[#151515] text-[#F2D675] border border-[#D4AF37]/50 font-bold shadow-sm'
+                  : 'text-[#9CA3AF] hover:text-white'
               }`}
             >
-              <FileText className="w-3 h-3" />
+              <FileText className="w-3 h-3 text-[#D4AF37]" />
               MarketMind AI Card
             </button>
             <button
               onClick={() => setViewMode('grid')}
-              className={`px-2 py-1 rounded transition flex items-center gap-1 ${
-                viewMode === 'grid' ? 'bg-[#6366f1] text-white font-bold' : 'text-slate-400 hover:text-slate-200'
+              className={`px-3 py-1 rounded-md transition flex items-center gap-1.5 ${
+                viewMode === 'grid'
+                  ? 'bg-[#151515] text-[#F2D675] border border-[#D4AF37]/50 font-bold shadow-sm'
+                  : 'text-[#9CA3AF] hover:text-white'
               }`}
             >
-              <BarChart2 className="w-3 h-3" />
+              <BarChart2 className="w-3 h-3 text-[#D4AF37]" />
               Multi-Factor Grid
             </button>
           </div>
         </div>
 
-        <div className="text-[10px] text-slate-400 font-mono hidden sm:block">
-          Market Status: <span className="text-emerald-400 font-bold">REGULAR LIVE</span> &bull; Gemini 3.7 Flash Active
+        <div className="text-[10px] text-[#9CA3AF] font-mono hidden sm:block">
+          Asset: <span className="text-white font-bold">{quote.ticker}</span> &bull; Gemini 2.5 Active
         </div>
       </div>
 
@@ -125,438 +205,436 @@ export const DashboardOverview: React.FC<DashboardOverviewProps> = ({
 
       {/* 2. THREE-COLUMN MARKET ENGINE & QUANT DASHBOARD GRID (When viewMode is 'both' or 'grid') */}
       {(viewMode === 'both' || viewMode === 'grid') && (
-        <div className="grid grid-cols-1 md:grid-cols-12 gap-2.5">
-        {/* LEFT COLUMN: Technical Engine, S/R, Multi-Timeframe Trends (Col span 3) */}
-        <section className="md:col-span-3 flex flex-col gap-2.5">
-        {/* Technical Engine Card */}
-        <div className="bg-[#15171a] border border-[#2d3139] rounded-lg flex-1 flex flex-col overflow-hidden shadow-sm">
-          <div className="p-2 bg-[#1c1f24] border-b border-[#2d3139] flex justify-between items-center text-[10px] font-bold uppercase tracking-widest text-slate-400">
-            <span className="flex items-center gap-1.5">
-              <Zap className="w-3 h-3 text-[#6366f1]" />
-              Technical Engine
-            </span>
-            <button
-              onClick={() => onNavigateTab('technicals')}
-              className="text-[#818cf8] hover:underline normal-case text-[9px] font-medium"
-            >
-              Details &rarr;
-            </button>
-          </div>
-
-          <div className="p-3 grid grid-cols-2 gap-y-2.5 gap-x-3 text-xs">
-            <div className="flex flex-col">
-              <span className="text-[9px] text-slate-500 uppercase font-semibold">RSI (14)</span>
-              <span
-                className={`text-xs font-mono font-bold ${
-                  technicals.rsi14 > 70
-                    ? 'text-rose-400'
-                    : technicals.rsi14 < 30
-                    ? 'text-emerald-400'
-                    : 'text-emerald-400'
-                }`}
-              >
-                {technicals.rsi14} <span className="text-[9px] font-normal text-slate-400">({technicals.rsiStatus})</span>
-              </span>
-            </div>
-
-            <div className="flex flex-col">
-              <span className="text-[9px] text-slate-500 uppercase font-semibold">VWAP</span>
-              <span className="text-xs font-mono font-bold text-white">${technicals.vwap.toFixed(2)}</span>
-            </div>
-
-            <div className="flex flex-col">
-              <span className="text-[9px] text-slate-500 uppercase font-semibold">9 EMA</span>
-              <span className="text-xs font-mono font-bold text-white">${technicals.ema9.toFixed(2)}</span>
-            </div>
-
-            <div className="flex flex-col">
-              <span className="text-[9px] text-slate-500 uppercase font-semibold">20 EMA</span>
-              <span className="text-xs font-mono font-bold text-white">${technicals.ema20.toFixed(2)}</span>
-            </div>
-
-            <div className="flex flex-col">
-              <span className="text-[9px] text-slate-500 uppercase font-semibold">MACD (12,26,9)</span>
-              <span className="text-xs font-mono font-bold text-emerald-400">
-                +{technicals.macd} <span className="text-[9px] font-normal text-slate-400">Bull</span>
-              </span>
-            </div>
-
-            <div className="flex flex-col">
-              <span className="text-[9px] text-slate-500 uppercase font-semibold">ADX (14)</span>
-              <span className="text-xs font-mono font-bold text-amber-400">
-                {technicals.adx} <span className="text-[9px] font-normal text-slate-400">{technicals.adxStrength}</span>
-              </span>
-            </div>
-
-            <div className="flex flex-col">
-              <span className="text-[9px] text-slate-500 uppercase font-semibold">ATR (14)</span>
-              <span className="text-xs font-mono font-bold text-white">${technicals.atr14.toFixed(2)}</span>
-            </div>
-
-            <div className="flex flex-col">
-              <span className="text-[9px] text-slate-500 uppercase font-semibold">Rel Volume</span>
-              <span className="text-xs font-mono font-bold text-emerald-400">{quote.relativeVolume}x</span>
-            </div>
-          </div>
-
-          {/* Support & Resistance Mini Ladder */}
-          <div className="p-3 border-t border-[#2d3139] space-y-2 bg-[#121316]">
-            <div className="flex justify-between items-center text-[9px] font-bold text-slate-400 uppercase tracking-widest">
-              <span>Support & Resistance</span>
-              <span className="text-[8px] text-emerald-400 font-mono">Pivot: ${((technicals.prevDayHigh + technicals.prevDayLow + technicals.prevDayClose)/3).toFixed(2)}</span>
-            </div>
-
-            <div className="space-y-1 font-mono text-[11px]">
-              <div className="flex justify-between items-center text-slate-400 opacity-60">
-                <span className="text-rose-400">R3 Target</span>
-                <span>${supportResistance.r3.toFixed(2)}</span>
-              </div>
-              <div className="flex justify-between items-center text-slate-300 opacity-80">
-                <span className="text-rose-400">R2 Area</span>
-                <span>${supportResistance.r2.toFixed(2)}</span>
-              </div>
-              <div className="flex justify-between items-center font-bold px-2 py-0.5 bg-rose-900/20 border border-rose-900/40 rounded text-rose-300">
-                <span className="text-rose-400 flex items-center gap-1">
-                  R1 Key Level
+        <div className="grid grid-cols-1 md:grid-cols-12 gap-3">
+          {/* LEFT COLUMN: Technical Engine, S/R, Multi-Timeframe Trends (Col span 3) */}
+          <section className="md:col-span-3 flex flex-col gap-3">
+            {/* Technical Engine Card */}
+            <div className="bg-[#0A0A0A] border border-[#242424] hover:border-[rgba(212,175,55,0.35)] rounded-xl flex-1 flex flex-col overflow-hidden shadow-lg transition">
+              <div className="p-2.5 bg-[#101010] border-b border-[#1C1C1C] flex justify-between items-center text-[10px] font-bold uppercase tracking-widest text-[#9CA3AF]">
+                <span className="flex items-center gap-1.5 text-white">
+                  <Zap className="w-3 h-3 text-[#D4AF37]" />
+                  Technical Engine
                 </span>
-                <span>${supportResistance.r1.toFixed(2)}</span>
-              </div>
-
-              {/* Current Price Line Indicator */}
-              <div className="py-0.5 flex items-center gap-2">
-                <div className="h-[1px] flex-1 bg-gradient-to-r from-transparent via-[#6366f1] to-transparent" />
-                <span className="text-[10px] font-bold text-white bg-[#6366f1]/30 px-2 py-0.2 rounded border border-[#6366f1]/60">
-                  Current ${quote.price.toFixed(2)}
-                </span>
-                <div className="h-[1px] flex-1 bg-gradient-to-r from-transparent via-[#6366f1] to-transparent" />
-              </div>
-
-              <div className="flex justify-between items-center font-bold px-2 py-0.5 bg-emerald-900/20 border border-emerald-900/40 rounded text-emerald-300">
-                <span className="text-emerald-400">S1 Key Level</span>
-                <span>${supportResistance.s1.toFixed(2)}</span>
-              </div>
-              <div className="flex justify-between items-center text-slate-300 opacity-80">
-                <span className="text-emerald-400">S2 Area</span>
-                <span>${supportResistance.s2.toFixed(2)}</span>
-              </div>
-              <div className="flex justify-between items-center text-slate-400 opacity-60">
-                <span className="text-emerald-400">S3 Major</span>
-                <span>${supportResistance.s3.toFixed(2)}</span>
-              </div>
-            </div>
-          </div>
-        </div>
-
-        {/* Multi-Timeframe Trend Alignment Engine */}
-        <div className="bg-[#15171a] border border-[#2d3139] rounded-lg p-2.5">
-          <div className="flex justify-between items-center text-[9px] font-bold text-slate-400 uppercase tracking-widest mb-1.5">
-            <span>Trend Alignment</span>
-            <span className="text-emerald-400 font-mono font-bold">
-              {data.trendAlignmentScore}% Bullish
-            </span>
-          </div>
-          <div className="grid grid-cols-4 sm:grid-cols-8 gap-1 text-center">
-            {trends.map((t) => (
-              <div key={t.timeframe} className="flex flex-col items-center bg-[#1c1f24] p-1 rounded border border-[#2d3139]/80">
-                <span className="text-[9px] text-slate-500 font-semibold">{t.timeframe}</span>
-                <span
-                  className={`text-[10px] font-bold ${
-                    t.trend === 'BULLISH'
-                      ? 'text-emerald-400'
-                      : t.trend === 'BEARISH'
-                      ? 'text-rose-400'
-                      : 'text-amber-400'
-                  }`}
-                >
-                  {t.trend === 'BULLISH' ? 'Bull' : t.trend === 'BEARISH' ? 'Bear' : 'Neut'}
-                </span>
-              </div>
-            ))}
-          </div>
-        </div>
-      </section>
-
-      {/* MIDDLE COLUMN: AI Market Summary, Setup Quality, Drivers, Options & Risk (Col span 6) */}
-      <section className="md:col-span-6 flex flex-col gap-2.5">
-        {/* Main "Why is SPY Moving?" AI Section */}
-        <div className="bg-[#15171a] border border-[#2d3139] rounded-lg p-3.5 flex-1 flex flex-col justify-between">
-          <div>
-            <div className="flex flex-wrap justify-between items-center gap-2 mb-2.5">
-              <div className="flex items-center gap-2">
-                <h2 className="text-base md:text-lg font-black text-white flex items-center gap-1.5">
-                  <Radio className="w-4 h-4 text-[#818cf8] animate-pulse" />
-                  Why is {quote.ticker} moving?
-                </h2>
-              </div>
-              <div className="flex items-center gap-1.5">
                 <button
-                  onClick={() => {
-                    onAskQuestion(`Analyze ${quote.ticker} right now`);
-                    onNavigateTab('chat');
-                  }}
-                  className="px-2 py-1 bg-[#6366f1] hover:bg-[#4f46e5] text-white text-[10px] font-bold rounded flex items-center gap-1 shadow-sm transition"
-                  title="Ask Gemini for a complete institutional analysis"
+                  onClick={() => onNavigateTab('technicals')}
+                  className="text-[#F2D675] hover:underline normal-case text-[9px] font-medium"
                 >
-                  <Sparkles className="w-2.5 h-2.5 text-amber-300" />
-                  <span>Ask Gemini to Analyze</span>
-                </button>
-                <button
-                  onClick={() => {
-                    onAskQuestion(`Why is ${quote.ticker} moving today?`);
-                    onNavigateTab('chat');
-                  }}
-                  className="px-2 py-1 bg-[#1c1f24] hover:bg-[#252830] border border-[#6366f1]/40 text-[#a5b4fc] hover:text-white text-[10px] font-bold rounded flex items-center gap-1 transition"
-                  title="Ask Gemini why this asset is moving"
-                >
-                  <BotMessageSquare className="w-2.5 h-2.5 text-[#818cf8]" />
-                  <span>Ask Assistant</span>
+                  Details &rarr;
                 </button>
               </div>
-            </div>
 
-            {/* AI Explanation Narrative Box */}
-            <p className="text-xs md:text-sm text-slate-200 leading-relaxed italic border-l-2 border-[#6366f1] pl-3.5 py-1 mb-3 bg-[#1c1f24]/50 rounded-r">
-              &ldquo;{quote.ticker} is currently showing {isPositive ? 'solid bullish momentum' : 'distribution pressure'}. Price is trading {quote.price >= technicals.vwap ? 'above VWAP' : 'below VWAP'} and short-term exponential averages while technology (XLK) and large-cap growth lead. Treasury yields have stabilized, expanding equity multiples. However, overhead resistance near ${supportResistance.r1.toFixed(2)} requires volume expansion (&gt;1.25x) for full continuation.&rdquo;
-            </p>
-
-            {/* Drivers & Setup Quality Grid */}
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 mb-3">
-              <div className="space-y-1.5">
-                <div className="p-2 rounded bg-[#1c1f24] border border-[#2d3139]">
-                  <div className="text-[9px] uppercase font-bold text-[#6366f1] mb-0.5 flex items-center gap-1">
-                    <Zap className="w-2.5 h-2.5" /> Primary Driver
-                  </div>
-                  <div className="text-xs font-semibold text-white">{probabilities.primaryDriver}</div>
-                </div>
-                <div className="p-2 rounded bg-[#1c1f24] border border-[#2d3139]">
-                  <div className="text-[9px] uppercase font-bold text-rose-400 mb-0.5 flex items-center gap-1">
-                    <AlertTriangle className="w-2.5 h-2.5" /> Main Risk
-                  </div>
-                  <div className="text-xs font-semibold text-slate-300">{probabilities.mainRisk}</div>
-                </div>
-              </div>
-
-              {/* Setup Quality Metric */}
-              <div className="bg-[#1c1f24] border border-[#2d3139] rounded p-2.5 flex flex-col justify-center items-center text-center">
-                <div className="text-[9px] uppercase font-bold text-slate-400 mb-1 tracking-wider">
-                  Market Setup Quality
-                </div>
-                <div className="flex items-baseline gap-1">
-                  <span className="text-3xl font-black text-white font-mono">{probabilities.setupScore}</span>
-                  <span className="text-xs text-slate-500 font-mono">/100</span>
-                </div>
-                <div
-                  className={`mt-1 text-[10px] font-bold uppercase px-2 py-0.5 rounded border ${
-                    probabilities.setupScore >= 75
-                      ? 'text-emerald-400 bg-emerald-400/10 border-emerald-400/30'
-                      : probabilities.setupScore >= 60
-                      ? 'text-amber-400 bg-amber-400/10 border-amber-400/30'
-                      : 'text-rose-400 bg-rose-400/10 border-rose-400/30'
-                  }`}
-                >
-                  {probabilities.setupQuality}
-                </div>
-              </div>
-            </div>
-          </div>
-
-          {/* Bullish Confirmation & Bearish Invalidation Cards */}
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 mt-1">
-            <div className="p-2 border border-[#10b981]/30 bg-[#10b981]/5 rounded">
-              <div className="text-[10px] font-bold text-[#10b981] uppercase mb-0.5 flex items-center gap-1">
-                <TrendingUp className="w-3 h-3" /> Bullish Confirmation
-              </div>
-              <div className="text-[11px] text-slate-300">
-                Break and 15m candle close above <span className="font-bold text-white font-mono">${scenarios.bullish.confirmationPrice.toFixed(2)}</span> with relative volume &gt; 1.25x. Targets: ${scenarios.bullish.target1.toFixed(2)}, ${scenarios.bullish.target2.toFixed(2)}.
-              </div>
-            </div>
-
-            <div className="p-2 border border-rose-500/30 bg-rose-500/5 rounded">
-              <div className="text-[10px] font-bold text-rose-400 uppercase mb-0.5 flex items-center gap-1">
-                <TrendingDown className="w-3 h-3" /> Bearish Invalidation
-              </div>
-              <div className="text-[11px] text-slate-300">
-                Loss of VWAP / support at <span className="font-bold text-white font-mono">${scenarios.bearish.confirmationPrice.toFixed(2)}</span> invalidates current setup. Targets: ${scenarios.bearish.target1.toFixed(2)}, ${scenarios.bearish.target2.toFixed(2)}.
-              </div>
-            </div>
-          </div>
-        </div>
-
-        {/* Bottom Split: Options Summary & Risk Meter Gauge */}
-        <div className="bg-[#15171a] border border-[#2d3139] rounded-lg p-3 grid grid-cols-1 sm:grid-cols-2 gap-3">
-          {/* Options Sentiment */}
-          <div>
-            <div className="flex justify-between items-center text-[9px] font-bold text-slate-400 uppercase tracking-widest mb-1.5">
-              <span>Options Sentiment</span>
-              <button
-                onClick={() => onNavigateTab('options')}
-                className="text-[#818cf8] hover:underline normal-case text-[9px]"
-              >
-                Flow Details &rarr;
-              </button>
-            </div>
-            <div className="flex items-center gap-3">
-              <div className="text-xl font-bold font-mono text-white">
-                {options.putCallRatio.toFixed(2)}{' '}
-                <span className="text-[10px] font-normal text-slate-400">P/C Ratio</span>
-              </div>
-              <div
-                className={`text-[10px] px-2 py-0.5 border rounded uppercase font-bold ${
-                  options.sentiment.includes('Bullish')
-                    ? 'bg-emerald-400/10 text-emerald-400 border-emerald-400/30'
-                    : 'bg-rose-400/10 text-rose-400 border-rose-400/30'
-                }`}
-              >
-                {options.sentiment}
-              </div>
-            </div>
-            <div className="mt-1.5 text-[10px] text-slate-400 font-mono">
-              Largest OI Wall: <span className="text-white font-bold">${options.largestCallOIStrike.toFixed(2)} Call</span> | Gamma Support: <span className="text-white font-bold">${options.gammaSupport.toFixed(2)}</span>
-            </div>
-          </div>
-
-          {/* Risk Meter Gauge */}
-          <div className="border-t sm:border-t-0 sm:border-l border-[#2d3139] pt-2 sm:pt-0 sm:pl-3">
-            <div className="flex justify-between items-center text-[9px] font-bold text-slate-400 uppercase tracking-widest mb-1">
-              <span>Risk Meter</span>
-              <span
-                className={`font-bold font-mono ${
-                  probabilities.riskLevel === 'LOW RISK'
-                    ? 'text-emerald-400'
-                    : probabilities.riskLevel === 'MODERATE RISK'
-                    ? 'text-amber-400'
-                    : 'text-rose-400'
-                }`}
-              >
-                {probabilities.riskLevel}
-              </span>
-            </div>
-            <div className="w-full h-2 bg-[#2d3139] rounded-full overflow-hidden mt-1.5 relative">
-              <div
-                className="bg-gradient-to-r from-emerald-500 via-amber-500 to-rose-500 h-full transition-all duration-500 rounded-full"
-                style={{ width: `${riskPercent}%` }}
-              />
-            </div>
-            <div className="flex justify-between text-[8px] mt-1 text-slate-500 font-mono uppercase">
-              <span>Low (VIX &lt; 14)</span>
-              <span>Moderate</span>
-              <span>High (VIX &gt; 18)</span>
-            </div>
-          </div>
-        </div>
-      </section>
-
-      {/* RIGHT COLUMN: Economic Calendar, Sector Strength, Live News AI (Col span 3) */}
-      <section className="md:col-span-3 flex flex-col gap-2.5">
-        {/* Economic Calendar Mini Timeline */}
-        <div className="bg-[#15171a] border border-[#2d3139] rounded-lg flex-1 flex flex-col overflow-hidden shadow-sm">
-          <div className="p-2 bg-[#1c1f24] border-b border-[#2d3139] flex justify-between items-center text-[10px] font-bold uppercase tracking-widest text-slate-400">
-            <span>Economic Calendar</span>
-            <button
-              onClick={() => onNavigateTab('economic_fed')}
-              className="text-[#818cf8] hover:underline normal-case text-[9px]"
-            >
-              Full Calendar &rarr;
-            </button>
-          </div>
-
-          <div className="p-2.5 space-y-2 overflow-y-auto flex-1 text-xs">
-            {economicEvents.slice(0, 3).map((evt) => (
-              <div
-                key={evt.id}
-                className={`relative pl-3 border-l-2 ${
-                  evt.isApproachingHighVol ? 'border-rose-500 bg-rose-950/10 p-1 rounded-r' : 'border-[#6366f1]'
-                }`}
-              >
-                <div className="text-[9px] text-slate-500 font-mono font-semibold">{evt.time}</div>
-                <div className="text-xs font-bold text-white leading-tight">{evt.event}</div>
-                <div className="flex items-center gap-2 text-[9px] mt-0.5 font-mono">
-                  <span className="text-slate-400">Est: {evt.consensus}</span>
-                  {evt.actual && <span className="text-emerald-400 font-bold">Act: {evt.actual}</span>}
-                </div>
-                {evt.isApproachingHighVol && (
-                  <span className="text-[8px] font-black text-rose-400 uppercase tracking-tighter block mt-0.5">
-                    HIGH VOLATILITY RISK
-                  </span>
-                )}
-                <span
-                  className={`absolute -left-1 top-1 w-2 h-2 rounded-full ${
-                    evt.isApproachingHighVol ? 'bg-rose-500 animate-ping' : 'bg-[#6366f1]'
-                  }`}
-                />
-              </div>
-            ))}
-          </div>
-
-          {/* Sector Strength Matrix Mini */}
-          <div className="p-2.5 bg-[#1c1f24] border-t border-[#2d3139]">
-            <div className="flex justify-between items-center text-[9px] font-bold text-slate-400 uppercase mb-1.5 tracking-widest">
-              <span>Sector Strength</span>
-              <span className="text-[8px] text-emerald-400">Top: {sectors[0]?.symbol}</span>
-            </div>
-            <div className="grid grid-cols-4 gap-1">
-              {sectors.slice(0, 8).map((sec) => {
-                const isSecPos = sec.changePercent >= 0;
-                return (
-                  <div
-                    key={sec.symbol}
-                    onClick={() => onNavigateTab('sectors')}
-                    className={`aspect-video rounded flex flex-col items-center justify-center text-[8px] font-bold cursor-pointer transition border ${
-                      sec.changePercent > 1.0
-                        ? 'bg-emerald-600/40 text-emerald-300 border-emerald-500/40'
-                        : isSecPos
-                        ? 'bg-emerald-800/30 text-emerald-400 border-emerald-700/30'
-                        : sec.changePercent < -0.5
-                        ? 'bg-rose-600/40 text-rose-300 border-rose-500/40'
-                        : 'bg-slate-800/50 text-slate-400 border-slate-700/50'
+              <div className="p-3 grid grid-cols-2 gap-y-2.5 gap-x-3 text-xs">
+                <div className="flex flex-col">
+                  <span className="text-[9px] text-[#9CA3AF] uppercase font-semibold">RSI (14)</span>
+                  <span
+                    className={`text-xs font-mono font-bold ${
+                      technicals.rsi14 > 70
+                        ? 'text-[#EF4444]'
+                        : technicals.rsi14 < 30
+                        ? 'text-[#22C55E]'
+                        : 'text-white'
                     }`}
-                    title={`${sec.name}: ${isSecPos ? '+' : ''}${sec.changePercent}%`}
                   >
-                    <span>{sec.symbol}</span>
-                    <span className="font-mono text-[7.5px] opacity-80">
-                      {isSecPos ? '+' : ''}{sec.changePercent}%
+                    {technicals.rsi14} <span className="text-[9px] font-normal text-[#9CA3AF]">({technicals.rsiStatus})</span>
+                  </span>
+                </div>
+
+                <div className="flex flex-col">
+                  <span className="text-[9px] text-[#9CA3AF] uppercase font-semibold">VWAP</span>
+                  <span className="text-xs font-mono font-bold text-[#F2D675]">${technicals.vwap.toFixed(2)}</span>
+                </div>
+
+                <div className="flex flex-col">
+                  <span className="text-[9px] text-[#9CA3AF] uppercase font-semibold">9 EMA</span>
+                  <span className="text-xs font-mono font-bold text-white">${technicals.ema9.toFixed(2)}</span>
+                </div>
+
+                <div className="flex flex-col">
+                  <span className="text-[9px] text-[#9CA3AF] uppercase font-semibold">20 EMA</span>
+                  <span className="text-xs font-mono font-bold text-white">${technicals.ema20.toFixed(2)}</span>
+                </div>
+
+                <div className="flex flex-col">
+                  <span className="text-[9px] text-[#9CA3AF] uppercase font-semibold">MACD (12,26,9)</span>
+                  <span className="text-xs font-mono font-bold text-[#22C55E]">
+                    +{technicals.macd} <span className="text-[9px] font-normal text-[#9CA3AF]">Bull</span>
+                  </span>
+                </div>
+
+                <div className="flex flex-col">
+                  <span className="text-[9px] text-[#9CA3AF] uppercase font-semibold">ADX (14)</span>
+                  <span className="text-xs font-mono font-bold text-[#F2D675]">
+                    {technicals.adx} <span className="text-[9px] font-normal text-[#9CA3AF]">{technicals.adxStrength}</span>
+                  </span>
+                </div>
+
+                <div className="flex flex-col">
+                  <span className="text-[9px] text-[#9CA3AF] uppercase font-semibold">ATR (14)</span>
+                  <span className="text-xs font-mono font-bold text-white">${technicals.atr14.toFixed(2)}</span>
+                </div>
+
+                <div className="flex flex-col">
+                  <span className="text-[9px] text-[#9CA3AF] uppercase font-semibold">Rel Volume</span>
+                  <span className="text-xs font-mono font-bold text-[#22C55E]">{quote.relativeVolume}x</span>
+                </div>
+              </div>
+
+              {/* Support & Resistance Mini Ladder */}
+              <div className="p-3 border-t border-[#1C1C1C] space-y-2 bg-[#050505]">
+                <div className="flex justify-between items-center text-[9px] font-bold text-[#9CA3AF] uppercase tracking-widest">
+                  <span>Support & Resistance</span>
+                  <span className="text-[8px] text-[#F2D675] font-mono">Pivot: ${((technicals.prevDayHigh + technicals.prevDayLow + technicals.prevDayClose)/3).toFixed(2)}</span>
+                </div>
+
+                <div className="space-y-1 font-mono text-[11px]">
+                  <div className="flex justify-between items-center text-[#9CA3AF] opacity-60">
+                    <span className="text-[#EF4444]">R3 Target</span>
+                    <span>${supportResistance.r3.toFixed(2)}</span>
+                  </div>
+                  <div className="flex justify-between items-center text-[#E5E5E5] opacity-80">
+                    <span className="text-[#EF4444]">R2 Area</span>
+                    <span>${supportResistance.r2.toFixed(2)}</span>
+                  </div>
+                  <div className="flex justify-between items-center font-bold px-2 py-0.5 bg-[#EF4444]/10 border border-[#EF4444]/30 rounded text-[#EF4444]">
+                    <span>R1 Key Level</span>
+                    <span>${supportResistance.r1.toFixed(2)}</span>
+                  </div>
+
+                  {/* Current Price Line Indicator */}
+                  <div className="py-0.5 flex items-center gap-2">
+                    <div className="h-[1px] flex-1 bg-gradient-to-r from-transparent via-[#D4AF37] to-transparent" />
+                    <span className="text-[10px] font-bold text-white bg-[#151515] px-2 py-0.2 rounded border border-[#D4AF37]/50 font-mono">
+                      Current ${quote.price.toFixed(2)}
+                    </span>
+                    <div className="h-[1px] flex-1 bg-gradient-to-r from-transparent via-[#D4AF37] to-transparent" />
+                  </div>
+
+                  <div className="flex justify-between items-center font-bold px-2 py-0.5 bg-[#22C55E]/10 border border-[#22C55E]/30 rounded text-[#22C55E]">
+                    <span>S1 Key Level</span>
+                    <span>${supportResistance.s1.toFixed(2)}</span>
+                  </div>
+                  <div className="flex justify-between items-center text-[#E5E5E5] opacity-80">
+                    <span className="text-[#22C55E]">S2 Area</span>
+                    <span>${supportResistance.s2.toFixed(2)}</span>
+                  </div>
+                  <div className="flex justify-between items-center text-[#9CA3AF] opacity-60">
+                    <span className="text-[#22C55E]">S3 Major</span>
+                    <span>${supportResistance.s3.toFixed(2)}</span>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {/* Multi-Timeframe Trend Alignment Engine */}
+            <div className="bg-[#0A0A0A] border border-[#242424] hover:border-[rgba(212,175,55,0.35)] rounded-xl p-3 transition">
+              <div className="flex justify-between items-center text-[9px] font-bold text-[#9CA3AF] uppercase tracking-widest mb-2">
+                <span>Trend Alignment</span>
+                <span className="text-[#22C55E] font-mono font-bold">
+                  {data.trendAlignmentScore}% Bullish
+                </span>
+              </div>
+              <div className="grid grid-cols-4 sm:grid-cols-8 gap-1 text-center">
+                {trends.map((t) => (
+                  <div key={t.timeframe} className="flex flex-col items-center bg-[#101010] p-1 rounded border border-[#1C1C1C]">
+                    <span className="text-[9px] text-[#9CA3AF] font-semibold">{t.timeframe}</span>
+                    <span
+                      className={`text-[10px] font-bold ${
+                        t.trend === 'BULLISH'
+                          ? 'text-[#22C55E]'
+                          : t.trend === 'BEARISH'
+                          ? 'text-[#EF4444]'
+                          : 'text-[#F2D675]'
+                      }`}
+                    >
+                      {t.trend === 'BULLISH' ? 'Bull' : t.trend === 'BEARISH' ? 'Bear' : 'Neut'}
                     </span>
                   </div>
-                );
-              })}
-            </div>
-          </div>
-        </div>
-
-        {/* Live News AI Snippet */}
-        <div className="bg-[#15171a] border border-[#2d3139] rounded-lg p-2.5 shadow-sm">
-          <div className="flex justify-between items-center text-[9px] font-bold text-slate-400 uppercase tracking-widest mb-1.5">
-            <span>Live News AI</span>
-            <button
-              onClick={() => onNavigateTab('news')}
-              className="text-[#818cf8] hover:underline normal-case text-[9px]"
-            >
-              All News &rarr;
-            </button>
-          </div>
-          {news[0] && (
-            <div className="flex gap-2 items-start bg-[#1c1f24] p-2 rounded border border-[#2d3139]">
-              <div
-                className={`w-1 h-7 rounded-full mt-0.5 shrink-0 ${
-                  news[0].sentiment === 'BULLISH'
-                    ? 'bg-emerald-500'
-                    : news[0].sentiment === 'BEARISH'
-                    ? 'bg-rose-500'
-                    : 'bg-amber-500'
-                }`}
-              />
-              <div className="flex flex-col min-w-0">
-                <span className="text-[10px] font-bold text-white truncate leading-tight">
-                  {news[0].headline}
-                </span>
-                <span className="text-[9px] text-slate-400 italic mt-0.5">
-                  Impact: {news[0].impactScore}/10 ({news[0].sentiment}) &bull; {news[0].publishedTime}
-                </span>
+                ))}
               </div>
             </div>
-          )}
-        </div>
-      </section>
+          </section>
+
+          {/* MIDDLE COLUMN: AI Market Summary, Setup Quality, Drivers, Options & Risk (Col span 6) */}
+          <section className="md:col-span-6 flex flex-col gap-3">
+            {/* Main "Why is [Ticker] Moving?" AI Section */}
+            <div className="bg-[#0A0A0A] border border-[#242424] hover:border-[rgba(212,175,55,0.35)] rounded-xl p-4 flex-1 flex flex-col justify-between shadow-lg transition">
+              <div>
+                <div className="flex flex-wrap justify-between items-center gap-2 mb-3">
+                  <div className="flex items-center gap-2">
+                    <h2 className="text-base md:text-lg font-black text-white flex items-center gap-2 font-mono">
+                      <Radio className="w-4 h-4 text-[#D4AF37] animate-pulse" />
+                      Why is {quote.ticker} moving?
+                    </h2>
+                  </div>
+                  <div className="flex items-center gap-1.5">
+                    <button
+                      onClick={() => {
+                        onAskQuestion(`Analyze ${quote.ticker} right now`);
+                        onNavigateTab('chat');
+                      }}
+                      className="px-2.5 py-1 bg-[#151515] hover:bg-[#202020] border border-[#D4AF37]/50 text-[#F2D675] hover:text-white text-[10px] font-bold rounded-lg flex items-center gap-1 shadow-sm transition"
+                      title="Ask Gemini for a complete institutional analysis"
+                    >
+                      <Sparkles className="w-3 h-3 text-[#D4AF37]" />
+                      <span>Ask AI Analyst</span>
+                    </button>
+                    <button
+                      onClick={() => {
+                        onAskQuestion(`Why is ${quote.ticker} moving today?`);
+                        onNavigateTab('chat');
+                      }}
+                      className="px-2.5 py-1 bg-[#101010] hover:bg-[#181818] border border-[#242424] text-[#E5E5E5] text-[10px] font-bold rounded-lg flex items-center gap-1 transition"
+                      title="Ask Assistant why this asset is moving"
+                    >
+                      <BotMessageSquare className="w-3 h-3 text-[#D4AF37]" />
+                      <span>Chat</span>
+                    </button>
+                  </div>
+                </div>
+
+                {/* AI Explanation Narrative Box */}
+                <p className="text-xs md:text-sm text-[#E5E5E5] leading-relaxed italic border-l-2 border-[#D4AF37] pl-3.5 py-1.5 mb-3 bg-[#101010] rounded-r-lg border-y border-r border-[#1C1C1C]">
+                  &ldquo;{quote.ticker} is currently showing {isPositive ? 'solid bullish momentum' : 'distribution pressure'}. Price is trading {quote.price >= technicals.vwap ? 'above VWAP' : 'below VWAP'} and short-term exponential averages while technology and large-cap leaders show strength. Treasury yields have stabilized, expanding multiples. However, overhead resistance near ${supportResistance.r1.toFixed(2)} requires volume expansion (&gt;1.25x) for continuation.&rdquo;
+                </p>
+
+                {/* Drivers & Setup Quality Grid */}
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 mb-3">
+                  <div className="space-y-1.5">
+                    <div className="p-2.5 rounded-lg bg-[#101010] border border-[#242424]">
+                      <div className="text-[9px] uppercase font-bold text-[#D4AF37] mb-0.5 flex items-center gap-1">
+                        <Zap className="w-2.5 h-2.5" /> Primary Driver
+                      </div>
+                      <div className="text-xs font-semibold text-white">{probabilities.primaryDriver}</div>
+                    </div>
+                    <div className="p-2.5 rounded-lg bg-[#101010] border border-[#242424]">
+                      <div className="text-[9px] uppercase font-bold text-[#EF4444] mb-0.5 flex items-center gap-1">
+                        <AlertTriangle className="w-2.5 h-2.5" /> Main Risk Factor
+                      </div>
+                      <div className="text-xs font-semibold text-[#E5E5E5]">{probabilities.mainRisk}</div>
+                    </div>
+                  </div>
+
+                  {/* Setup Quality Metric */}
+                  <div className="bg-[#101010] border border-[#242424] rounded-lg p-2.5 flex flex-col justify-center items-center text-center">
+                    <div className="text-[9px] uppercase font-bold text-[#9CA3AF] mb-1 tracking-wider">
+                      Setup Quality Index
+                    </div>
+                    <div className="flex items-baseline gap-1">
+                      <span className="text-3xl font-black text-white font-mono">{probabilities.setupScore}</span>
+                      <span className="text-xs text-[#9CA3AF] font-mono">/100</span>
+                    </div>
+                    <div
+                      className={`mt-1 text-[10px] font-bold uppercase px-2 py-0.5 rounded border ${
+                        probabilities.setupScore >= 75
+                          ? 'text-[#22C55E] bg-[#22C55E]/10 border-[#22C55E]/30'
+                          : probabilities.setupScore >= 60
+                          ? 'text-[#F2D675] bg-[#D4AF37]/10 border-[#D4AF37]/30'
+                          : 'text-[#EF4444] bg-[#EF4444]/10 border-[#EF4444]/30'
+                      }`}
+                    >
+                      {probabilities.setupQuality}
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              {/* Bullish Confirmation & Bearish Invalidation Cards */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 mt-1">
+                <div className="p-2.5 border border-[#22C55E]/30 bg-[#22C55E]/5 rounded-lg">
+                  <div className="text-[10px] font-bold text-[#22C55E] uppercase mb-0.5 flex items-center gap-1">
+                    <TrendingUp className="w-3 h-3" /> Bullish Confirmation
+                  </div>
+                  <div className="text-[11px] text-[#E5E5E5]">
+                    Break and 15m candle close above <span className="font-bold text-white font-mono">${scenarios.bullish.confirmationPrice.toFixed(2)}</span> with relative volume &gt; 1.25x. Targets: ${scenarios.bullish.target1.toFixed(2)}, ${scenarios.bullish.target2.toFixed(2)}.
+                  </div>
+                </div>
+
+                <div className="p-2.5 border border-[#EF4444]/30 bg-[#EF4444]/5 rounded-lg">
+                  <div className="text-[10px] font-bold text-[#EF4444] uppercase mb-0.5 flex items-center gap-1">
+                    <TrendingDown className="w-3 h-3" /> Bearish Invalidation
+                  </div>
+                  <div className="text-[11px] text-[#E5E5E5]">
+                    Loss of VWAP / support at <span className="font-bold text-white font-mono">${scenarios.bearish.confirmationPrice.toFixed(2)}</span> invalidates current setup. Targets: ${scenarios.bearish.target1.toFixed(2)}, ${scenarios.bearish.target2.toFixed(2)}.
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {/* Bottom Split: Options Summary & Risk Meter Gauge */}
+            <div className="bg-[#0A0A0A] border border-[#242424] hover:border-[rgba(212,175,55,0.35)] rounded-xl p-3.5 grid grid-cols-1 sm:grid-cols-2 gap-3 transition">
+              {/* Options Sentiment */}
+              <div>
+                <div className="flex justify-between items-center text-[9px] font-bold text-[#9CA3AF] uppercase tracking-widest mb-1.5">
+                  <span>Options Flow Sentiment</span>
+                  <button
+                    onClick={() => onNavigateTab('options')}
+                    className="text-[#F2D675] hover:underline normal-case text-[9px]"
+                  >
+                    Flow Details &rarr;
+                  </button>
+                </div>
+                <div className="flex items-center gap-3">
+                  <div className="text-xl font-bold font-mono text-white">
+                    {options.putCallRatio.toFixed(2)}{' '}
+                    <span className="text-[10px] font-normal text-[#9CA3AF]">P/C Ratio</span>
+                  </div>
+                  <div
+                    className={`text-[10px] px-2 py-0.5 border rounded uppercase font-bold ${
+                      options.sentiment.includes('Bullish')
+                        ? 'bg-[#22C55E]/10 text-[#22C55E] border-[#22C55E]/30'
+                        : 'bg-[#EF4444]/10 text-[#EF4444] border-[#EF4444]/30'
+                    }`}
+                  >
+                    {options.sentiment}
+                  </div>
+                </div>
+                <div className="mt-1.5 text-[10px] text-[#9CA3AF] font-mono">
+                  Largest OI Wall: <span className="text-white font-bold">${options.largestCallOIStrike.toFixed(2)} Call</span> | Gamma Support: <span className="text-white font-bold">${options.gammaSupport.toFixed(2)}</span>
+                </div>
+              </div>
+
+              {/* Risk Meter Gauge */}
+              <div className="border-t sm:border-t-0 sm:border-l border-[#1C1C1C] pt-2 sm:pt-0 sm:pl-3">
+                <div className="flex justify-between items-center text-[9px] font-bold text-[#9CA3AF] uppercase tracking-widest mb-1">
+                  <span>System Risk Meter</span>
+                  <span
+                    className={`font-bold font-mono ${
+                      probabilities.riskLevel === 'LOW RISK'
+                        ? 'text-[#22C55E]'
+                        : probabilities.riskLevel === 'MODERATE RISK'
+                        ? 'text-[#F2D675]'
+                        : 'text-[#EF4444]'
+                    }`}
+                  >
+                    {probabilities.riskLevel}
+                  </span>
+                </div>
+                <div className="w-full h-2 bg-[#1C1C1C] rounded-full overflow-hidden mt-1.5 relative">
+                  <div
+                    className="bg-gradient-to-r from-[#22C55E] via-[#D4AF37] to-[#EF4444] h-full transition-all duration-500 rounded-full"
+                    style={{ width: `${riskPercent}%` }}
+                  />
+                </div>
+                <div className="flex justify-between text-[8px] mt-1 text-[#9CA3AF] font-mono uppercase">
+                  <span>Low (VIX &lt; 14)</span>
+                  <span>Moderate</span>
+                  <span>High (VIX &gt; 18)</span>
+                </div>
+              </div>
+            </div>
+          </section>
+
+          {/* RIGHT COLUMN: Economic Calendar, Sector Strength, Live News AI (Col span 3) */}
+          <section className="md:col-span-3 flex flex-col gap-3">
+            {/* Economic Calendar Mini Timeline */}
+            <div className="bg-[#0A0A0A] border border-[#242424] hover:border-[rgba(212,175,55,0.35)] rounded-xl flex-1 flex flex-col overflow-hidden shadow-lg transition">
+              <div className="p-2.5 bg-[#101010] border-b border-[#1C1C1C] flex justify-between items-center text-[10px] font-bold uppercase tracking-widest text-[#9CA3AF]">
+                <span>Economic Calendar</span>
+                <button
+                  onClick={() => onNavigateTab('economic_fed')}
+                  className="text-[#F2D675] hover:underline normal-case text-[9px]"
+                >
+                  Full Calendar &rarr;
+                </button>
+              </div>
+
+              <div className="p-2.5 space-y-2 overflow-y-auto flex-1 text-xs">
+                {economicEvents.slice(0, 3).map((evt) => (
+                  <div
+                    key={evt.id}
+                    className={`relative pl-3 border-l-2 ${
+                      evt.isApproachingHighVol ? 'border-[#EF4444] bg-[#EF4444]/10 p-1 rounded-r' : 'border-[#D4AF37]'
+                    }`}
+                  >
+                    <div className="text-[9px] text-[#9CA3AF] font-mono font-semibold">{evt.time}</div>
+                    <div className="text-xs font-bold text-white leading-tight">{evt.event}</div>
+                    <div className="flex items-center gap-2 text-[9px] mt-0.5 font-mono">
+                      <span className="text-[#9CA3AF]">Est: {evt.consensus}</span>
+                      {evt.actual && <span className="text-[#22C55E] font-bold">Act: {evt.actual}</span>}
+                    </div>
+                    {evt.isApproachingHighVol && (
+                      <span className="text-[8px] font-black text-[#EF4444] uppercase tracking-tighter block mt-0.5">
+                        HIGH VOLATILITY RISK
+                      </span>
+                    )}
+                    <span
+                      className={`absolute -left-1 top-1 w-2 h-2 rounded-full ${
+                        evt.isApproachingHighVol ? 'bg-[#EF4444] animate-ping' : 'bg-[#D4AF37]'
+                      }`}
+                    />
+                  </div>
+                ))}
+              </div>
+
+              {/* Sector Strength Matrix Mini */}
+              <div className="p-2.5 bg-[#101010] border-t border-[#1C1C1C]">
+                <div className="flex justify-between items-center text-[9px] font-bold text-[#9CA3AF] uppercase mb-1.5 tracking-widest">
+                  <span>Sector Strength</span>
+                  <span className="text-[8px] text-[#22C55E]">Top: {sectors[0]?.symbol}</span>
+                </div>
+                <div className="grid grid-cols-4 gap-1">
+                  {sectors.slice(0, 8).map((sec) => {
+                    const isSecPos = sec.changePercent >= 0;
+                    return (
+                      <div
+                        key={sec.symbol}
+                        onClick={() => onNavigateTab('sectors')}
+                        className={`aspect-video rounded-md flex flex-col items-center justify-center text-[8px] font-bold cursor-pointer transition border ${
+                          sec.changePercent > 1.0
+                            ? 'bg-[#22C55E]/20 text-[#22C55E] border-[#22C55E]/40'
+                            : isSecPos
+                            ? 'bg-[#22C55E]/10 text-[#22C55E] border-[#22C55E]/20'
+                            : sec.changePercent < -0.5
+                            ? 'bg-[#EF4444]/20 text-[#EF4444] border-[#EF4444]/40'
+                            : 'bg-[#151515] text-[#9CA3AF] border-[#242424]'
+                        }`}
+                        title={`${sec.name}: ${isSecPos ? '+' : ''}${sec.changePercent}%`}
+                      >
+                        <span>{sec.symbol}</span>
+                        <span className="font-mono text-[7.5px] opacity-80">
+                          {isSecPos ? '+' : ''}{sec.changePercent}%
+                        </span>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            </div>
+
+            {/* Live News AI Snippet */}
+            <div className="bg-[#0A0A0A] border border-[#242424] hover:border-[rgba(212,175,55,0.35)] rounded-xl p-3 shadow-lg transition">
+              <div className="flex justify-between items-center text-[9px] font-bold text-[#9CA3AF] uppercase tracking-widest mb-1.5">
+                <span>Live News AI</span>
+                <button
+                  onClick={() => onNavigateTab('news')}
+                  className="text-[#F2D675] hover:underline normal-case text-[9px]"
+                >
+                  All News &rarr;
+                </button>
+              </div>
+              {news[0] && (
+                <div className="flex gap-2 items-start bg-[#101010] p-2.5 rounded-lg border border-[#1C1C1C]">
+                  <div
+                    className={`w-1 h-7 rounded-full mt-0.5 shrink-0 ${
+                      news[0].sentiment === 'BULLISH'
+                        ? 'bg-[#22C55E]'
+                        : news[0].sentiment === 'BEARISH'
+                        ? 'bg-[#EF4444]'
+                        : 'bg-[#D4AF37]'
+                    }`}
+                  />
+                  <div className="flex flex-col min-w-0">
+                    <span className="text-[10px] font-bold text-white truncate leading-tight">
+                      {news[0].headline}
+                    </span>
+                    <span className="text-[9px] text-[#9CA3AF] italic mt-0.5">
+                      Impact: {news[0].impactScore}/10 ({news[0].sentiment}) &bull; {news[0].publishedTime}
+                    </span>
+                  </div>
+                </div>
+              )}
+            </div>
+          </section>
         </div>
       )}
     </div>

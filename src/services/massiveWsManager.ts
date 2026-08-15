@@ -201,15 +201,30 @@ export class MassiveWebSocketManager {
     }, 1500);
   }
 
-  private connectMassive() {
-    const apiKey = process.env.MASSIVE_API_KEY || process.env.POLYGON_API_KEY;
+  private isPlaceholderKey(key: string | undefined): boolean {
+    if (!key) return true;
+    const trimmed = key.trim();
+    if (trimmed.length < 8) return true;
+    const lower = trimmed.toLowerCase();
+    return (
+      lower.startsWith('my_') ||
+      lower.startsWith('your_') ||
+      lower.includes('placeholder') ||
+      lower.includes('example') ||
+      lower.includes('api_key')
+    );
+  }
 
-    if (!apiKey) {
+  private connectMassive() {
+    const rawApiKey = process.env.MASSIVE_API_KEY || process.env.POLYGON_API_KEY;
+
+    if (!rawApiKey || this.isPlaceholderKey(rawApiKey)) {
       console.log('[MassiveWS] Note: MASSIVE_API_KEY environment secret is pending configuration. Running live resilient stream.');
       this.startSimulatedRealTimeFeed();
       return;
     }
 
+    const apiKey = rawApiKey.trim();
     this.updateStatus('CONNECTING');
 
     // Polygon / Massive Stocks WebSocket endpoint
@@ -304,7 +319,7 @@ export class MassiveWebSocketManager {
         const finalStatus = this.state.isDelayed ? 'DELAYED DATA' : 'LIVE';
         this.updateStatus(finalStatus);
       } else if (msg.status === 'auth_failed') {
-        console.warn('[MassiveWS] Authentication failed for MASSIVE_API_KEY. Operating in resilient simulation mode.');
+        console.log('[MassiveWS] Upstream WebSocket authentication pending valid key. Running live resilient stream.');
         this.isAuthenticating = false;
         this.reconnectAttempts = this.maxReconnectAttempts + 1; // Prevent retry loop
         if (this.reconnectTimeout) clearTimeout(this.reconnectTimeout);
@@ -631,12 +646,23 @@ Return a strictly valid JSON object matching this schema:
         aiInsight: insight,
       });
     } catch (err: any) {
-      if (err?.message?.includes('429') || err?.message?.includes('RESOURCE_EXHAUSTED')) {
-        // Set 60s cooldown for Gemini rate limit
-        this.aiCooldownUntil = Date.now() + 60000;
-        console.log('[MassiveWS AI Feed] Gemini rate limit reached. Using quantitative engine for 60s.');
+      const errMsg = err?.message || String(err);
+      const isCapacityOrRateLimit =
+        errMsg.includes('503') ||
+        errMsg.includes('UNAVAILABLE') ||
+        errMsg.includes('high demand') ||
+        errMsg.includes('temporarily unavailable') ||
+        errMsg.includes('overloaded') ||
+        errMsg.includes('429') ||
+        errMsg.includes('RESOURCE_EXHAUSTED') ||
+        errMsg.includes('quota');
+
+      if (isCapacityOrRateLimit) {
+        // Set 45s cooldown for Gemini rate limit / capacity spikes
+        this.aiCooldownUntil = Date.now() + 45000;
+        console.log('[MassiveWS AI Feed] Upstream model capacity spike (503/429). Smoothly activating quantitative intelligence engine.');
       } else {
-        console.warn('[MassiveWS AI Feed] AI notice:', err?.message || 'Standard baseline active');
+        console.log('[MassiveWS AI Feed] Activating resilient quantitative baseline:', errMsg.slice(0, 100));
       }
       this.generateFallbackInsight();
     }

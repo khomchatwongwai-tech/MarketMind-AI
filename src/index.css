@@ -1,1 +1,100 @@
 @import "tailwindcss";
+
+:root {
+  --bg-primary: #050505;
+  --bg-secondary: #0A0A0A;
+  --surface-card: #101010;
+  --surface-elevated: #151515;
+  --border-primary: #242424;
+  --border-subtle: #1C1C1C;
+  --border-gold-hover: rgba(212, 175, 55, 0.4);
+
+  --gold-primary: #D4AF37;
+  --gold-rich: #C9A227;
+  --gold-light: #F2D675;
+  --gold-dark: #8C6B18;
+  --gold-highlight: #FFE08A;
+
+  --text-primary: #FFFFFF;
+  --text-secondary: #E5E5E5;
+  --text-muted: #9CA3AF;
+  --text-dark: #6B7280;
+
+  --bullish: #22C55E;
+  --bearish: #EF4444;
+  --neutral: #A3A3A3;
+}
+
+body {
+  background-color: #050505;
+  color: #E5E5E5;
+  font-family: 'Inter', system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  overflow-x: hidden;
+  -webkit-font-smoothing: antialiased;
+}
+
+/* Metallic Gold Gradients and Accents */
+.gold-gradient-text {
+  background: linear-gradient(135deg, #FFE08A 0%, #D4AF37 40%, #C9A227 75%, #8C6B18 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+}
+
+.gold-gradient-bg {
+  background: linear-gradient(135deg, #8C6B18 0%, #D4AF37 25%, #FFE08A 50%, #C9A227 75%, #8C6B18 100%);
+}
+
+.gold-gradient-btn {
+  background: linear-gradient(135deg, #D4AF37 0%, #FFE08A 50%, #C9A227 100%);
+  color: #050505;
+  font-weight: 700;
+  transition: all 0.2s ease-in-out;
+}
+
+.gold-gradient-btn:hover {
+  background: linear-gradient(135deg, #FFE08A 0%, #D4AF37 50%, #F2D675 100%);
+  box-shadow: 0 0 15px rgba(212, 175, 55, 0.35);
+  transform: translateY(-1px);
+}
+
+.gold-subtle-box {
+  background: linear-gradient(180deg, rgba(212, 175, 55, 0.08) 0%, rgba(10, 10, 10, 0.4) 100%);
+  border: 1px solid rgba(212, 175, 55, 0.3);
+}
+
+.gold-badge {
+  background: rgba(212, 175, 55, 0.12);
+  color: #F2D675;
+  border: 1px solid rgba(212, 175, 55, 0.35);
+}
+
+.card-luxury {
+  background: #101010;
+  border: 1px solid #242424;
+  border-radius: 0.75rem;
+  transition: border-color 0.2s ease, box-shadow 0.2s ease;
+}
+
+.card-luxury:hover {
+  border-color: rgba(212, 175, 55, 0.35);
+  box-shadow: 0 4px 20px -2px rgba(0, 0, 0, 0.7);
+}
+
+/* Custom Scrollbar for Luxury Dark Terminal */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+
+::-webkit-scrollbar-track {
+  background: #050505;
+}
+
+::-webkit-scrollbar-thumb {
+  background: #242424;
+  border-radius: 3px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: #D4AF37;
+}

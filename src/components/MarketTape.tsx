@@ -62,29 +62,29 @@ export const MarketTape: React.FC<MarketTapeProps> = ({
   }, [isLive]);
 
   return (
-    <div className="bg-[#0f1115] border-b border-[#2d3139] px-3 py-1.5 flex items-center justify-between overflow-hidden select-none text-xs">
-      <div className="flex items-center gap-2 pr-3 border-r border-[#2d3139] shrink-0">
+    <div className="bg-[#050505] border-b border-[#242424] px-3.5 py-1.5 flex items-center justify-between overflow-hidden select-none text-xs">
+      <div className="flex items-center gap-2 pr-3.5 border-r border-[#242424] shrink-0">
         <span className="relative flex h-2 w-2">
           {isLive && (
-            <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
+            <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-[#22C55E] opacity-75"></span>
           )}
           <span
             className={`relative inline-flex rounded-full h-2 w-2 ${
-              isLive ? 'bg-emerald-500' : 'bg-slate-500'
+              isLive ? 'bg-[#22C55E]' : 'bg-[#6B7280]'
             }`}
           ></span>
         </span>
-        <span className="font-mono text-[10px] font-black text-slate-300 uppercase tracking-widest flex items-center gap-1">
-          <Radio className="w-3 h-3 text-[#6366f1]" />
-          Yahoo / Google Live
+        <span className="font-mono text-[10px] font-extrabold text-[#E5E5E5] uppercase tracking-widest flex items-center gap-1">
+          <Radio className="w-3 h-3 text-[#D4AF37]" />
+          Direct Multi-Feed
         </span>
-        <span className="text-[9px] text-slate-500 font-mono hidden md:inline">
+        <span className="text-[9px] text-[#6B7280] font-mono hidden md:inline">
           {lastSync}
         </span>
       </div>
 
-      {/* Horizontal scrolling or wrapping ticker ribbon */}
-      <div className="flex items-center gap-3 overflow-x-auto no-scrollbar py-0.5 px-2 flex-1 scroll-smooth">
+      {/* Horizontal scrolling ticker ribbon */}
+      <div className="flex items-center gap-2 overflow-x-auto no-scrollbar py-0.5 px-2 flex-1 scroll-smooth">
         {tapeQuotes.map((item) => {
           const isSelected = selectedTicker.toUpperCase() === item.symbol.toUpperCase();
           const isPos = item.change >= 0;
@@ -92,18 +92,18 @@ export const MarketTape: React.FC<MarketTapeProps> = ({
             <button
               key={item.symbol}
               onClick={() => onSelectTicker(item.symbol as TickerSymbol)}
-              className={`flex items-center gap-1.5 px-2 py-0.5 rounded text-[11px] font-mono shrink-0 transition ${
+              className={`flex items-center gap-1.5 px-2.5 py-1 rounded-md text-[11px] font-mono shrink-0 transition ${
                 isSelected
-                  ? 'bg-[#6366f1]/25 text-white border border-[#6366f1]/60 font-black shadow-sm'
-                  : 'bg-[#15171a] hover:bg-[#1f2228] text-slate-300 border border-[#23272f]'
+                  ? 'bg-gradient-to-r from-[rgba(212,175,55,0.2)] to-[rgba(20,20,20,0.9)] text-white border border-[#D4AF37] font-black shadow-[0_0_8px_rgba(212,175,55,0.2)]'
+                  : 'bg-[#0A0A0A] hover:bg-[#101010] text-[#9CA3AF] hover:text-[#E5E5E5] border border-[#1C1C1C]'
               }`}
               title={`Click to load live ${item.name} analysis`}
             >
-              <span className="font-bold">{item.symbol}</span>
-              <span className="text-slate-200">${item.price.toFixed(2)}</span>
+              <span className="font-bold text-white">{item.symbol}</span>
+              <span className="text-[#E5E5E5]">${item.price.toFixed(2)}</span>
               <span
                 className={`flex items-center text-[10px] font-bold ${
-                  isPos ? 'text-emerald-400' : 'text-rose-400'
+                  isPos ? 'text-[#22C55E]' : 'text-[#EF4444]'
                 }`}
               >
                 {isPos ? '+' : ''}
@@ -114,9 +114,9 @@ export const MarketTape: React.FC<MarketTapeProps> = ({
         })}
       </div>
 
-      <div className="hidden lg:flex items-center gap-1.5 pl-3 border-l border-[#2d3139] shrink-0 text-[10px] font-mono text-slate-400">
-        <Zap className="w-3 h-3 text-amber-400" />
-        <span>0s Latency Feed</span>
+      <div className="hidden lg:flex items-center gap-1.5 pl-3 border-l border-[#242424] shrink-0 text-[10px] font-mono text-[#9CA3AF]">
+        <Zap className="w-3 h-3 text-[#D4AF37]" />
+        <span>Sub-millisecond Routing</span>
       </div>
     </div>
   );

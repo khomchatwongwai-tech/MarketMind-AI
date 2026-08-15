@@ -8,6 +8,7 @@ import { SupportResistanceView } from './components/SupportResistanceView';
 import { BreadthIntermarketView } from './components/BreadthIntermarketView';
 import { SectorHeatmapView } from './components/SectorHeatmapView';
 import { OptionsAnalyticsView } from './components/OptionsAnalyticsView';
+import { OptionsTraderView } from './components/optionsTrader/OptionsTraderView';
 import { EconomicFedView } from './components/EconomicFedView';
 import { NewsAnalyzerView } from './components/NewsAnalyzerView';
 import { AskMarketMindChat } from './components/AskMarketMindChat';
@@ -24,6 +25,8 @@ import { ExportReportsView } from './components/ExportReportsView';
 import { HelpCenterView } from './components/HelpCenterView';
 import { StatusPageView } from './components/StatusPageView';
 import { AdminDashboardView } from './components/AdminDashboardView';
+import { ConnectedAccountsView } from './components/ConnectedAccountsView';
+import { CommunityView } from './components/community/CommunityView';
 
 // Modals
 import { AuthModal } from './components/AuthModal';
@@ -43,7 +46,10 @@ import {
 } from './services/marketDataService';
 import { TickerSymbol, MarketAlert, LiveMarketDataSource } from './types/market';
 import { UserProfile } from './types/user';
-import { UserService } from './services/userService';
+import { DEFAULT_ADMIN_EMAIL, UserService } from './services/userService';
+import { auth } from './config/firebase';
+import { onAuthStateChanged } from 'firebase/auth';
+import { FirestoreService } from './services/firestoreService';
 import { ShieldCheck, HelpCircle, Activity, FileText, Lock, MessageSquare } from 'lucide-react';
 
 export default function App() {
@@ -77,6 +83,43 @@ export default function App() {
       }, 1200);
       return () => clearTimeout(timer);
     }
+  }, []);
+
+  // Firebase Auth State Listener & Firestore Synchronization
+  useEffect(() => {
+    const unsubscribe = onAuthStateChanged(auth, async (fbUser) => {
+      if (fbUser) {
+        const userEmail = fbUser.email || DEFAULT_ADMIN_EMAIL;
+        const isMasterAdmin = userEmail.toLowerCase() === DEFAULT_ADMIN_EMAIL.toLowerCase();
+        try {
+          const profile = await FirestoreService.getUserProfile(fbUser.uid);
+          if (profile) {
+            setCurrentUser(profile);
+            UserService.saveUser(profile);
+          } else {
+            const newProfile: UserProfile = {
+              ...currentUser,
+              id: fbUser.uid,
+              email: userEmail,
+              name: fbUser.displayName || userEmail.split('@')[0],
+              avatarUrl: fbUser.photoURL || currentUser.avatarUrl,
+              emailVerified: fbUser.emailVerified,
+              role: isMasterAdmin ? 'admin' : 'user',
+              plan: isMasterAdmin ? 'premium' : 'pro',
+              planTier: isMasterAdmin ? 'PREMIUM' : 'PRO',
+              isGuest: false,
+            };
+            setCurrentUser(newProfile);
+            UserService.saveUser(newProfile);
+            await FirestoreService.syncUserProfile(newProfile);
+          }
+        } catch (err) {
+          console.warn('Firestore profile sync error on auth change:', err);
+        }
+      }
+    });
+
+    return () => unsubscribe();
   }, []);
 
   const handleUserChange = (updatedUser: UserProfile) => {
@@ -247,6 +290,18 @@ export default function App() {
           />
         )}
 
+        {activeTab === 'connected_portfolio' && (
+          <ConnectedAccountsView
+            currentUser={currentUser}
+            onOpenAuth={() => setIsAuthModalOpen(true)}
+            onOpenSubscription={() => setIsSubscriptionModalOpen(true)}
+            onSelectTicker={(ticker) => {
+              handleSelectTicker(ticker as TickerSymbol);
+              setActiveTab('overview');
+            }}
+          />
+        )}
+
         {activeTab === 'technicals' && <TechnicalEngineView data={marketData} />}
 
         {activeTab === 'support_resistance' && <SupportResistanceView data={marketData} />}
@@ -255,11 +310,21 @@ export default function App() {
 
         {activeTab === 'sectors' && <SectorHeatmapView data={marketData} />}
 
-        {activeTab === 'options' && <OptionsAnalyticsView data={marketData} />}
+        {activeTab === 'options' && <OptionsTraderView />}
 
         {activeTab === 'economic_fed' && <EconomicFedView data={marketData} />}
 
         {activeTab === 'news' && <NewsAnalyzerView data={marketData} />}
+
+        {activeTab === 'community' && (
+          <CommunityView
+            currentUser={currentUser}
+            onSelectTicker={(ticker) => {
+              handleSelectTicker(ticker as TickerSymbol);
+              setActiveTab('overview');
+            }}
+          />
+        )}
 
         {activeTab === 'chat' && (
           <AskMarketMindChat data={marketData} initialQuestion={chatInitialPrompt} />

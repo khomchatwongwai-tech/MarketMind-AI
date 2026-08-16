@@ -70,7 +70,7 @@ export function useMassiveWebSocket(initialTicker: string = 'SPY'): UseMassiveWe
 
       ws.onopen = () => {
         setIsConnected(true);
-        setStatus('LIVE');
+        setStatus('CONNECTING');
         // Subscribe only to active ticker (default SPY)
         ws.send(JSON.stringify({ action: 'SUBSCRIBE', ticker }));
       };
@@ -105,12 +105,16 @@ export function useMassiveWebSocket(initialTicker: string = 'SPY'): UseMassiveWe
 
           if (msg.type === 'SIGNALS' && msg.signals) {
             setSignals(msg.signals);
-            setLivePrice(msg.signals.price);
+            if (msg.signals.price > 0) setLivePrice(msg.signals.price);
             if (msg.signals.isDelayed !== undefined) setIsDelayed(msg.signals.isDelayed);
           }
 
           if (msg.type === 'AI_INSIGHT' && msg.aiInsight) {
             setAiInsight(msg.aiInsight);
+          }
+
+          if (msg.type === 'ERROR') {
+            setStatus('ERROR');
           }
         } catch (e) {
           console.warn('[useMassiveWebSocket] Error parsing server message:', e);

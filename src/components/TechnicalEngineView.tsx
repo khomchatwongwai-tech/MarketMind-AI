@@ -10,7 +10,7 @@ interface TechnicalEngineViewProps {
 export const TechnicalEngineView: React.FC<TechnicalEngineViewProps> = ({ data }) => {
   const { quote, technicals, supportResistance } = data;
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
-  const [chartMode, setChartMode] = useState<'canvas' | 'tradingview'>('canvas');
+  const [chartMode, setChartMode] = useState<'canvas' | 'tradingview'>('tradingview');
   const [selectedTimeframe, setSelectedTimeframe] = useState<'1M' | '5M' | '15M' | '1H' | '1D'>('15M');
   const [overlayVwap, setOverlayVwap] = useState(true);
   const [overlayEma, setOverlayEma] = useState(true);
@@ -47,10 +47,9 @@ export const TechnicalEngineView: React.FC<TechnicalEngineViewProps> = ({ data }
       ctx.stroke();
     }
 
-    // Generate 32 sample candles based on current price & technicals
+    // The local canvas never fabricates candles. Verified candles are rendered by
+    // the provider-backed TradingView chart until a server candle series is supplied.
     const candleCount = 32;
-    const base = quote.previousClose;
-    const current = quote.price;
     const high = quote.dayHigh;
     const low = quote.dayLow;
 
@@ -61,19 +60,12 @@ export const TechnicalEngineView: React.FC<TechnicalEngineViewProps> = ({ data }
     const candleWidth = Math.floor((width - 70) / candleCount);
 
     const candles: { open: number; high: number; low: number; close: number; vol: number }[] = [];
-    let p = base;
-    for (let i = 0; i < candleCount; i++) {
-      const progress = i / (candleCount - 1);
-      const targetP = base + (current - base) * progress;
-      const noise = (Math.sin(i * 0.8) + (i % 3 === 0 ? 0.3 : -0.2)) * (quote.price * 0.0015);
-      const cOpen = p;
-      const cClose = i === candleCount - 1 ? current : Number((targetP + noise).toFixed(2));
-      const cHigh = Number((Math.max(cOpen, cClose) + Math.abs(noise) * 0.8).toFixed(2));
-      const cLow = Number((Math.min(cOpen, cClose) - Math.abs(noise) * 0.8).toFixed(2));
-      const vol = 50 + Math.abs(Math.sin(i * 1.2)) * 80;
-      candles.push({ open: cOpen, high: cHigh, low: cLow, close: cClose, vol });
-      p = cClose;
-    }
+
+    ctx.fillStyle = '#94a3b8';
+    ctx.font = '12px monospace';
+    ctx.textAlign = 'center';
+    ctx.fillText('Verified candle series unavailable — use Provider Chart', width / 2, height / 2);
+    ctx.textAlign = 'start';
 
     // Draw Candles & Volume
     candles.forEach((c, idx) => {

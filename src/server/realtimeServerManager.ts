@@ -72,7 +72,8 @@ export class RealtimeServerManager {
       ws.send(
         JSON.stringify({
           type: 'STATUS',
-          status: 'CONNECTED',
+          status: 'CONNECTED_TO_SERVER',
+          marketDataStatus: this.getAvailableUpstreamCount() > 0 ? 'AVAILABLE' : 'UNAVAILABLE',
           timestamp: Date.now(),
         })
       );
@@ -99,7 +100,12 @@ export class RealtimeServerManager {
 
     // Connect to upstreams
     this.initCryptoStream();
-    this.initMassiveStream();
+    const massiveStatus = this.upstreamStatuses.get('massive');
+    if (massiveStatus) {
+      massiveStatus.isConfigured = Boolean(process.env.MASSIVE_API_KEY || process.env.POLYGON_API_KEY);
+      massiveStatus.wsStatus = 'DISCONNECTED';
+      massiveStatus.lastError = 'Massive equities are served by the canonical /ws/massive server gateway.';
+    }
     this.initFinnhubStream();
     this.startVerifiedPolling();
   }
@@ -146,6 +152,12 @@ export class RealtimeServerManager {
     });
   }
 
+  private getAvailableUpstreamCount(): number {
+    return Array.from(this.upstreamStatuses.values()).filter(
+      (provider) => provider.wsStatus === 'CONNECTED'
+    ).length;
+  }
+
   // --- Upstream 1: 24/7 Crypto Stream ---
   private initCryptoStream() {
     try {
@@ -175,15 +187,20 @@ export class RealtimeServerManager {
 
             const sym = data.s.replace('USDT', '') + '-USD';
             const price = Number(data.c);
+            const bid = Number(data.b);
+            const ask = Number(data.a);
+            if (!Number.isFinite(price) || price <= 0 || !Number.isFinite(bid) || bid <= 0 || !Number.isFinite(ask) || ask <= 0) {
+              return;
+            }
             const quote = {
               type: 'QUOTE',
               symbol: sym,
               price,
-              bid: Number(data.b || price * 0.9999),
-              ask: Number(data.a || price * 1.0001),
-              high: Number(data.h || price),
-              low: Number(data.l || price),
-              open: Number(data.o || price),
+              bid,
+              ask,
+              high: Number(data.h),
+              low: Number(data.l),
+              open: Number(data.o),
               volume: Number(data.v || 0),
               change: Number(data.p || 0),
               changePercent: Number(data.P || 0),

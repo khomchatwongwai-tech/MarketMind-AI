@@ -226,7 +226,7 @@ export const DashboardOverview: React.FC<DashboardOverviewProps> = ({
       />
 
       {/* 1. PROFESSIONAL REAL-TIME INTERACTIVE CANDLESTICK CHART */}
-      <RealTimeStockChart ticker={quote.ticker} isLiveSimulation={true} />
+      <RealTimeStockChart ticker={quote.ticker} />
 
       {/* View Switcher & Quick Actions */}
       <div className="flex flex-wrap justify-between items-center bg-[#0A0A0A] px-3.5 py-2 rounded-xl border border-[#242424] text-xs shadow-md gap-2">

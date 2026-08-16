@@ -469,7 +469,7 @@ export class DataProviderRouter {
     return {
       instrument,
       quote: {
-        price: instrument.price || 0,
+        price: 0,
         change: 0,
         changePercent: 0,
         bid: 0,
@@ -479,7 +479,7 @@ export class DataProviderRouter {
         dayHigh: 0,
         dayLow: 0,
         openPrice: 0,
-        previousClose: instrument.previousClose || 0,
+        previousClose: 0,
         marketState,
         timestamp: new Date().toISOString(),
         dataSource: `${provider.name} (Data Unavailable)`,
@@ -587,24 +587,6 @@ export class DataProviderRouter {
       }
     }
 
-    // 3. Fallback catalog known state (if available in directory)
-    const catalog = InstrumentDirectoryService.getBySymbol(symbol);
-    if (catalog && catalog.price && catalog.price > 0) {
-      return {
-        price: catalog.price,
-        change: catalog.change || 0,
-        changePercent: catalog.changePercent || 0,
-        dayHigh: catalog.high || catalog.price,
-        dayLow: catalog.low || catalog.price,
-        openPrice: catalog.open || catalog.price,
-        previousClose: catalog.previousClose || catalog.price,
-        volume: catalog.volume || 0,
-        bid: catalog.bid,
-        ask: catalog.ask,
-        timestamp: Date.now(),
-      };
-    }
-
     return null;
   }
 
@@ -649,67 +631,12 @@ export class DataProviderRouter {
   }
 
   public static generateMultiAssetCandles(
-    instrument: NormalizedInstrument,
-    timeframe: string = '5m',
-    count: number = 60
+    _instrument: NormalizedInstrument,
+    _timeframe: string = '5m',
+    _count: number = 60
   ): MultiAssetChartCandle[] {
-    const basePrice = instrument.price || instrument.previousClose || 100;
-    const now = Date.now();
-    const stepMs =
-      timeframe === '1m'
-        ? 60 * 1000
-        : timeframe === '5m'
-        ? 5 * 60 * 1000
-        : timeframe === '15m'
-        ? 15 * 60 * 1000
-        : timeframe === '1h'
-        ? 60 * 60 * 1000
-        : timeframe === '1d'
-        ? 24 * 60 * 60 * 1000
-        : 5 * 60 * 1000;
-
-    const candles: MultiAssetChartCandle[] = [];
-    let currentClose = basePrice;
-    let cumVolume = 0;
-    let cumPV = 0;
-
-    for (let i = count - 1; i >= 0; i--) {
-      const candleTime = now - i * stepMs;
-      const dateObj = new Date(candleTime);
-      const timeString = dateObj.toLocaleTimeString('en-US', {
-        timeZone: instrument.marketTimezone || 'America/New_York',
-        hour: '2-digit',
-        minute: '2-digit',
-      });
-
-      // Deterministic small micro-variance based on index
-      const deltaPercent = Math.sin(i * 0.25) * 0.002;
-      const open = currentClose;
-      const close = Number((open * (1 + deltaPercent)).toFixed(2));
-      const high = Number((Math.max(open, close) * 1.0015).toFixed(2));
-      const low = Number((Math.min(open, close) * 0.9985).toFixed(2));
-      const volume = Math.floor(5000 + Math.abs(Math.sin(i)) * 12000);
-
-      cumPV += ((high + low + close) / 3) * volume;
-      cumVolume += volume;
-      const vwap = Number((cumPV / cumVolume).toFixed(2));
-
-      candles.push({
-        timestamp: candleTime,
-        timeString,
-        open,
-        high,
-        low,
-        close,
-        volume,
-        vwap,
-        session: 'REGULAR',
-      });
-
-      currentClose = close;
-    }
-
-    return candles;
+    // Historical candles must come from a verified server-side provider.
+    return [];
   }
 
   private static recordProviderSuccess(providerId: string, latencyMs: number) {

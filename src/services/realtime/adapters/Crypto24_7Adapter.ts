@@ -88,8 +88,8 @@ export class Crypto24_7Adapter extends BaseRealTimeAdapter {
             const quote: NormalizedQuote = {
               symbol: normSym,
               price,
-              bid: Number(data.b || price * 0.9999),
-              ask: Number(data.a || price * 1.0001),
+              bid: Number(data.b) || 0,
+              ask: Number(data.a) || 0,
               high,
               low,
               open,

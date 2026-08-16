@@ -44,13 +44,11 @@ import { FastOnboardingModal } from './components/FastOnboardingModal';
 import { NotificationCenterModal } from './components/NotificationCenterModal';
 import { MarketBriefsModal } from './components/MarketBriefsModal';
 import { ReportDataIssueModal } from './components/ReportDataIssueModal';
-import { AppConfig } from './config/environment';
 import { SmartAlertEngine } from './services/smartAlertEngine';
 import { AnalyticsService } from './services/analyticsService';
 
 import {
   getComprehensiveMarketData,
-  simulateTick,
   fetchLiveMarketQuote,
   mergeLiveQuoteIntoComprehensiveData,
   ComprehensiveMarketData,
@@ -215,28 +213,15 @@ export default function App() {
     syncLiveMarket(selectedTicker, dataSource);
   };
 
-  // Real-time live movement polling & tick engine
+  // Provider-backed polling only. Never interpolate or invent prices between responses.
   useEffect(() => {
     if (!isLive) return;
 
-    let tickCount = 0;
     const interval = setInterval(async () => {
-      tickCount++;
-      // Every 3 ticks, fetch fresh quote from Yahoo / Google
-      if (tickCount % 3 === 0) {
-        const liveResult = await fetchLiveMarketQuote(selectedTicker, dataSource);
-        if (liveResult && liveResult.price) {
-          setMarketData((prev) => mergeLiveQuoteIntoComprehensiveData(prev, liveResult));
-          return;
-        }
-      }
-
-      // Fast tick movement interpolation between live queries
-      setMarketData((prev) => {
-        if (!AppConfig.allowSimulatedMarketData) {
-          return prev;
-        }
-        const next = simulateTick(prev);
+      const liveResult = await fetchLiveMarketQuote(selectedTicker, dataSource);
+      if (liveResult && Number(liveResult.price) > 0) {
+        setMarketData((prev) => {
+          const next = mergeLiveQuoteIntoComprehensiveData(prev, liveResult);
         const smartAlert = SmartAlertEngine.evaluateQuoteAlerts(
           next.quote,
           undefined,
@@ -258,8 +243,9 @@ export default function App() {
           ]);
         }
         return next;
-      });
-    }, tickSpeed);
+        });
+      }
+    }, Math.max(tickSpeed, 15000));
 
     return () => clearInterval(interval);
   }, [isLive, selectedTicker, dataSource, tickSpeed]);

@@ -105,7 +105,7 @@ export const MassiveLiveFeedBar: React.FC<MassiveLiveFeedBarProps> = ({
                   : 'bg-[#EF4444]'
               }`}
             />
-            {endOfDayMode ? 'END-OF-DAY' : displayStatus}
+            {endOfDayMode ? (signals ? 'END-OF-DAY' : 'DATA UNAVAILABLE') : displayStatus}
           </div>
 
           <button
@@ -118,6 +118,12 @@ export const MassiveLiveFeedBar: React.FC<MassiveLiveFeedBarProps> = ({
           </button>
         </div>
       </div>
+
+      {!signals && (
+        <div className="mt-3 rounded-lg border border-amber-500/30 bg-amber-500/10 px-3 py-2 text-[11px] font-mono text-amber-200">
+          Verified {endOfDayMode ? 'end-of-day' : 'streaming'} market data is currently unavailable. No simulated prices or candles are being generated.
+        </div>
+      )}
 
       {/* 2. Real-Time Signal Cards Grid */}
       <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-2.5 mt-3">

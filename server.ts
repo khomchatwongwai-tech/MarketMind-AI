@@ -58,6 +58,9 @@ function validateEnvironment(): { valid: boolean; warnings: string[] } {
   if (!process.env.FIREBASE_PROJECT_ID) {
     warnings.push('FIREBASE_PROJECT_ID not set; using default platform identifier.');
   }
+  if (!getMassiveApiKey()) {
+    warnings.push('MASSIVE_API_KEY/POLYGON_API_KEY is not configured. Market prices and candles will report unavailable.');
+  }
   return { valid: true, warnings };
 }
 
@@ -140,6 +143,17 @@ app.get('/api/instruments/:instrumentId/chart', (req, res) => {
   }
 
   const candles = DataProviderRouter.generateMultiAssetCandles(instrument, timeframe, count);
+  if (candles.length === 0) {
+    return res.status(503).json({
+      instrumentId: instrument.instrumentId,
+      symbol: instrument.symbol,
+      timeframe,
+      status: 'UNAVAILABLE',
+      isDelayed: true,
+      error: 'Verified provider candles are unavailable. Synthetic candles are disabled.',
+      candles: [],
+    });
+  }
   res.json({
     instrumentId: instrument.instrumentId,
     symbol: instrument.symbol,
@@ -446,7 +460,7 @@ app.get('/api/market/candles/:ticker', async (req, res) => {
 
           const lastCandle = candles[candles.length - 1];
           const currentPrice = lastCandle.close;
-          const prevClose = candles.length > 1 ? candles[candles.length - 2].close : currentPrice * 0.995;
+          const prevClose = candles.length > 1 ? candles[candles.length - 2].close : currentPrice;
           const pivot = Number((((dayHigh > 0 ? dayHigh : currentPrice) + (dayLow < Infinity ? dayLow : currentPrice) + prevClose) / 3).toFixed(2));
 
           return res.json({
@@ -471,8 +485,8 @@ app.get('/api/market/candles/:ticker', async (req, res) => {
               r2: Number((pivot + ((dayHigh > 0 ? dayHigh : currentPrice) - (dayLow < Infinity ? dayLow : currentPrice))).toFixed(2)),
               s1: Number((2 * pivot - (dayHigh > 0 ? dayHigh : currentPrice)).toFixed(2)),
               s2: Number((pivot - ((dayHigh > 0 ? dayHigh : currentPrice) - (dayLow < Infinity ? dayLow : currentPrice))).toFixed(2)),
-              pdh: Number((prevClose * 1.008).toFixed(2)),
-              pdl: Number((prevClose * 0.992).toFixed(2)),
+              pdh: dayHigh > 0 ? Number(dayHigh.toFixed(2)) : undefined,
+              pdl: dayLow < Infinity ? Number(dayLow.toFixed(2)) : undefined,
               pdc: prevClose,
             },
             candles: candles.slice(-500),
@@ -513,7 +527,10 @@ app.get('/api/market/candles/:ticker', async (req, res) => {
         const lows: (number | null)[] = quoteObj.low || [];
         const volumes: (number | null)[] = quoteObj.volume || [];
 
-        const currentPrice = meta.regularMarketPrice ?? meta.previousClose ?? 500;
+        const currentPrice = Number(meta.regularMarketPrice ?? meta.previousClose);
+        if (!Number.isFinite(currentPrice) || currentPrice <= 0) {
+          throw new Error(`No verified candle price returned for ${ticker}`);
+        }
         const prevClose = meta.chartPreviousClose ?? meta.previousClose ?? currentPrice;
 
         // Build candles
@@ -629,8 +646,8 @@ app.get('/api/market/candles/:ticker', async (req, res) => {
             r2,
             s1,
             s2,
-            pdh: Number(prevClose * 1.008),
-            pdl: Number(prevClose * 0.992),
+            pdh: dayHigh > 0 ? Number(dayHigh.toFixed(2)) : undefined,
+            pdl: dayLow < Infinity ? Number(dayLow.toFixed(2)) : undefined,
             pdc: Number(prevClose.toFixed(2)),
           },
           candles: candles.slice(-500),
@@ -819,18 +836,23 @@ app.get('/api/market/live/:ticker', async (req, res) => {
   // close aggregate instead of making unsupported snapshot/WebSocket claims.
   if (massiveKey && (process.env.MARKET_DATA_MODE || 'end_of_day') === 'end_of_day') {
     try {
+      const toDate = new Date();
+      const fromDate = new Date(toDate);
+      fromDate.setDate(fromDate.getDate() - 14);
       const previousCloseUrl = `https://api.massive.com/v2/aggs/ticker/${encodeURIComponent(
         ticker
-      )}/prev?adjusted=true&apiKey=${encodeURIComponent(massiveKey)}`;
+      )}/range/1/day/${fromDate.toISOString().slice(0, 10)}/${toDate.toISOString().slice(0, 10)}?adjusted=true&sort=desc&limit=2&apiKey=${encodeURIComponent(massiveKey)}`;
       const previousCloseResponse = await fetch(previousCloseUrl);
       if (previousCloseResponse.ok) {
         const previousCloseData = await previousCloseResponse.json();
         const bar = previousCloseData?.results?.[0];
-        if (bar && Number(bar.c) > 0) {
-          const open = Number(bar.o ?? bar.c);
+        const priorBar = previousCloseData?.results?.[1];
+        if (bar && priorBar && Number(bar.c) > 0 && Number(priorBar.c) > 0) {
+          const open = Number(bar.o);
           const close = Number(bar.c);
-          const change = Number((close - open).toFixed(2));
-          const changePercent = open > 0 ? Number(((change / open) * 100).toFixed(2)) : 0;
+          const priorClose = Number(priorBar.c);
+          const change = Number((close - priorClose).toFixed(2));
+          const changePercent = Number(((change / priorClose) * 100).toFixed(2));
           return res.json({
             source: 'Massive Stocks Basic End-of-Day Aggregate',
             status: 'END_OF_DAY',
@@ -842,9 +864,10 @@ app.get('/api/market/live/:ticker', async (req, res) => {
             price: Number(close.toFixed(2)),
             change,
             changePercent,
-            previousClose: Number(open.toFixed(2)),
-            dayHigh: Number(Number(bar.h ?? close).toFixed(2)),
-            dayLow: Number(Number(bar.l ?? close).toFixed(2)),
+            openPrice: Number(open.toFixed(2)),
+            previousClose: Number(priorClose.toFixed(2)),
+            dayHigh: Number(Number(bar.h).toFixed(2)),
+            dayLow: Number(Number(bar.l).toFixed(2)),
             volume: Number(bar.v ?? 0),
             marketState: 'CLOSED',
             dataTimestamp: bar.t ?? null,
@@ -1553,10 +1576,10 @@ app.post('/api/ai/ask', requireAuth, async (req, res) => {
     return res.json(result);
   } catch (error: any) {
     console.error('Ask MarketMind error:', error?.message);
-    return res.json({
-      answer: `Market analysis indicates ${req.body?.ticker || req.body?.marketState?.ticker || 'SPY'} remains in active trading. Please ensure connection to market data.`,
-      timestamp: new Date().toLocaleTimeString('en-US', { timeZone: 'America/New_York' }) + ' ET',
-      source: 'MarketMind Resilient Engine',
+    return res.status(503).json({
+      error: 'Market analysis unavailable',
+      status: 'UNAVAILABLE',
+      message: 'Verified market data or the configured AI provider is unavailable.',
     });
   }
 });
@@ -1609,50 +1632,11 @@ app.post('/api/ai/report', requireAuth, async (req, res) => {
     const ai = getAI();
 
     if (!ai) {
-      const price = marketState?.price || marketState?.preMarket || null;
-      if (!price) {
-        return res.status(503).json({ error: 'Market report unavailable without verified price.' });
-      }
-      if (type === 'morning') {
-        return res.json({
-          title: `Morning Market Intelligence Report: ${marketState?.ticker || 'SPY'}`,
-          bias: 'NEUTRAL / MONITORING',
-          riskLevel: 'MODERATE',
-          preMarketPrice: price,
-          overnightFutures: 'Futures data aligned with baseline session.',
-          overnightNews: 'Market participants awaiting standard opening session catalysts.',
-          economicCalendar: 'Refer to institutional macroeconomic calendar for upcoming releases.',
-          keyLevels: {
-            pivot: price,
-            resistance1: Number((price * 1.008).toFixed(2)),
-            resistance2: Number((price * 1.015).toFixed(2)),
-            support1: Number((price * 0.992).toFixed(2)),
-            support2: Number((price * 0.985).toFixed(2)),
-          },
-          bullishScenario: `Hold above $${Number((price * 1.004).toFixed(2))} with relative volume confirmation.`,
-          bearishScenario: `Breakdown below $${Number((price * 0.992).toFixed(2))} indicates risk-off pressure.`,
-          summary: `Pre-market structure for ${marketState?.ticker || 'SPY'} evaluated at $${price}. Monitor the opening range before executing trades.`,
-          source: 'MarketMind Intelligence Engine (Verified Baseline Pipeline)',
-        });
-      } else {
-        return res.json({
-          title: `End-of-Day Market Performance Review: ${marketState?.ticker || 'SPY'}`,
-          outcome: 'Session Review',
-          closingPrice: price,
-          dayRange: `${marketState?.dayLow || Number((price * 0.99).toFixed(2))} - ${marketState?.dayHigh || Number((price * 1.01).toFixed(2))}`,
-          whyMarketMoved: 'Daily price movement evaluated against institutional breadth and sector performance.',
-          strongestSectors: ['Technology', 'Financials'],
-          weakestSectors: ['Utilities', 'Energy'],
-          predictionAccuracy: 'Analysis aligned with prevailing market structure.',
-          lessonsLearned: 'Risk management and key level adherence remain paramount.',
-          tomorrowLevels: {
-            majorResistance: Number((price * 1.01).toFixed(2)),
-            keyPivot: price,
-            majorSupport: Number((price * 0.99).toFixed(2)),
-          },
-          source: 'MarketMind Intelligence Engine (EOD Verified Baseline)',
-        });
-      }
+      return res.status(503).json({
+        error: 'Market report unavailable',
+        status: 'UNAVAILABLE',
+        message: 'The server-side AI provider is not configured. No synthetic report was generated.',
+      });
     }
 
     const prompt = `Generate a comprehensive, structured financial market report for ${type.toUpperCase()} report.
@@ -2255,6 +2239,13 @@ const realtimeServerManager = RealtimeServerManager.getInstance();
 
 // Endpoint to inspect or trigger active Massive stream
 app.get('/api/market/massive/signals', (req, res) => {
+  if (!massiveWsManager.hasVerifiedMarketData()) {
+    return res.status(503).json({
+      status: 'UNAVAILABLE',
+      source: 'Massive / Polygon WebSocket',
+      error: 'No verified market event has been received from the upstream provider.',
+    });
+  }
   res.json(massiveWsManager.getCalculatedSignals());
 });
 

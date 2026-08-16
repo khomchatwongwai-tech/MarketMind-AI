@@ -68,7 +68,6 @@ import {
 
 interface RealTimeStockChartProps {
   ticker: TickerSymbol;
-  isLiveSimulation?: boolean;
 }
 
 const TIMEFRAMES: Array<{ label: string; value: ChartTimeframe }> = [
@@ -85,7 +84,6 @@ const TIMEFRAMES: Array<{ label: string; value: ChartTimeframe }> = [
 
 export const RealTimeStockChart: React.FC<RealTimeStockChartProps> = ({
   ticker,
-  isLiveSimulation = true,
 }) => {
   const { resolvedTheme, isDark, colors } = useTheme();
   const chartContainerRef = useRef<HTMLDivElement>(null);
@@ -116,7 +114,7 @@ export const RealTimeStockChart: React.FC<RealTimeStockChartProps> = ({
   const [extendedHours, setExtendedHours] = useState<boolean>(true);
   const [candles, setCandles] = useState<ChartCandle[]>([]);
   const [levels, setLevels] = useState<ChartLevels>({});
-  const [marketStatus, setMarketStatus] = useState<'LIVE' | 'DELAYED' | 'DISCONNECTED' | 'UNAVAILABLE'>('LIVE');
+  const [marketStatus, setMarketStatus] = useState<'LIVE' | 'DELAYED' | 'DISCONNECTED' | 'UNAVAILABLE'>('UNAVAILABLE');
   const [lastUpdateStr, setLastUpdateStr] = useState<string>('');
   const [isLoading, setIsLoading] = useState<boolean>(true);
   const [connectionMessage, setConnectionMessage] = useState<string | null>(null);

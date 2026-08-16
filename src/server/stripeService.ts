@@ -1,7 +1,6 @@
 import Stripe from 'stripe';
 import { SubscriptionPlanId } from '../types/subscription';
 import { SUBSCRIPTION_PLANS } from '../config/plans';
-import { ServerUserStore } from '../services/serverUserStore';
 import { getFirebaseFirestore } from './firebaseAdmin';
 
 let stripeClient: Stripe | null = null;
@@ -16,31 +15,21 @@ export function getStripe(): Stripe | null {
 }
 
 // Server-side whitelist mapping for price IDs
-export const SERVER_PRICE_ALLOWLIST: Record<SubscriptionPlanId, { monthly?: string; annual?: string }> = {
-  free: {},
-  basic: {
-    monthly: process.env.STRIPE_PRICE_BASIC || undefined,
-    annual: process.env.STRIPE_PRICE_BASIC_ANNUAL || undefined,
-  },
-  pro: {
-    monthly: process.env.STRIPE_PRICE_PRO || undefined,
-    annual: process.env.STRIPE_PRICE_PRO_ANNUAL || undefined,
-  },
-  premium: {
-    monthly: process.env.STRIPE_PRICE_PREMIUM || undefined,
-    annual: process.env.STRIPE_PRICE_PREMIUM_ANNUAL || undefined,
-  },
-};
+export function getServerPriceAllowlist(): Record<SubscriptionPlanId, { monthly?: string; annual?: string }> {
+  return { free: {}, basic: { monthly: process.env.STRIPE_PRICE_BASIC, annual: process.env.STRIPE_PRICE_BASIC_ANNUAL },
+    pro: { monthly: process.env.STRIPE_PRICE_PRO, annual: process.env.STRIPE_PRICE_PRO_ANNUAL },
+    premium: { monthly: process.env.STRIPE_PRICE_PREMIUM, annual: process.env.STRIPE_PRICE_PREMIUM_ANNUAL } };
+}
 
 export function getStripePriceId(planId: SubscriptionPlanId, billingCycle: 'monthly' | 'annual' = 'monthly'): string | null {
-  const mapping = SERVER_PRICE_ALLOWLIST[planId];
+  const mapping = getServerPriceAllowlist()[planId];
   if (!mapping) return null;
-  return mapping[billingCycle] || mapping.monthly || null;
+  return mapping[billingCycle] || null;
 }
 
 export function isAllowedPriceId(priceId: string): boolean {
   if (!priceId) return false;
-  for (const plan of Object.values(SERVER_PRICE_ALLOWLIST)) {
+  for (const plan of Object.values(getServerPriceAllowlist())) {
     if (plan.monthly === priceId || plan.annual === priceId) {
       return true;
     }
@@ -84,6 +73,10 @@ export class StripeService {
 
     const priceId = getStripePriceId(planId, billingCycle);
 
+    if (!priceId || !isAllowedPriceId(priceId)) {
+      return { error: `Stripe ${billingCycle} price is not configured for ${planId}.`, code: 'STRIPE_PRICE_NOT_CONFIGURED' };
+    }
+
     try {
       const origin = appUrl.replace(/\/+$/, '');
       const sessionParams: Stripe.Checkout.SessionCreateParams = {
@@ -106,30 +99,7 @@ export class StripeService {
         cancel_url: `${origin}/?billing_status=canceled`,
       };
 
-      if (priceId && isAllowedPriceId(priceId)) {
-        sessionParams.line_items = [{ price: priceId, quantity: 1 }];
-      } else {
-        // Dynamic verified price item based on server plan configuration
-        const unitAmount = Math.round(
-          (billingCycle === 'annual' ? planConfig.annualMonthlyPrice * 12 : planConfig.monthlyPrice) * 100
-        );
-        sessionParams.line_items = [
-          {
-            price_data: {
-              currency: 'usd',
-              product_data: {
-                name: `MarketMind AI ${planConfig.name} Subscription`,
-                description: planConfig.description,
-              },
-              unit_amount: unitAmount,
-              recurring: {
-                interval: billingCycle === 'annual' ? 'year' : 'month',
-              },
-            },
-            quantity: 1,
-          },
-        ];
-      }
+      sessionParams.line_items = [{ price: priceId, quantity: 1 }];
 
       const session = await stripe.checkout.sessions.create(sessionParams);
       if (!session.url) {
@@ -142,7 +112,7 @@ export class StripeService {
       };
     } catch (err: any) {
       console.error('[StripeService] Checkout session creation failed:', err?.message);
-      return { error: err?.message || 'Failed to create Stripe Checkout session', code: 'STRIPE_ERROR' };
+      return { error: 'Stripe checkout could not be created.', code: 'STRIPE_ERROR' };
     }
   }
 
@@ -167,7 +137,7 @@ export class StripeService {
       return { url: portalSession.url };
     } catch (err: any) {
       console.error('[StripeService] Customer portal session failed:', err?.message);
-      return { error: err?.message || 'Failed to create billing portal session.' };
+      return { error: 'Stripe billing portal could not be created.' };
     }
   }
 
@@ -187,156 +157,64 @@ export class StripeService {
       event = stripe.webhooks.constructEvent(rawBody, signature, webhookSecret);
     } catch (err: any) {
       console.error('[Stripe Webhook] Signature verification failed:', err?.message);
-      return { error: `Webhook signature verification failed: ${err?.message}`, received: false };
+      return { error: 'Webhook signature verification failed.', received: false };
     }
 
-    // Idempotency check: in-memory and durable database check
+    // This cache is only an optimization. Firestore is the authority.
     if (processedWebhookEvents.has(event.id)) {
-      console.log(`[Stripe Webhook] Event ${event.id} already processed. Skipping.`);
       return { received: true, eventType: event.type };
     }
 
     try {
       const db = getFirebaseFirestore();
-      const eventDoc = await db.collection('processed_webhooks').doc(event.id).get().catch(() => null);
-      if (eventDoc && eventDoc.exists) {
-        processedWebhookEvents.add(event.id);
-        console.log(`[Stripe Webhook] Event ${event.id} already exists in Firestore. Skipping.`);
-        return { received: true, eventType: event.type };
-      }
-    } catch (dbErr) {
-      // Continue if Firestore is running in mock/emulator mode
-    }
-
-    processedWebhookEvents.add(event.id);
-
-    try {
-      const db = getFirebaseFirestore();
-      await db.collection('processed_webhooks').doc(event.id).set({
-        eventId: event.id,
-        type: event.type,
-        processedAt: new Date().toISOString(),
-      }).catch(() => null);
-    } catch {}
-
-    console.log(`[Stripe Webhook] Verified event ${event.id}: ${event.type}`);
-
-    try {
-      switch (event.type) {
-        case 'checkout.session.completed': {
+      const eventRef = db.collection('processed_webhooks').doc(event.id);
+      const outcome = await db.runTransaction(async (transaction) => {
+        if ((await transaction.get(eventRef)).exists) return 'duplicate';
+        const now = new Date().toISOString();
+        let uid: string | undefined;
+        let updates: Record<string, unknown> | undefined;
+        if (event.type === 'checkout.session.completed') {
           const session = event.data.object as Stripe.Checkout.Session;
-          const uid = session.client_reference_id || session.metadata?.firebaseUid;
-          const planId = (session.metadata?.planId as SubscriptionPlanId) || 'pro';
-
-          if (uid) {
-            ServerUserStore.updateSubscriptionByUid(uid, {
-              plan: planId,
-              subscriptionStatus: 'active',
-              paymentProvider: 'stripe',
-              paymentCustomerId: session.customer as string,
-              paymentSubscriptionId: session.subscription as string,
-            });
-
-            // Persist to durable Firestore database
-            try {
-              const db = getFirebaseFirestore();
-              await db.collection('users').doc(uid).set(
-                {
-                  plan: planId,
-                  planTier: planId.toUpperCase(),
-                  subscriptionStatus: 'active',
-                  paymentProvider: 'stripe',
-                  paymentCustomerId: session.customer as string,
-                  paymentSubscriptionId: session.subscription as string,
-                  updatedAt: new Date().toISOString(),
-                },
-                { merge: true }
-              );
-            } catch (fsErr) {
-              console.warn('[Stripe Webhook] Firestore user sync notice:', fsErr);
-            }
-
-            console.log(`[Stripe Webhook] Activated subscription for user ${uid} (Plan: ${planId})`);
-          }
-          break;
+          uid = session.client_reference_id || session.metadata?.firebaseUid || undefined;
+          const plan = session.metadata?.planId as SubscriptionPlanId;
+          if (!uid || !['basic', 'pro', 'premium'].includes(plan)) throw new Error('Webhook subscription identity is invalid');
+          updates = { plan, planTier: plan.toUpperCase(), subscriptionStatus: 'active', paymentProvider: 'stripe',
+            paymentCustomerId: session.customer, paymentSubscriptionId: session.subscription, updatedAt: now };
+        } else if (event.type === 'customer.subscription.updated' || event.type === 'customer.subscription.deleted') {
+          const subscription = event.data.object as Stripe.Subscription;
+          uid = subscription.metadata?.firebaseUid;
+          if (!uid) throw new Error('Webhook subscription identity is invalid');
+          const deleted = event.type === 'customer.subscription.deleted';
+          updates = deleted
+            ? { plan: 'free', planTier: 'FREE', subscriptionStatus: 'canceled', cancelAtPeriodEnd: true, updatedAt: now }
+            : { subscriptionStatus: subscription.status === 'active' ? 'active' : subscription.status === 'past_due' ? 'past_due' : 'canceled', cancelAtPeriodEnd: subscription.cancel_at_period_end, updatedAt: now };
         }
-
-        case 'customer.subscription.updated': {
-          const sub = event.data.object as Stripe.Subscription;
-          const uid = sub.metadata?.firebaseUid;
-          if (uid) {
-            const status = sub.status === 'active' ? 'active' : sub.status === 'past_due' ? 'past_due' : 'canceled';
-            ServerUserStore.updateSubscriptionByUid(uid, {
-              subscriptionStatus: status,
-              cancelAtPeriodEnd: sub.cancel_at_period_end,
-            });
-
-            try {
-              const db = getFirebaseFirestore();
-              await db.collection('users').doc(uid).set(
-                {
-                  subscriptionStatus: status,
-                  cancelAtPeriodEnd: sub.cancel_at_period_end,
-                  updatedAt: new Date().toISOString(),
-                },
-                { merge: true }
-              );
-            } catch {}
-
-            console.log(`[Stripe Webhook] Updated subscription for user ${uid} to ${status}`);
-          }
-          break;
+        if (uid && updates) {
+          const userRef = db.collection('users').doc(uid);
+          if (!(await transaction.get(userRef)).exists) throw new Error('Webhook user account was not found');
+          transaction.set(userRef, updates, { merge: true });
         }
-
-        case 'customer.subscription.deleted': {
-          const sub = event.data.object as Stripe.Subscription;
-          const uid = sub.metadata?.firebaseUid;
-          if (uid) {
-            ServerUserStore.updateSubscriptionByUid(uid, {
-              subscriptionStatus: 'canceled',
-              cancelAtPeriodEnd: true,
-              plan: 'free',
-            });
-
-            try {
-              const db = getFirebaseFirestore();
-              await db.collection('users').doc(uid).set(
-                {
-                  subscriptionStatus: 'canceled',
-                  cancelAtPeriodEnd: true,
-                  plan: 'free',
-                  planTier: 'FREE',
-                  updatedAt: new Date().toISOString(),
-                },
-                { merge: true }
-              );
-            } catch {}
-
-            console.log(`[Stripe Webhook] Canceled subscription for user ${uid}`);
-          }
-          break;
-        }
-
-        case 'invoice.payment_succeeded': {
-          const invoice = event.data.object as Stripe.Invoice;
-          console.log(`[Stripe Webhook] Invoice ${invoice.id} paid successfully for customer ${invoice.customer}`);
-          break;
-        }
-
-        case 'invoice.payment_failed': {
-          const invoice = event.data.object as Stripe.Invoice;
-          console.warn(`[Stripe Webhook] Invoice ${invoice.id} payment failed for customer ${invoice.customer}`);
-          break;
-        }
-
-        default:
-          break;
-      }
-
+        transaction.create(eventRef, { eventId: event.id, type: event.type, processedAt: now });
+        return 'processed';
+      });
+      processedWebhookEvents.add(event.id);
+      if (outcome === 'processed') console.log(`[Stripe Webhook] Processed verified ${event.type} event`);
       return { received: true, eventType: event.type };
     } catch (processError: any) {
-      console.error('[Stripe Webhook] Processing error:', processError);
-      return { received: false, error: processError?.message };
+      console.error('[Stripe Webhook] Processing failed; event remains retryable');
+      return { received: false, error: 'Webhook processing failed.' };
+    }
+  }
+
+  static async scheduleSubscriptionCancellation(subscriptionId: string): Promise<boolean> {
+    const stripe = getStripe();
+    if (!stripe || !subscriptionId) return false;
+    try {
+      await stripe.subscriptions.update(subscriptionId, { cancel_at_period_end: true });
+      return true;
+    } catch {
+      console.error('[StripeService] Subscription cancellation request failed');
+      return false;
     }
   }
 }

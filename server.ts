@@ -12,7 +12,7 @@ import {
   executeWhyIsItMoving,
   buildStructuredMarketContext,
 } from './src/services/geminiMarketService';
-import { ServerUserStore } from './src/services/serverUserStore';
+import { FirestoreUserStore as ServerUserStore } from './src/server/firestoreUserStore';
 import { SUBSCRIPTION_PLANS, TRIAL_DURATION_DAYS } from './src/config/plans';
 import { SubscriptionPlanId } from './src/types/subscription';
 import { newsIntelligenceService } from './src/services/newsIntelligenceService';
@@ -22,47 +22,47 @@ import { executeMultiAssetAIAnalysis } from './src/services/geminiMultiAssetServ
 import { UniversalAssetClass } from './src/types/instrument';
 import { requireAuth, requireRole, requireAnyRole, requireEntitlement, AuthenticatedRequest } from './src/server/authMiddleware';
 import { StripeService } from './src/server/stripeService';
+import { assertProductionEnvironment } from './src/server/productionPreflight';
 
 dotenv.config();
 
 const PORT = Number(process.env.PORT) || 3000;
 const app = express();
+app.disable('x-powered-by');
+app.set('trust proxy', 1);
 
 // Security Headers Middleware
 app.use((req, res, next) => {
   res.setHeader('X-Content-Type-Options', 'nosniff');
-  res.setHeader('X-Frame-Options', 'SAMEORIGIN');
+  res.setHeader('X-Frame-Options', 'DENY');
   res.setHeader('X-XSS-Protection', '1; mode=block');
   res.setHeader('Referrer-Policy', 'strict-origin-when-cross-origin');
+  res.setHeader('Permissions-Policy', 'camera=(), microphone=(), geolocation=()');
   next();
 });
 
 // Capture raw body for Stripe webhook signature verification
 app.use(
   express.json({
+    limit: '1mb',
     verify: (req: any, _res, buf) => {
       req.rawBody = buf;
     },
   })
 );
 
-// Production Environment Diagnostics
-function validateEnvironment(): { valid: boolean; warnings: string[] } {
-  const warnings: string[] = [];
-  if (!process.env.GEMINI_API_KEY) {
-    warnings.push('GEMINI_API_KEY is not configured. Server-side AI intelligence will run in fallback state.');
-  }
-  if (!process.env.STRIPE_SECRET_KEY) {
-    warnings.push('STRIPE_SECRET_KEY is not configured. Billing checkouts will return unconfigured notices.');
-  }
-  if (!process.env.FIREBASE_PROJECT_ID) {
-    warnings.push('FIREBASE_PROJECT_ID not set; using default platform identifier.');
-  }
-  if (!getMassiveApiKey()) {
-    warnings.push('MASSIVE_API_KEY/POLYGON_API_KEY is not configured. Market prices and candles will report unavailable.');
-  }
-  return { valid: true, warnings };
-}
+const requestWindows = new Map<string, { count: number; resetAt: number }>();
+app.use('/api', (req, res, next) => {
+  const now = Date.now();
+  const key = req.ip || req.socket.remoteAddress || 'unknown';
+  const current = requestWindows.get(key);
+  const window = !current || current.resetAt <= now ? { count: 0, resetAt: now + 60_000 } : current;
+  window.count += 1;
+  requestWindows.set(key, window);
+  if (requestWindows.size > 10_000) for (const [id, value] of requestWindows) if (value.resetAt <= now) requestWindows.delete(id);
+  if (window.count > 180) return res.status(429).json({ error: 'Too many requests.', code: 'RATE_LIMITED' });
+  next();
+});
 
 // Lazy-initialize Gemini AI client
 let aiClient: GoogleGenAI | null = null;
@@ -790,7 +790,7 @@ Return a comprehensive, institutional-grade probabilistic chart analysis in JSON
 }`;
 
     const response = await ai.models.generateContent({
-      model: 'gemini-3.7-flash',
+      model: process.env.GEMINI_MODEL || 'gemini-2.5-flash',
       contents: prompt,
       config: {
         responseMimeType: 'application/json',
@@ -1448,7 +1448,7 @@ app.post('/api/news/portfolio-exposure', requireAuth, async (req, res) => {
 });
 
 // Alert Rules endpoints
-app.get('/api/news/alerts', (req, res) => {
+app.get('/api/news/alerts', requireAuth, (req, res) => {
   res.json({ rules: newsIntelligenceService.getAlertRules() });
 });
 
@@ -1461,7 +1461,7 @@ app.post('/api/news/alerts', requireAuth, (req, res) => {
   }
 });
 
-app.patch('/api/news/alerts/:id/toggle', (req, res) => {
+app.patch('/api/news/alerts/:id/toggle', requireAuth, (req, res) => {
   const enabled = newsIntelligenceService.toggleAlertRule(req.params.id);
   res.json({ id: req.params.id, enabled });
 });
@@ -1472,7 +1472,7 @@ app.delete('/api/news/alerts/:id', requireAuth, (req, res) => {
 });
 
 // Notifications endpoints
-app.get('/api/news/notifications', (req, res) => {
+app.get('/api/news/notifications', requireAuth, (req, res) => {
   res.json({ notifications: newsIntelligenceService.getNotifications() });
 });
 
@@ -1647,7 +1647,7 @@ Current State: ${JSON.stringify(marketState)}
 Respond in valid JSON format matching the schema for a professional trading desk report.`;
 
     const response = await ai.models.generateContent({
-      model: 'gemini-3.7-flash',
+      model: process.env.GEMINI_MODEL || 'gemini-2.5-flash',
       contents: prompt,
       config: { responseMimeType: 'application/json' },
     });
@@ -1669,14 +1669,14 @@ Respond in valid JSON format matching the schema for a professional trading desk
 // ==========================================
 
 // Get Current User Profile & Entitlements (Protected by Firebase Auth)
-app.get('/api/auth/me', requireAuth, (req: AuthenticatedRequest, res) => {
+app.get('/api/auth/me', requireAuth, async (req: AuthenticatedRequest, res) => {
   const uid = req.user!.uid;
   const email = req.user!.email || '';
   const role = req.user!.role || 'user';
 
-  let account = ServerUserStore.findById(uid);
+  let account = await ServerUserStore.findById(uid);
   if (!account) {
-    account = ServerUserStore.getOrCreateUser({
+    account = await ServerUserStore.getOrCreateUser({
       uid,
       email,
       role,
@@ -1687,7 +1687,7 @@ app.get('/api/auth/me', requireAuth, (req: AuthenticatedRequest, res) => {
 });
 
 // Update User Profile (Protected by Firebase Auth with strict safe field allowlist)
-app.put('/api/auth/profile', requireAuth, (req: AuthenticatedRequest, res) => {
+app.put('/api/auth/profile', requireAuth, async (req: AuthenticatedRequest, res) => {
   try {
     const uid = req.user!.uid;
     const { updates } = req.body;
@@ -1695,13 +1695,13 @@ app.put('/api/auth/profile', requireAuth, (req: AuthenticatedRequest, res) => {
       return res.status(400).json({ error: 'Invalid updates payload provided.' });
     }
 
-    const account = ServerUserStore.findById(uid) || ServerUserStore.getOrCreateUser({
+    const account = await ServerUserStore.findById(uid) || await ServerUserStore.getOrCreateUser({
       uid,
       email: req.user!.email || '',
       role: req.user!.role || 'user',
     });
 
-    const result = ServerUserStore.updateSafeProfile(account.id, updates);
+    const result = await ServerUserStore.updateSafeProfile(account.id, updates);
     return res.json({
       message: 'Profile updated successfully.',
       user: ServerUserStore.convertToUserProfile(result.user),
@@ -1726,15 +1726,15 @@ app.get('/api/billing/plans', (req, res) => {
 });
 
 // Get User Subscription Status & Invoices (Protected)
-app.get('/api/billing/status', requireAuth, (req: AuthenticatedRequest, res) => {
+app.get('/api/billing/status', requireAuth, async (req: AuthenticatedRequest, res) => {
   const uid = req.user!.uid;
-  const account = ServerUserStore.findById(uid) || ServerUserStore.getOrCreateUser({
+  const account = await ServerUserStore.findById(uid) || await ServerUserStore.getOrCreateUser({
     uid,
     email: req.user!.email || '',
     role: req.user!.role,
   });
 
-  const invoices = ServerUserStore.getInvoicesForUser(account.id);
+  const invoices = await ServerUserStore.getInvoicesForUser(account.id);
   res.json({
     subscription: {
       planId: account.plan,
@@ -1753,11 +1753,12 @@ app.get('/api/billing/status', requireAuth, (req: AuthenticatedRequest, res) => 
 });
 
 // Start 15-Day Free Trial on a Plan (Protected - Strict Trial Re-use Enforcement)
-app.post('/api/billing/start-trial', requireAuth, (req: AuthenticatedRequest, res) => {
+app.post('/api/billing/start-trial', requireAuth, async (req: AuthenticatedRequest, res) => {
   try {
     const uid = req.user!.uid;
     const { planId = 'pro' } = req.body;
-    const account = ServerUserStore.findById(uid) || ServerUserStore.getOrCreateUser({
+    if (!['basic', 'pro', 'premium'].includes(planId)) return res.status(400).json({ error: 'Invalid trial plan.', code: 'INVALID_PLAN' });
+    const account = await ServerUserStore.findById(uid) || await ServerUserStore.getOrCreateUser({
       uid,
       email: req.user!.email || '',
       role: req.user!.role,
@@ -1774,7 +1775,7 @@ app.post('/api/billing/start-trial', requireAuth, (req: AuthenticatedRequest, re
     const now = new Date();
     const trialEndsAt = new Date(now.getTime() + TRIAL_DURATION_DAYS * 86400000).toISOString();
 
-    const updated = ServerUserStore.updateAccount(account.id, {
+    const updated = await ServerUserStore.updateAccount(account.id, {
       plan: plan.id,
       subscriptionStatus: 'trialing',
       trialStartedAt: now.toISOString(),
@@ -1802,6 +1803,10 @@ app.post('/api/billing/create-checkout-session', requireAuth, async (req: Authen
     const { planId, billingCycle = 'monthly' } = req.body;
     const appUrl = process.env.APP_URL || `http://${req.headers.host || 'localhost:3000'}`;
 
+    if (!['basic', 'pro', 'premium'].includes(planId) || !['monthly', 'annual'].includes(billingCycle)) {
+      return res.status(400).json({ error: 'Invalid checkout selection.', code: 'INVALID_CHECKOUT_SELECTION' });
+    }
+
     if (!StripeService.isConfigured()) {
       return res.status(400).json({
         error: 'Stripe payment provider is not configured. Set STRIPE_SECRET_KEY in environment variables.',
@@ -1828,7 +1833,7 @@ app.post('/api/billing/create-checkout-session', requireAuth, async (req: Authen
     });
   } catch (err: any) {
     console.error('Checkout session route error:', err);
-    return res.status(500).json({ error: 'Internal checkout error', message: err.message });
+    return res.status(500).json({ error: 'Internal checkout error' });
   }
 });
 
@@ -1836,7 +1841,7 @@ app.post('/api/billing/create-checkout-session', requireAuth, async (req: Authen
 app.post('/api/billing/create-portal-session', requireAuth, async (req: AuthenticatedRequest, res) => {
   try {
     const uid = req.user!.uid;
-    const account = ServerUserStore.findById(uid);
+    const account = await ServerUserStore.findById(uid);
     const appUrl = process.env.APP_URL || `http://${req.headers.host || 'localhost:3000'}`;
 
     if (!account?.paymentCustomerId) {
@@ -1864,11 +1869,11 @@ app.post('/api/billing/create-portal-session', requireAuth, async (req: Authenti
 });
 
 // Upgrade or Downgrade Subscription Plan (Protected - Direct activation of paid plan is FORBIDDEN)
-app.post('/api/billing/change-plan', requireAuth, (req: AuthenticatedRequest, res) => {
+app.post('/api/billing/change-plan', requireAuth, async (req: AuthenticatedRequest, res) => {
   try {
     const uid = req.user!.uid;
     const { planId } = req.body;
-    const account = ServerUserStore.findById(uid) || ServerUserStore.getOrCreateUser({
+    const account = await ServerUserStore.findById(uid) || await ServerUserStore.getOrCreateUser({
       uid,
       email: req.user!.email || '',
       role: req.user!.role,
@@ -1882,17 +1887,9 @@ app.post('/api/billing/change-plan', requireAuth, (req: AuthenticatedRequest, re
       });
     }
 
-    // Allow user to downgrade to free plan
-    const updated = ServerUserStore.updateAccount(account.id, {
-      plan: 'free',
-      subscriptionStatus: 'free',
-      monthlyPrice: 0,
-      cancelAtPeriodEnd: false,
-    });
-
-    return res.json({
-      message: 'Subscription plan has been set to Free tier.',
-      user: ServerUserStore.convertToUserProfile(updated),
+    return res.status(403).json({
+      error: 'Subscription changes must be completed through the Stripe billing portal.',
+      code: 'STRIPE_PORTAL_REQUIRED',
     });
   } catch (error: any) {
     return res.status(500).json({ error: error.message || 'Failed to update plan.' });
@@ -1900,15 +1897,19 @@ app.post('/api/billing/change-plan', requireAuth, (req: AuthenticatedRequest, re
 });
 
 // Cancel Subscription (Protected)
-app.post('/api/billing/cancel-subscription', requireAuth, (req: AuthenticatedRequest, res) => {
+app.post('/api/billing/cancel-subscription', requireAuth, async (req: AuthenticatedRequest, res) => {
   try {
     const uid = req.user!.uid;
-    const account = ServerUserStore.findById(uid);
+    const account = await ServerUserStore.findById(uid);
     if (!account) {
       return res.status(404).json({ error: 'Account not found.' });
     }
 
-    const updated = ServerUserStore.updateAccount(account.id, {
+    if (!account.paymentSubscriptionId || !(await StripeService.scheduleSubscriptionCancellation(account.paymentSubscriptionId))) {
+      return res.status(502).json({ error: 'Stripe could not confirm cancellation. No account changes were made.', code: 'STRIPE_CANCELLATION_FAILED' });
+    }
+
+    const updated = await ServerUserStore.updateAccount(account.id, {
       cancelAtPeriodEnd: true,
       subscriptionStatus: 'canceled',
     });
@@ -1924,15 +1925,15 @@ app.post('/api/billing/cancel-subscription', requireAuth, (req: AuthenticatedReq
 });
 
 // Get Billing History / Invoices (Protected)
-app.get('/api/billing/history', requireAuth, (req: AuthenticatedRequest, res) => {
+app.get('/api/billing/history', requireAuth, async (req: AuthenticatedRequest, res) => {
   const uid = req.user!.uid;
-  const invoices = ServerUserStore.getInvoicesForUser(uid);
+  const invoices = await ServerUserStore.getInvoicesForUser(uid);
   res.json({ invoices });
 });
 
 // Get Admin Subscription Business Metrics (Admin Protected)
-app.get('/api/billing/admin-metrics', requireAuth, requireRole('admin'), (_req: AuthenticatedRequest, res) => {
-  const metrics = ServerUserStore.getAdminMetrics();
+app.get('/api/billing/admin-metrics', requireAuth, requireRole('admin'), async (_req: AuthenticatedRequest, res) => {
+  const metrics = await ServerUserStore.getAdminMetrics();
   res.json(metrics);
 });
 
@@ -1947,7 +1948,7 @@ app.post('/api/billing/webhook', async (req: any, res) => {
   const result = await StripeService.handleWebhookEvent(rawBody, signature as string);
 
   if (result.error) {
-    return res.status(400).json({ error: result.error });
+    return res.status(result.error.includes('signature') ? 400 : 500).json({ error: result.error });
   }
 
   return res.json({ received: true, eventType: result.eventType });
@@ -2256,12 +2257,12 @@ app.post('/api/market/massive/subscribe', requireAuth, (req, res) => {
 });
 
 // Real-Time Server Diagnostics Endpoint
-app.get('/api/realtime/diagnostics', (req, res) => {
+app.get('/api/realtime/diagnostics', requireAuth, requireRole('admin'), (req, res) => {
   res.json(realtimeServerManager.getDiagnostics());
 });
 
 // Real-Time Connection Test Endpoint
-app.get('/api/realtime/test-connection', async (req, res) => {
+app.get('/api/realtime/test-connection', requireAuth, requireRole('admin'), async (req, res) => {
   const symbol = (req.query.symbol as string) || 'BTC-USD';
   const startTime = Date.now();
 
@@ -2305,11 +2306,7 @@ app.get('/api/realtime/test-connection', async (req, res) => {
 
 // Setup Vite dev middleware or static serving
 async function startServer() {
-  const envCheck = validateEnvironment();
-  if (envCheck.warnings.length > 0) {
-    console.log('[MarketMind Server Boot Diagnostics]:');
-    envCheck.warnings.forEach((w) => console.log(`  - ${w}`));
-  }
+  assertProductionEnvironment();
 
   const server = http.createServer(app);
 

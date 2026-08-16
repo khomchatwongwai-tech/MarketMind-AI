@@ -22,9 +22,17 @@ import { UniversalAssetClass } from './src/types/instrument';
 
 dotenv.config();
 
-const PORT = 3000;
+const PORT = Number.parseInt(process.env.PORT || '3000', 10);
 const app = express();
-app.use(express.json());
+app.disable('x-powered-by');
+app.use((req, res, next) => {
+  res.setHeader('X-Content-Type-Options', 'nosniff');
+  res.setHeader('X-Frame-Options', 'DENY');
+  res.setHeader('Referrer-Policy', 'strict-origin-when-cross-origin');
+  res.setHeader('Permissions-Policy', 'camera=(), microphone=(), geolocation=()');
+  next();
+});
+app.use(express.json({ limit: '1mb' }));
 
 // Lazy-initialize Gemini AI client
 let aiClient: GoogleGenAI | null = null;
@@ -45,7 +53,28 @@ function getAI(): GoogleGenAI | null {
 
 // Health check endpoint
 app.get('/api/health', (req, res) => {
-  res.json({ status: 'ok', service: 'MarketMind AI Engine', timestamp: new Date().toISOString() });
+  res.setHeader('Cache-Control', 'no-store');
+  res.json({
+    status: 'ok',
+    service: 'MarketMind AI Engine',
+    version: process.env.RENDER_GIT_COMMIT || process.env.npm_package_version || 'development',
+    uptimeSeconds: Math.floor(process.uptime()),
+    timestamp: new Date().toISOString(),
+  });
+});
+
+app.get('/api/ready', (req, res) => {
+  res.setHeader('Cache-Control', 'no-store');
+  res.json({
+    status: 'ready',
+    dependencies: {
+      gemini: Boolean(process.env.GEMINI_API_KEY),
+      marketData: Boolean(process.env.MASSIVE_API_KEY || process.env.POLYGON_API_KEY),
+      stripe: Boolean(process.env.STRIPE_SECRET_KEY && process.env.STRIPE_WEBHOOK_SECRET),
+      durableUserStore: false,
+    },
+    timestamp: new Date().toISOString(),
+  });
 });
 
 // ==========================================
@@ -136,13 +165,13 @@ app.get('/api/instruments/:instrumentId/market-status', (req, res) => {
 });
 
 // 6. News for Multi-Asset Instrument
-app.get('/api/instruments/:instrumentId/news', (req, res) => {
+app.get('/api/instruments/:instrumentId/news', async (req, res) => {
   const idOrSymbol = req.params.instrumentId;
   const instrument =
     InstrumentDirectoryService.getById(idOrSymbol) ||
     InstrumentDirectoryService.getBySymbol(idOrSymbol);
 
-  const articles = newsIntelligenceService.getStoredArticles();
+  const articles = await newsIntelligenceService.getAggregatedNews({ limit: 100 });
   const symbol = instrument?.symbol.toUpperCase() || idOrSymbol.toUpperCase();
 
   const filtered = articles.filter(
@@ -1790,6 +1819,11 @@ app.post('/api/auth/login', (req, res) => {
 
 // Google SSO / OAuth Authentication
 app.post('/api/auth/google', (req, res) => {
+  if (process.env.NODE_ENV === 'production') {
+    return res.status(501).json({
+      error: 'Google sign-in is disabled until server-side Firebase ID token verification is configured.',
+    });
+  }
   try {
     const { email, name, firstName, lastName, country, language, timezone } = req.body;
     if (!email) {
@@ -1850,7 +1884,7 @@ app.post('/api/auth/forgot-password', (req, res) => {
 
       return res.json({
         message: 'Password reset link has been prepared for your email.',
-        resetToken, // Provided for user-friendly testing & verification
+        ...(process.env.NODE_ENV !== 'production' ? { resetToken } : {}),
       });
     }
 
@@ -1874,13 +1908,8 @@ app.post('/api/auth/reset-password', (req, res) => {
     // Find account by reset token
     let foundAccount: any = null;
     const now = Date.now();
-    for (const email of ['khomchatwongwai@gmail.com', 'alex.morgan@quantcap.com', 'sarah.chen@singaporealpha.sg']) {
-      const acc = ServerUserStore.findByEmail(email);
-      if (acc && acc.resetPasswordToken === token && (acc.resetPasswordExpires || 0) > now) {
-        foundAccount = acc;
-        break;
-      }
-    }
+    const accountForToken = ServerUserStore.findByResetToken(token);
+    if (accountForToken && (accountForToken.resetPasswordExpires || 0) > now) foundAccount = accountForToken;
 
     if (!foundAccount) {
       return res.status(400).json({ error: 'Invalid or expired password reset token.' });
@@ -1981,7 +2010,8 @@ app.post('/api/auth/delete-account', (req, res) => {
 
 // Get Current User Session Endpoint
 app.get('/api/auth/me', (req, res) => {
-  const email = (req.query.email as string) || DEFAULT_ADMIN_EMAIL;
+  const email = req.query.email as string;
+  if (!email) return res.status(400).json({ error: 'Email is required.' });
   const account = ServerUserStore.findByEmail(email);
   if (!account) {
     return res.status(404).json({ error: 'User session not found.' });
@@ -2066,7 +2096,7 @@ app.post('/api/billing/create-checkout-session', (req, res) => {
   const stripeKey = process.env.STRIPE_SECRET_KEY;
 
   if (!stripeKey) {
-    return res.json({
+    return res.status(503).json({
       connected: false,
       message: 'PAYMENT PROVIDER NOT CONNECTED',
       providerStatus: 'Awaiting Stripe API credentials in environment variables.',
@@ -2075,10 +2105,9 @@ app.post('/api/billing/create-checkout-session', (req, res) => {
     });
   }
 
-  // Real Stripe Integration Path when STRIPE_SECRET_KEY is configured
-  return res.json({
-    connected: true,
-    checkoutUrl: `https://checkout.stripe.com/pay/cs_test_mock_${Date.now()}`,
+  return res.status(501).json({
+    connected: false,
+    error: 'Stripe checkout session creation is not implemented. No charge was attempted.',
   });
 });
 
@@ -2086,16 +2115,16 @@ app.post('/api/billing/create-checkout-session', (req, res) => {
 app.post('/api/billing/create-portal-session', (req, res) => {
   const stripeKey = process.env.STRIPE_SECRET_KEY;
   if (!stripeKey) {
-    return res.json({
+    return res.status(503).json({
       connected: false,
       message: 'PAYMENT PROVIDER NOT CONNECTED',
       details: 'Customer Billing Portal will become active once Stripe credentials are provided.',
     });
   }
 
-  return res.json({
-    connected: true,
-    portalUrl: 'https://billing.stripe.com/p/session/test',
+  return res.status(501).json({
+    connected: false,
+    error: 'Stripe billing portal creation is not implemented.',
   });
 });
 
@@ -2181,6 +2210,11 @@ app.get('/api/billing/admin-metrics', (req, res) => {
 // Payment Provider Webhook Handler (Stripe Webhook Architecture)
 app.post('/api/billing/webhook', (req, res) => {
   const sig = req.headers['stripe-signature'];
+  if (!process.env.STRIPE_WEBHOOK_SECRET || !sig) {
+    return res.status(503).json({ error: 'Verified Stripe webhooks are not configured.' });
+  }
+  return res.status(501).json({ error: 'Stripe signature verification is not implemented.' });
+  /*
   console.log('[Webhook] Received billing webhook event:', req.body?.type || 'generic_event');
 
   // Verify event and handle idempotency
@@ -2205,6 +2239,7 @@ app.post('/api/billing/webhook', (req, res) => {
   }
 
   res.json({ received: true });
+  */
 });
 
 // MarketMind Connected Portfolio™ Server-Side AI Intelligence Endpoint
@@ -2486,4 +2521,7 @@ async function startServer() {
   });
 }
 
-startServer();
+startServer().catch((error) => {
+  console.error('[Startup] MarketMind AI failed to start:', error instanceof Error ? error.message : error);
+  process.exit(1);
+});

@@ -273,7 +273,7 @@ function renderAssetSpecificBar(instrument: NormalizedInstrument) {
         <div className="grid grid-cols-3 sm:grid-cols-6 gap-2 text-center text-xs font-mono">
           <div className="p-1.5 bg-[#1b1e28] rounded border border-[#2a2f3d]">
             <span className="text-slate-500 text-[10px] block">IV</span>
-            <span className="text-white font-bold">{g.impliedVolatility ? `${(g.impliedVolatility * 100).toFixed(1)}%` : 'N/A'}</span>
+            <span className="text-white font-bold">{g.iv != null ? `${(g.iv * 100).toFixed(1)}%` : 'N/A'}</span>
           </div>
           <div className="p-1.5 bg-[#1b1e28] rounded border border-[#2a2f3d]">
             <span className="text-slate-500 text-[10px] block">DELTA (&Delta;)</span>
@@ -293,7 +293,7 @@ function renderAssetSpecificBar(instrument: NormalizedInstrument) {
           </div>
           <div className="p-1.5 bg-[#1b1e28] rounded border border-[#2a2f3d]">
             <span className="text-slate-500 text-[10px] block">OPEN INT</span>
-            <span className="text-white font-bold">{instrument.openInterest?.toLocaleString() ?? 'N/A'}</span>
+            <span className="text-white font-bold">{g.openInterest?.toLocaleString() ?? 'N/A'}</span>
           </div>
         </div>
       </div>
@@ -326,11 +326,11 @@ function renderAssetSpecificBar(instrument: NormalizedInstrument) {
           </div>
           <div className="p-1.5 bg-[#1b1e28] rounded border border-[#2a2f3d]">
             <span className="text-slate-500 text-[10px] block">TERM STRUCTURE</span>
-            <span className="text-emerald-400 font-bold">{f.termStructure}</span>
+            <span className="text-emerald-400 font-bold">{f.isContinuous ? 'CONTINUOUS' : f.contractMonth}</span>
           </div>
           <div className="p-1.5 bg-[#1b1e28] rounded border border-[#2a2f3d]">
             <span className="text-slate-500 text-[10px] block">FRONT MONTH</span>
-            <span className="text-white font-bold">{f.isFrontMonth ? 'YES' : 'BACK-MONTH'}</span>
+            <span className="text-white font-bold">{instrument.symbol === f.frontMonthSymbol ? 'YES' : 'BACK-MONTH'}</span>
           </div>
         </div>
       </div>
@@ -355,11 +355,11 @@ function renderAssetSpecificBar(instrument: NormalizedInstrument) {
           </div>
           <div className="p-1.5 bg-[#1b1e28] rounded border border-[#2a2f3d]">
             <span className="text-slate-500 text-[10px] block">PIP VALUE (1 LOT)</span>
-            <span className="text-[#F2D675] font-bold">${fx.pipValue}</span>
+            <span className="text-[#F2D675] font-bold">{fx.spreadPips.toFixed(1)} pips spread</span>
           </div>
           <div className="p-1.5 bg-[#1b1e28] rounded border border-[#2a2f3d]">
             <span className="text-slate-500 text-[10px] block">STANDARD LOT</span>
-            <span className="text-white font-bold">{fx.lotSize.toLocaleString()}</span>
+            <span className="text-white font-bold">100,000</span>
           </div>
           <div className="p-1.5 bg-[#1b1e28] rounded border border-[#2a2f3d]">
             <span className="text-slate-500 text-[10px] block">MARKET SESSION</span>
@@ -382,7 +382,7 @@ function renderAssetSpecificBar(instrument: NormalizedInstrument) {
         <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 text-center text-xs font-mono">
           <div className="p-1.5 bg-[#1b1e28] rounded border border-[#2a2f3d]">
             <span className="text-slate-500 text-[10px] block">YIELD TO MATURITY</span>
-            <span className="text-[#F2D675] font-bold">{b.yieldPercent.toFixed(3)}%</span>
+            <span className="text-[#F2D675] font-bold">{b.yieldToMaturity.toFixed(3)}%</span>
           </div>
           <div className="p-1.5 bg-[#1b1e28] rounded border border-[#2a2f3d]">
             <span className="text-slate-500 text-[10px] block">COUPON</span>
@@ -413,11 +413,11 @@ function renderAssetSpecificBar(instrument: NormalizedInstrument) {
         <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 text-center text-xs font-mono">
           <div className="p-1.5 bg-[#1b1e28] rounded border border-[#2a2f3d]">
             <span className="text-slate-500 text-[10px] block">ACTUAL VALUE</span>
-            <span className="text-white font-bold">{em.actualValue} {em.unit}</span>
+            <span className="text-white font-bold">{em.lastReading} {em.unit}</span>
           </div>
           <div className="p-1.5 bg-[#1b1e28] rounded border border-[#2a2f3d]">
             <span className="text-slate-500 text-[10px] block">CONSENSUS FORECAST</span>
-            <span className="text-slate-300 font-bold">{em.consensusEstimate || 'N/A'} {em.unit}</span>
+            <span className="text-slate-300 font-bold">{em.consensusForecast ?? 'N/A'} {em.unit}</span>
           </div>
           <div className="p-1.5 bg-[#1b1e28] rounded border border-[#2a2f3d]">
             <span className="text-slate-500 text-[10px] block">FREQUENCY</span>
@@ -425,7 +425,7 @@ function renderAssetSpecificBar(instrument: NormalizedInstrument) {
           </div>
           <div className="p-1.5 bg-[#1b1e28] rounded border border-[#2a2f3d]">
             <span className="text-slate-500 text-[10px] block">LAST RELEASE</span>
-            <span className="text-[#F2D675] font-bold">{em.lastReleaseDate}</span>
+            <span className="text-[#F2D675] font-bold">{em.nextReleaseDate || 'N/A'}</span>
           </div>
         </div>
       </div>

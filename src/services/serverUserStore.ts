@@ -3,6 +3,7 @@
  * Provides persistent memory and local storage for authentication, trials, and billing records
  */
 
+import { randomBytes, scryptSync, timingSafeEqual } from 'node:crypto';
 import { UserProfile } from '../types/user';
 import { UserSubscriptionRecord, BillingInvoice, SubscriptionPlanId, AdminSubscriptionMetrics } from '../types/subscription';
 import { SUBSCRIPTION_PLANS, TRIAL_DURATION_DAYS } from '../config/plans';
@@ -43,24 +44,21 @@ export interface StoredUserAccount {
   lastLoginAt?: string;
 }
 
-// Simple deterministic hash for demo/app environment
 export function hashPassword(password: string): string {
-  let hash = 0;
-  for (let i = 0; i < password.length; i++) {
-    const char = password.charCodeAt(i);
-    hash = (hash << 5) - hash + char;
-    hash |= 0;
-  }
-  return `sha256_sim_${Math.abs(hash)}_${password.length * 997}`;
+  const salt = randomBytes(16).toString('hex');
+  const derivedKey = scryptSync(password, salt, 64).toString('hex');
+  return `scrypt$${salt}$${derivedKey}`;
 }
 
-export const DEFAULT_ADMIN_EMAIL = 'khomchatwongwai@gmail.com';
+export const DEFAULT_ADMIN_EMAIL = (process.env.ADMIN_EMAIL || '').toLowerCase().trim();
 
 // Pre-seeded Admin Account
 const initialAccounts: Map<string, StoredUserAccount> = new Map();
 
 // Helper to seed master user
 function seedInitialAdmin() {
+  const bootstrapPassword = process.env.ADMIN_BOOTSTRAP_PASSWORD;
+  if (!DEFAULT_ADMIN_EMAIL || !bootstrapPassword) return;
   const adminId = 'usr_alpha_9921';
   const now = new Date();
   const renews = new Date(now.getTime() + 365 * 86400000);
@@ -68,7 +66,7 @@ function seedInitialAdmin() {
   const adminAccount: StoredUserAccount = {
     id: adminId,
     email: DEFAULT_ADMIN_EMAIL.toLowerCase(),
-    passwordHash: hashPassword('MarketMind@2026!'),
+    passwordHash: hashPassword(bootstrapPassword),
     firstName: 'Khomchat',
     lastName: 'Wongwai',
     name: 'Khomchat Wongwai',
@@ -96,12 +94,15 @@ function seedInitialAdmin() {
 
   initialAccounts.set(adminAccount.email, adminAccount);
 
-  // Seed sample active subscribers for realistic metrics
+  // Demo accounts are useful locally but must never exist in production.
+  if (process.env.NODE_ENV === 'production') return;
+
+  // Seed sample active subscribers for realistic local metrics
   const sampleUsers: StoredUserAccount[] = [
     {
       id: 'usr_demo_01',
       email: 'alex.morgan@quantcap.com',
-      passwordHash: hashPassword('Password123!'),
+      passwordHash: hashPassword(randomBytes(32).toString('base64url')),
       firstName: 'Alex',
       lastName: 'Morgan',
       name: 'Alex Morgan',
@@ -130,7 +131,7 @@ function seedInitialAdmin() {
     {
       id: 'usr_demo_02',
       email: 'sarah.chen@singaporealpha.sg',
-      passwordHash: hashPassword('Password123!'),
+      passwordHash: hashPassword(randomBytes(32).toString('base64url')),
       firstName: 'Sarah',
       lastName: 'Chen',
       name: 'Sarah Chen',
@@ -157,7 +158,7 @@ function seedInitialAdmin() {
     {
       id: 'usr_demo_03',
       email: 'marcus.weber@berlin-algo.de',
-      passwordHash: hashPassword('Password123!'),
+      passwordHash: hashPassword(randomBytes(32).toString('base64url')),
       firstName: 'Marcus',
       lastName: 'Weber',
       name: 'Marcus Weber',
@@ -184,7 +185,7 @@ function seedInitialAdmin() {
     {
       id: 'usr_demo_04',
       email: 'trader.free@marketmind.ai',
-      passwordHash: hashPassword('Password123!'),
+      passwordHash: hashPassword(randomBytes(32).toString('base64url')),
       firstName: 'Jordan',
       lastName: 'Taylor',
       name: 'Jordan Taylor',
@@ -283,7 +284,7 @@ export class ServerUserStore {
     const account: StoredUserAccount = {
       id,
       email: cleanEmail,
-      passwordHash: password ? hashPassword(password) : hashPassword('MarketMind_OAuth_SSO_Secret'),
+      passwordHash: hashPassword(password || randomBytes(32).toString('base64url')),
       firstName: firstName.trim(),
       lastName: lastName.trim(),
       name: `${firstName.trim()} ${lastName.trim()}`.trim(),
@@ -331,8 +332,19 @@ export class ServerUserStore {
 
   static verifyPassword(account: StoredUserAccount, passwordAttempt: string): boolean {
     if (!passwordAttempt) return false;
-    const targetHash = hashPassword(passwordAttempt);
-    return account.passwordHash === targetHash;
+    const [algorithm, salt, expectedHex] = account.passwordHash.split('$');
+    if (algorithm !== 'scrypt' || !salt || !expectedHex) return false;
+    const expected = Buffer.from(expectedHex, 'hex');
+    const actual = scryptSync(passwordAttempt, salt, expected.length);
+    return expected.length === actual.length && timingSafeEqual(expected, actual);
+  }
+
+  static findByResetToken(token: string): StoredUserAccount | null {
+    if (!token) return null;
+    for (const account of initialAccounts.values()) {
+      if (account.resetPasswordToken === token) return account;
+    }
+    return null;
   }
 
   static updateAccount(id: string, updates: Partial<StoredUserAccount>): StoredUserAccount {

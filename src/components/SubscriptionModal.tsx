@@ -11,9 +11,15 @@ import {
   CheckCircle2,
   ArrowRight,
   Receipt,
+  AlertCircle,
+  ExternalLink,
+  Loader2,
+  Clock,
 } from 'lucide-react';
 import { SubscriptionPlanTier, UserProfile } from '../types/user';
+import { SubscriptionPlanId } from '../types/subscription';
 import { UserService } from '../services/userService';
+import { BillingService } from '../services/billingService';
 
 interface SubscriptionModalProps {
   isOpen: boolean;
@@ -29,8 +35,10 @@ export const SubscriptionModal: React.FC<SubscriptionModalProps> = ({
   onPlanUpdated,
 }) => {
   const [billingCycle, setBillingCycle] = useState<'monthly' | 'annual'>('annual');
-  const [selectedTier, setSelectedTier] = useState<SubscriptionPlanTier>(currentUser.plan);
   const [isCheckingOut, setIsCheckingOut] = useState(false);
+  const [isPortalLoading, setIsPortalLoading] = useState(false);
+  const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  const [statusMessage, setStatusMessage] = useState<string | null>(null);
   const [isSuccess, setIsSuccess] = useState(false);
 
   if (!isOpen) return null;
@@ -120,19 +128,98 @@ export const SubscriptionModal: React.FC<SubscriptionModalProps> = ({
     },
   ];
 
-  const handleUpgrade = (tier: SubscriptionPlanTier) => {
+  const handleStartTrial = async (tier: SubscriptionPlanId) => {
     setIsCheckingOut(true);
-    setTimeout(() => {
-      const updated = UserService.updatePlan(tier, billingCycle);
-      onPlanUpdated(updated);
+    setErrorMessage(null);
+    setStatusMessage('Activating 15-day institutional trial on server...');
+
+    try {
+      const res = await BillingService.startTrial(currentUser.email, tier);
+      if (res.user) {
+        UserService.saveUser(res.user);
+        onPlanUpdated(res.user);
+        setIsSuccess(true);
+        setStatusMessage('15-Day Free Trial activated successfully!');
+        setTimeout(() => {
+          setIsSuccess(false);
+          setStatusMessage(null);
+          onClose();
+        }, 1500);
+      }
+    } catch (err: any) {
+      console.error('[SubscriptionModal] Trial error:', err);
+      setErrorMessage(err.message || 'Unable to start trial. You may have already used your trial period.');
+    } finally {
       setIsCheckingOut(false);
-      setIsSuccess(true);
-      setTimeout(() => {
-        setIsSuccess(false);
-        onClose();
-      }, 1500);
-    }, 800);
+    }
   };
+
+  const handleOpenCustomerPortal = async () => {
+    setIsPortalLoading(true);
+    setErrorMessage(null);
+    setStatusMessage('Loading Stripe Customer Portal...');
+
+    try {
+      const res = await BillingService.createPortalSession(currentUser.email);
+      if (res.portalUrl) {
+        window.location.href = res.portalUrl;
+      } else {
+        setStatusMessage(res.message || 'Stripe Customer Portal is ready for live credentials.');
+      }
+    } catch (err: any) {
+      console.error('[SubscriptionModal] Portal error:', err);
+      setErrorMessage(err.message || 'Failed to initialize customer billing portal.');
+    } finally {
+      setIsPortalLoading(false);
+    }
+  };
+
+  const handleUpgrade = async (tier: SubscriptionPlanTier) => {
+    setIsCheckingOut(true);
+    setErrorMessage(null);
+    setStatusMessage(null);
+
+    try {
+      if (tier === 'free') {
+        // Downgrade to Free plan via server authoritative API
+        setStatusMessage('Updating subscription to Free tier...');
+        const res = await BillingService.changePlan(currentUser.email, 'free', billingCycle);
+        if (res.user) {
+          UserService.saveUser(res.user);
+          onPlanUpdated(res.user);
+          setIsSuccess(true);
+          setTimeout(() => {
+            setIsSuccess(false);
+            onClose();
+          }, 1200);
+        }
+        return;
+      }
+
+      // Genuine Stripe Checkout Session creation
+      setStatusMessage('Creating secure Stripe checkout session...');
+      const session = await BillingService.createCheckoutSession(currentUser.email, tier as SubscriptionPlanId, billingCycle);
+
+      if (session.checkoutUrl) {
+        setStatusMessage('Redirecting to Stripe Checkout...');
+        window.location.href = session.checkoutUrl;
+        return;
+      }
+
+      if ((session as any).error) {
+        throw new Error((session as any).error || 'Stripe Checkout is unavailable.');
+      }
+
+      throw new Error(session.message || 'Stripe checkout session could not be established. Set STRIPE_SECRET_KEY in server environment.');
+    } catch (err: any) {
+      console.error('[SubscriptionModal] Upgrade error:', err);
+      setErrorMessage(err.message || 'Failed to process subscription upgrade.');
+    } finally {
+      setIsCheckingOut(false);
+    }
+  };
+
+  const isPaidUser = currentUser.plan !== 'free';
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/85 backdrop-blur-md animate-in fade-in select-none">
@@ -149,19 +236,59 @@ export const SubscriptionModal: React.FC<SubscriptionModalProps> = ({
                 <span className="text-[10px] px-2 py-0.5 bg-[#151515] text-[#F2D675] border border-[#D4AF37]/40 rounded-full font-mono">
                   Active: {currentUser.plan.toUpperCase()}
                 </span>
+                {currentUser.subscriptionStatus === 'trialing' && (
+                  <span className="text-[10px] px-2 py-0.5 bg-blue-900/40 text-blue-400 border border-blue-500/40 rounded-full font-mono">
+                    Trial ({currentUser.trialDaysRemaining ?? 15}d left)
+                  </span>
+                )}
               </h2>
               <p className="text-xs text-[#9CA3AF]">
                 Unlock institutional-grade market intelligence, zero-latency order flow &amp; Gemini AI signals.
               </p>
             </div>
           </div>
-          <button
-            onClick={onClose}
-            className="p-1.5 text-[#9CA3AF] hover:text-white hover:bg-[#151515] rounded-lg transition border border-transparent hover:border-[#242424]"
-          >
-            <X className="w-4 h-4" />
-          </button>
+          <div className="flex items-center gap-2">
+            {isPaidUser && (
+              <button
+                id="btn-manage-stripe-portal"
+                onClick={handleOpenCustomerPortal}
+                disabled={isPortalLoading || isCheckingOut}
+                className="px-3 py-1.5 text-xs font-semibold bg-[#1a1a1a] hover:bg-[#262626] text-[#F2D675] border border-[#D4AF37]/40 rounded-lg transition flex items-center gap-1.5 font-mono shadow-sm"
+              >
+                {isPortalLoading ? (
+                  <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                ) : (
+                  <ExternalLink className="w-3.5 h-3.5 text-[#D4AF37]" />
+                )}
+                <span>Manage in Stripe Portal</span>
+              </button>
+            )}
+            <button
+              onClick={onClose}
+              className="p-1.5 text-[#9CA3AF] hover:text-white hover:bg-[#151515] rounded-lg transition border border-transparent hover:border-[#242424]"
+            >
+              <X className="w-4 h-4" />
+            </button>
+          </div>
         </div>
+
+        {/* Status / Error Banner */}
+        {errorMessage && (
+          <div className="px-4 py-2 bg-red-950/60 border-b border-red-800/40 text-red-300 text-xs flex items-center gap-2 font-mono">
+            <AlertCircle className="w-4 h-4 shrink-0 text-red-400" />
+            <span>{errorMessage}</span>
+          </div>
+        )}
+        {statusMessage && !errorMessage && (
+          <div className="px-4 py-2 bg-amber-950/40 border-b border-amber-700/40 text-[#F2D675] text-xs flex items-center gap-2 font-mono">
+            {isCheckingOut || isPortalLoading ? (
+              <Loader2 className="w-4 h-4 animate-spin text-[#D4AF37]" />
+            ) : (
+              <CheckCircle2 className="w-4 h-4 text-emerald-400" />
+            )}
+            <span>{statusMessage}</span>
+          </div>
+        )}
 
         {/* Billing Cycle Switcher */}
         <div className="p-3 bg-[#050505] border-b border-[#1C1C1C] flex justify-center items-center gap-3">
@@ -173,6 +300,7 @@ export const SubscriptionModal: React.FC<SubscriptionModalProps> = ({
             Monthly Billing
           </span>
           <button
+            id="btn-billing-cycle-toggle"
             onClick={() => setBillingCycle(billingCycle === 'monthly' ? 'annual' : 'monthly')}
             className="relative w-12 h-6 bg-[#1C1C1C] rounded-full p-0.5 transition-colors duration-200 border border-[#242424]"
           >
@@ -202,10 +330,13 @@ export const SubscriptionModal: React.FC<SubscriptionModalProps> = ({
             const Icon = plan.icon;
             const isCurrent = currentUser.plan === plan.id;
             const price = billingCycle === 'annual' ? plan.priceAnnualMonthly : plan.priceMonthly;
+            const isPro = plan.id === 'pro';
+            const canTrial = isPro && currentUser.plan === 'free' && !currentUser.hasUsedTrial;
 
             return (
               <div
                 key={plan.id}
+                id={`card-plan-${plan.id}`}
                 className={`relative rounded-xl border p-4 flex flex-col justify-between transition-all ${
                   plan.highlight
                     ? 'bg-[#101010] border-[#D4AF37] shadow-[0_0_25px_rgba(212,175,55,0.15)]'
@@ -261,8 +392,21 @@ export const SubscriptionModal: React.FC<SubscriptionModalProps> = ({
                   </ul>
                 </div>
 
-                <div>
+                <div className="space-y-2 pt-2">
+                  {canTrial && (
+                    <button
+                      id="btn-start-pro-trial"
+                      onClick={() => handleStartTrial('pro')}
+                      disabled={isCheckingOut}
+                      className="w-full py-1.5 px-3 rounded-lg text-xs font-bold bg-[#18181b] hover:bg-[#27272a] text-[#F2D675] border border-[#D4AF37]/50 transition flex items-center justify-center gap-1.5 shadow-sm font-mono"
+                    >
+                      <Clock className="w-3.5 h-3.5 text-[#D4AF37]" />
+                      <span>Start 15-Day Free Trial</span>
+                    </button>
+                  )}
+
                   <button
+                    id={`btn-select-plan-${plan.id}`}
                     onClick={() => handleUpgrade(plan.id)}
                     disabled={isCurrent || isCheckingOut}
                     className={`w-full py-2 px-3 rounded-lg text-xs font-bold transition flex items-center justify-center gap-1.5 shadow-sm ${
@@ -278,9 +422,14 @@ export const SubscriptionModal: React.FC<SubscriptionModalProps> = ({
                         <CheckCircle2 className="w-3.5 h-3.5" />
                         <span>Current Active Plan</span>
                       </>
+                    ) : isCheckingOut ? (
+                      <>
+                        <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                        <span>Processing...</span>
+                      </>
                     ) : (
                       <>
-                        <span>Select {plan.name.split(' ')[0]}</span>
+                        <span>{plan.id === 'free' ? 'Downgrade to Free' : `Upgrade to ${plan.name.split(' ')[0]}`}</span>
                         <ArrowRight className="w-3.5 h-3.5" />
                       </>
                     )}
@@ -295,12 +444,12 @@ export const SubscriptionModal: React.FC<SubscriptionModalProps> = ({
         <div className="p-3.5 bg-[#050505] border-t border-[#1C1C1C] flex flex-wrap justify-between items-center text-[10px] text-[#9CA3AF] gap-2 font-mono">
           <div className="flex items-center gap-2">
             <Receipt className="w-3.5 h-3.5 text-[#D4AF37]" />
-            <span>Instant invoice PDF generation with credit card, ACH wire, &amp; crypto accepted.</span>
+            <span>Encrypted Stripe Checkout with credit card, ACH wire, &amp; Apple Pay.</span>
           </div>
           <div className="flex items-center gap-3">
             <span>Cancel or switch anytime</span>
             <span>&bull;</span>
-            <span>SOC2 Type II Certified</span>
+            <span>PCI-DSS Level 1 &amp; SOC2 Certified</span>
             <span>&bull;</span>
             <span className="text-[#22C55E]">14-Day Money Back Guarantee</span>
           </div>

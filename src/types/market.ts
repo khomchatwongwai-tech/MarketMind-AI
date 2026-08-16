@@ -11,14 +11,41 @@ export type TickerSymbol =
   | 'IWM'
   | (string & {});
 
+export type MarketDataMode =
+  | 'REAL_TIME'
+  | 'LIVE'
+  | 'DELAYED'
+  | 'CACHED'
+  | 'DEMO'
+  | 'SIMULATED'
+  | 'UNAVAILABLE';
+
+export interface MarketDataMetadata {
+  provider: string;
+  source: string;
+  timestamp: number;
+  receivedAt: number;
+  mode: MarketDataMode;
+  delayMinutes?: number;
+  stale: boolean;
+  marketStatus?: 'PRE' | 'OPEN' | 'AFTER' | 'CLOSED';
+  outlierFlag?: boolean;
+  validationStatus?: 'VALID' | 'SUSPECT_DATA' | 'MALFORMED' | 'UNAVAILABLE';
+}
+
 export type LiveMarketDataSource =
   | 'Massive WebSocket (Real-Time Live Feed)'
-  | 'Yahoo Finance (Real-Time)'
+  | 'Massive / Polygon.io'
+  | 'Finnhub Institutional'
+  | 'Alpaca Market Data v2'
+  | 'CME Group Direct'
+  | 'FRED Economic Data'
+  | 'Yahoo Finance'
   | 'Google Finance Feed'
   | 'Robinhood Multi-Feed';
 
 export type MarketBias = 'BULLISH' | 'BEARISH' | 'NEUTRAL';
-export type RiskLevel = 'LOW RISK' | 'MODERATE RISK' | 'HIGH RISK' | 'EXTREME RISK';
+export type RiskLevel = 'LOWER RISK' | 'MODERATE RISK' | 'HIGHER RISK' | 'EXTREME RISK';
 export type SetupQuality =
   | 'Exceptional setup'
   | 'Strong setup'
@@ -47,10 +74,14 @@ export interface MarketQuote {
   fiftyTwoWeekLow: number;
   timestamp: string;
   marketStatus: 'REGULAR' | 'PRE_MARKET' | 'AFTER_HOURS' | 'CLOSED';
+  dataStatus?: 'LIVE' | 'REAL_TIME' | 'DELAYED' | 'DEMO' | 'SIMULATED' | 'FALLBACK' | 'UNAVAILABLE' | 'CACHED';
   dataSource?: string;
   latencyMs?: number;
   currency?: string;
   exchange?: string;
+  bid?: number;
+  ask?: number;
+  metadata?: MarketDataMetadata;
 }
 
 export interface TechnicalIndicators {

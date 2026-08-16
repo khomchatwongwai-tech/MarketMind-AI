@@ -393,9 +393,9 @@ export class NewsIntelligenceService {
       else neutralCount++;
     }
 
-    const currentPrice = liveQuote?.price || (sym === 'NVDA' ? 128.60 : sym === 'AAPL' ? 224.20 : sym === 'TSLA' ? 218.40 : 512.48);
-    const priceChange = liveQuote?.change || (sym === 'NVDA' ? 3.70 : sym === 'AAPL' ? 2.70 : sym === 'TSLA' ? 5.60 : 4.20);
-    const priceChangePercent = liveQuote?.changePercent || (sym === 'NVDA' ? 2.96 : sym === 'AAPL' ? 1.22 : sym === 'TSLA' ? 2.63 : 0.82);
+    const currentPrice = liveQuote?.price ?? 0;
+    const priceChange = liveQuote?.change ?? 0;
+    const priceChangePercent = liveQuote?.changePercent ?? 0;
 
     const sources: VerifiedSourceCitation[] = newsItems.map((n) => ({
       sourceName: n.source,
@@ -646,7 +646,7 @@ export class NewsIntelligenceService {
     return this.savedArticles;
   }
 
-  saveArticle(item: { articleId: string; headline: string; publisher: string; url: string; tickers?: string[]; notes?: string }): SavedArticle {
+  saveArticle(item: { articleId: string; headline: string; publisher: string; publishedAt?: string; url: string; tickers?: string[]; notes?: string }): SavedArticle {
     const existing = this.savedArticles.find((a) => a.articleId === item.articleId || a.url === item.url);
     if (existing) {
       return existing;
@@ -656,7 +656,7 @@ export class NewsIntelligenceService {
       articleId: item.articleId,
       headline: item.headline,
       publisher: item.publisher,
-      publishedAt: new Date().toISOString(),
+      publishedAt: item.publishedAt || new Date().toISOString(),
       url: item.url,
       tickers: item.tickers || ['SPY'],
       savedAt: new Date().toISOString(),

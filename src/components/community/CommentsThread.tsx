@@ -42,7 +42,7 @@ export const CommentsThread: React.FC<CommentsThreadProps> = ({
   const [error, setError] = useState<string | null>(null);
   const [reportTarget, setReportTarget] = useState<CommunityComment | null>(null);
 
-  const isAdmin = currentUser.role === 'admin' || currentUser.email.toLowerCase() === 'khomchatwongwai@gmail.com';
+  const isAdmin = currentUser.role === 'admin' || currentUser.role === 'super_admin';
 
   const loadComments = async () => {
     try {

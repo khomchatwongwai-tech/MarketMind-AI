@@ -20,6 +20,7 @@ import {
   ArrowUpRight,
   ArrowDownRight,
   DollarSign,
+  BookOpen,
 } from 'lucide-react';
 import { ComprehensiveMarketData } from '../services/marketDataService';
 import { Probabilities, TickerSymbol } from '../types/market';
@@ -27,12 +28,17 @@ import { RealTimeStockChart } from './RealTimeStockChart';
 import { MassiveLiveFeedBar } from './MassiveLiveFeedBar';
 import { MarketMindSummaryCard } from './MarketMindSummaryCard';
 import { useMassiveWebSocket } from '../hooks/useMassiveWebSocket';
+import { WhatChangedRetentionCard } from './WhatChangedRetentionCard';
+import { ExplainSimplyModal } from './ExplainSimplyModal';
+import { MASTER_INSTRUMENTS } from '../services/marketProviders/InstrumentDirectoryService';
+import { useRealTimeWatchlist } from '../hooks/useRealTimeMarket';
 
 interface DashboardOverviewProps {
   data: ComprehensiveMarketData;
   probabilities: Probabilities;
   onNavigateTab: (tab: any) => void;
   onAskQuestion: (q: string) => void;
+  onSelectTicker?: (ticker: TickerSymbol) => void;
 }
 
 export const DashboardOverview: React.FC<DashboardOverviewProps> = ({
@@ -40,9 +46,11 @@ export const DashboardOverview: React.FC<DashboardOverviewProps> = ({
   probabilities,
   onNavigateTab,
   onAskQuestion,
+  onSelectTicker,
 }) => {
   const { quote, technicals, supportResistance, trends, sectors, economicEvents, news, options, scenarios } = data;
   const isPositive = quote.change >= 0;
+  const [isExplainSimplyOpen, setIsExplainSimplyOpen] = useState(false);
 
   // Massive WebSocket Pipeline Hook
   const {
@@ -61,18 +69,81 @@ export const DashboardOverview: React.FC<DashboardOverviewProps> = ({
 
   const [viewMode, setViewMode] = useState<'both' | 'executive' | 'grid'>('both');
 
+  const macroSymbols = ['SPX', 'NDX', 'DJI', 'SPY', 'QQQ', 'VIX', 'US10Y', 'CL', 'XAU', 'BTC'];
+  const { quotes: rtMacroQuotes } = useRealTimeWatchlist(macroSymbols, 'overview_macro');
+
   // Key Market Indices & Core Assets for Intelligence Bar
   const keyMarketIndices = [
-    { name: 'S&P 500', symbol: 'SPX', price: '5,117.09', change: '+0.48%', isUp: true },
-    { name: 'NASDAQ 100', symbol: 'NDX', price: '18,288.40', change: '+0.62%', isUp: true },
-    { name: 'DOW JONES', symbol: 'DJI', price: '38,989.84', change: '+0.18%', isUp: true },
-    { name: 'SPY ETF', symbol: 'SPY', price: quote.price ? `$${quote.price.toFixed(2)}` : '$512.48', change: `${isPositive ? '+' : ''}${quote.changePercent.toFixed(2)}%`, isUp: isPositive },
-    { name: 'QQQ ETF', symbol: 'QQQ', price: '$443.20', change: '+0.75%', isUp: true },
-    { name: 'VIX VOLATILITY', symbol: 'VIX', price: '14.28', change: '-4.12%', isUp: false },
-    { name: '10Y TREASURY', symbol: 'US10Y', price: '4.22%', change: '-0.03', isUp: false },
-    { name: 'WTI CRUDE OIL', symbol: 'CL', price: '$78.45', change: '-0.85%', isUp: false },
-    { name: 'GOLD SPOT', symbol: 'XAU', price: '$2,342.10', change: '+0.88%', isUp: true },
-    { name: 'BITCOIN', symbol: 'BTC', price: '$67,820', change: '+2.40%', isUp: true },
+    {
+      name: 'S&P 500',
+      symbol: 'SPX',
+      price: rtMacroQuotes['SPX']?.price ? `$${rtMacroQuotes['SPX']!.price.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}` : quote.ticker === 'SPY' && quote.price ? `$${quote.price.toFixed(2)}` : '--',
+      change: rtMacroQuotes['SPX']?.changePercent !== undefined ? `${rtMacroQuotes['SPX']!.changePercent >= 0 ? '+' : ''}${rtMacroQuotes['SPX']!.changePercent.toFixed(2)}%` : `${isPositive ? '+' : ''}${quote.changePercent.toFixed(2)}%`,
+      isUp: rtMacroQuotes['SPX']?.change !== undefined ? rtMacroQuotes['SPX']!.change >= 0 : isPositive,
+    },
+    {
+      name: 'NASDAQ 100',
+      symbol: 'NDX',
+      price: rtMacroQuotes['NDX']?.price ? `$${rtMacroQuotes['NDX']!.price.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}` : '--',
+      change: rtMacroQuotes['NDX']?.changePercent !== undefined ? `${rtMacroQuotes['NDX']!.changePercent >= 0 ? '+' : ''}${rtMacroQuotes['NDX']!.changePercent.toFixed(2)}%` : '--',
+      isUp: rtMacroQuotes['NDX']?.change !== undefined ? rtMacroQuotes['NDX']!.change >= 0 : true,
+    },
+    {
+      name: 'DOW JONES',
+      symbol: 'DJI',
+      price: rtMacroQuotes['DJI']?.price ? `$${rtMacroQuotes['DJI']!.price.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}` : '--',
+      change: rtMacroQuotes['DJI']?.changePercent !== undefined ? `${rtMacroQuotes['DJI']!.changePercent >= 0 ? '+' : ''}${rtMacroQuotes['DJI']!.changePercent.toFixed(2)}%` : '--',
+      isUp: rtMacroQuotes['DJI']?.change !== undefined ? rtMacroQuotes['DJI']!.change >= 0 : true,
+    },
+    {
+      name: 'SPY ETF',
+      symbol: 'SPY',
+      price: quote.ticker === 'SPY' && quote.price ? `$${quote.price.toFixed(2)}` : rtMacroQuotes['SPY']?.price ? `$${rtMacroQuotes['SPY']!.price.toFixed(2)}` : '--',
+      change: quote.ticker === 'SPY' ? `${isPositive ? '+' : ''}${quote.changePercent.toFixed(2)}%` : rtMacroQuotes['SPY']?.changePercent !== undefined ? `${rtMacroQuotes['SPY']!.changePercent >= 0 ? '+' : ''}${rtMacroQuotes['SPY']!.changePercent.toFixed(2)}%` : '--',
+      isUp: quote.ticker === 'SPY' ? isPositive : rtMacroQuotes['SPY']?.change !== undefined ? rtMacroQuotes['SPY']!.change >= 0 : true,
+    },
+    {
+      name: 'QQQ ETF',
+      symbol: 'QQQ',
+      price: quote.ticker === 'QQQ' && quote.price ? `$${quote.price.toFixed(2)}` : rtMacroQuotes['QQQ']?.price ? `$${rtMacroQuotes['QQQ']!.price.toFixed(2)}` : '--',
+      change: quote.ticker === 'QQQ' ? `${isPositive ? '+' : ''}${quote.changePercent.toFixed(2)}%` : rtMacroQuotes['QQQ']?.changePercent !== undefined ? `${rtMacroQuotes['QQQ']!.changePercent >= 0 ? '+' : ''}${rtMacroQuotes['QQQ']!.changePercent.toFixed(2)}%` : '--',
+      isUp: quote.ticker === 'QQQ' ? isPositive : rtMacroQuotes['QQQ']?.change !== undefined ? rtMacroQuotes['QQQ']!.change >= 0 : true,
+    },
+    {
+      name: 'VIX VOLATILITY',
+      symbol: 'VIX',
+      price: rtMacroQuotes['VIX']?.price ? `${rtMacroQuotes['VIX']!.price.toFixed(2)}` : '--',
+      change: rtMacroQuotes['VIX']?.changePercent !== undefined ? `${rtMacroQuotes['VIX']!.changePercent >= 0 ? '+' : ''}${rtMacroQuotes['VIX']!.changePercent.toFixed(2)}%` : '--',
+      isUp: rtMacroQuotes['VIX']?.change !== undefined ? rtMacroQuotes['VIX']!.change >= 0 : false,
+    },
+    {
+      name: '10Y TREASURY',
+      symbol: 'US10Y',
+      price: rtMacroQuotes['US10Y']?.price ? `${rtMacroQuotes['US10Y']!.price.toFixed(2)}%` : '--',
+      change: rtMacroQuotes['US10Y']?.change !== undefined ? `${rtMacroQuotes['US10Y']!.change >= 0 ? '+' : ''}${rtMacroQuotes['US10Y']!.change.toFixed(2)}` : '--',
+      isUp: rtMacroQuotes['US10Y']?.change !== undefined ? rtMacroQuotes['US10Y']!.change >= 0 : false,
+    },
+    {
+      name: 'WTI CRUDE OIL',
+      symbol: 'CL',
+      price: rtMacroQuotes['CL']?.price ? `$${rtMacroQuotes['CL']!.price.toFixed(2)}` : '--',
+      change: rtMacroQuotes['CL']?.changePercent !== undefined ? `${rtMacroQuotes['CL']!.changePercent >= 0 ? '+' : ''}${rtMacroQuotes['CL']!.changePercent.toFixed(2)}%` : '--',
+      isUp: rtMacroQuotes['CL']?.change !== undefined ? rtMacroQuotes['CL']!.change >= 0 : false,
+    },
+    {
+      name: 'GOLD SPOT',
+      symbol: 'XAU',
+      price: rtMacroQuotes['XAU']?.price ? `$${rtMacroQuotes['XAU']!.price.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}` : '--',
+      change: rtMacroQuotes['XAU']?.changePercent !== undefined ? `${rtMacroQuotes['XAU']!.changePercent >= 0 ? '+' : ''}${rtMacroQuotes['XAU']!.changePercent.toFixed(2)}%` : '--',
+      isUp: rtMacroQuotes['XAU']?.change !== undefined ? rtMacroQuotes['XAU']!.change >= 0 : true,
+    },
+    {
+      name: 'BITCOIN',
+      symbol: 'BTC',
+      price: rtMacroQuotes['BTC']?.price ? `$${rtMacroQuotes['BTC']!.price.toLocaleString('en-US', { maximumFractionDigits: 0 })}` : '--',
+      change: rtMacroQuotes['BTC']?.changePercent !== undefined ? `${rtMacroQuotes['BTC']!.changePercent >= 0 ? '+' : ''}${rtMacroQuotes['BTC']!.changePercent.toFixed(2)}%` : '--',
+      isUp: rtMacroQuotes['BTC']?.change !== undefined ? rtMacroQuotes['BTC']!.change >= 0 : true,
+    },
   ];
 
   return (
@@ -131,6 +202,14 @@ export const DashboardOverview: React.FC<DashboardOverviewProps> = ({
         </div>
       </div>
 
+      {/* RETENTION INTELLIGENCE: WHAT CHANGED SINCE YOUR LAST VISIT? */}
+      <WhatChangedRetentionCard
+        onSelectSymbol={(sym) => {
+          if (onSelectTicker) onSelectTicker(sym as any);
+        }}
+        onAskAI={onAskQuestion}
+      />
+
       {/* 0. MASSIVE WEBSOCKET LIVE PIPELINE BAR */}
       <MassiveLiveFeedBar
         status={wsStatus}
@@ -144,8 +223,8 @@ export const DashboardOverview: React.FC<DashboardOverviewProps> = ({
       {/* 1. PROFESSIONAL REAL-TIME INTERACTIVE CANDLESTICK CHART */}
       <RealTimeStockChart ticker={quote.ticker} isLiveSimulation={true} />
 
-      {/* View Switcher Controls */}
-      <div className="flex justify-between items-center bg-[#0A0A0A] px-3.5 py-2 rounded-xl border border-[#242424] text-xs shadow-md">
+      {/* View Switcher & Quick Actions */}
+      <div className="flex flex-wrap justify-between items-center bg-[#0A0A0A] px-3.5 py-2 rounded-xl border border-[#242424] text-xs shadow-md gap-2">
         <div className="flex items-center gap-2.5">
           <span className="text-[10px] font-bold uppercase tracking-wider text-[#9CA3AF] flex items-center gap-1.5">
             <Sparkles className="w-3.5 h-3.5 text-[#D4AF37]" />
@@ -188,8 +267,19 @@ export const DashboardOverview: React.FC<DashboardOverviewProps> = ({
           </div>
         </div>
 
-        <div className="text-[10px] text-[#9CA3AF] font-mono hidden sm:block">
-          Asset: <span className="text-white font-bold">{quote.ticker}</span> &bull; Gemini 2.5 Active
+        <div className="flex items-center gap-2">
+          <button
+            onClick={() => setIsExplainSimplyOpen(true)}
+            className="px-3 py-1 bg-[#15151D] hover:bg-[#1D1D28] text-[#F2D675] border border-[#D4AF37]/40 rounded-lg text-xs font-semibold flex items-center gap-1.5 transition"
+            title="Explain Like I'm a Beginner"
+          >
+            <BookOpen className="w-3.5 h-3.5 text-[#D4AF37]" />
+            <span>Explain Simply</span>
+          </button>
+
+          <div className="text-[10px] text-[#9CA3AF] font-mono hidden sm:block">
+            Asset: <span className="text-white font-bold">{quote.ticker}</span> &bull; Verified Feed Active
+          </div>
         </div>
       </div>
 
@@ -636,6 +726,34 @@ export const DashboardOverview: React.FC<DashboardOverviewProps> = ({
             </div>
           </section>
         </div>
+      )}
+
+      {/* Explain Simply / Beginner Guide Modal */}
+      {isExplainSimplyOpen && (
+        <ExplainSimplyModal
+          isOpen={isExplainSimplyOpen}
+          onClose={() => setIsExplainSimplyOpen(false)}
+          instrument={
+            MASTER_INSTRUMENTS.find((i) => i.symbol.toUpperCase() === quote.ticker.toUpperCase()) || {
+              id: quote.ticker.toLowerCase(),
+              symbol: quote.ticker,
+              name: quote.name,
+              assetClass: 'STOCK',
+              exchange: quote.exchange || 'US Market',
+              currency: 'USD',
+              price: quote.price,
+              change: quote.change,
+              changePercent: quote.changePercent,
+              volume: quote.volume,
+              marketCap: 1000000000,
+              provider: quote.dataSource || 'Market Provider',
+              lastUpdated: quote.timestamp,
+              isTradable: true,
+              isSupported: true,
+            }
+          }
+          marketData={data}
+        />
       )}
     </div>
   );

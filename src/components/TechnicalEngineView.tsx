@@ -1,6 +1,7 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { LineChart, Zap, Sliders, CheckCircle2, TrendingUp, TrendingDown, Layers, BarChart2 } from 'lucide-react';
 import { ComprehensiveMarketData } from '../services/marketDataService';
+import { TradingViewChart } from './TradingViewChart';
 
 interface TechnicalEngineViewProps {
   data: ComprehensiveMarketData;
@@ -9,6 +10,7 @@ interface TechnicalEngineViewProps {
 export const TechnicalEngineView: React.FC<TechnicalEngineViewProps> = ({ data }) => {
   const { quote, technicals, supportResistance } = data;
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
+  const [chartMode, setChartMode] = useState<'canvas' | 'tradingview'>('canvas');
   const [selectedTimeframe, setSelectedTimeframe] = useState<'1M' | '5M' | '15M' | '1H' | '1D'>('15M');
   const [overlayVwap, setOverlayVwap] = useState(true);
   const [overlayEma, setOverlayEma] = useState(true);
@@ -174,6 +176,30 @@ export const TechnicalEngineView: React.FC<TechnicalEngineViewProps> = ({ data }
           </div>
 
           <div className="flex flex-wrap items-center gap-2 text-xs">
+            {/* Engine Switcher */}
+            <div className="flex bg-[#1c1f24] rounded p-0.5 border border-[#2d3139]">
+              <button
+                onClick={() => setChartMode('canvas')}
+                className={`px-2 py-0.5 rounded text-[10px] font-bold font-mono transition ${
+                  chartMode === 'canvas'
+                    ? 'bg-[#6366f1] text-white'
+                    : 'text-slate-400 hover:text-slate-200'
+                }`}
+              >
+                Quant Canvas
+              </button>
+              <button
+                onClick={() => setChartMode('tradingview')}
+                className={`px-2 py-0.5 rounded text-[10px] font-bold font-mono transition ${
+                  chartMode === 'tradingview'
+                    ? 'bg-[#10b981] text-white'
+                    : 'text-slate-400 hover:text-slate-200'
+                }`}
+              >
+                TradingView
+              </button>
+            </div>
+
             {/* Timeframe selector */}
             <div className="flex bg-[#1c1f24] rounded p-0.5 border border-[#2d3139]">
               {(['1M', '5M', '15M', '1H', '1D'] as const).map((tf) => (
@@ -191,40 +217,57 @@ export const TechnicalEngineView: React.FC<TechnicalEngineViewProps> = ({ data }
               ))}
             </div>
 
-            {/* Overlays */}
-            <div className="flex items-center gap-1.5 text-[10px]">
-              <button
-                onClick={() => setOverlayVwap(!overlayVwap)}
-                className={`px-2 py-0.5 rounded border transition font-mono ${
-                  overlayVwap
-                    ? 'bg-[#818cf8]/20 border-[#818cf8] text-[#a5b4fc]'
-                    : 'bg-[#1c1f24] border-[#2d3139] text-slate-500'
-                }`}
-              >
-                VWAP
-              </button>
-              <button
-                onClick={() => setOverlaySR(!overlaySR)}
-                className={`px-2 py-0.5 rounded border transition font-mono ${
-                  overlaySR
-                    ? 'bg-emerald-500/20 border-emerald-500 text-emerald-300'
-                    : 'bg-[#1c1f24] border-[#2d3139] text-slate-500'
-                }`}
-              >
-                S/R Levels
-              </button>
-            </div>
+            {/* Overlays (for canvas mode) */}
+            {chartMode === 'canvas' && (
+              <div className="flex items-center gap-1.5 text-[10px]">
+                <button
+                  onClick={() => setOverlayVwap(!overlayVwap)}
+                  className={`px-2 py-0.5 rounded border transition font-mono ${
+                    overlayVwap
+                      ? 'bg-[#818cf8]/20 border-[#818cf8] text-[#a5b4fc]'
+                      : 'bg-[#1c1f24] border-[#2d3139] text-slate-500'
+                  }`}
+                >
+                  VWAP
+                </button>
+                <button
+                  onClick={() => setOverlaySR(!overlaySR)}
+                  className={`px-2 py-0.5 rounded border transition font-mono ${
+                    overlaySR
+                      ? 'bg-emerald-500/20 border-emerald-500 text-emerald-300'
+                      : 'bg-[#1c1f24] border-[#2d3139] text-slate-500'
+                  }`}
+                >
+                  S/R Levels
+                </button>
+              </div>
+            )}
           </div>
         </div>
 
-        {/* Canvas Element */}
-        <div className="mt-2 w-full overflow-x-auto">
-          <canvas
-            ref={canvasRef}
-            width={960}
-            height={260}
-            className="w-full h-[260px] bg-[#0f1013] rounded border border-[#22262d]"
-          />
+        {/* Chart Canvas or TradingView Advanced Chart */}
+        <div className="mt-2 w-full overflow-hidden rounded-xl border border-[#22262d] bg-[#0A0A0A]">
+          {chartMode === 'tradingview' ? (
+            <TradingViewChart
+              symbol={quote.ticker}
+              interval={selectedTimeframe}
+              theme="dark"
+              allowSymbolChange={true}
+              hideSideToolbar={false}
+              hideTopToolbar={false}
+              saveImage={true}
+              className="border-0 rounded-none"
+            />
+          ) : (
+            <div className="w-full overflow-x-auto">
+              <canvas
+                ref={canvasRef}
+                width={960}
+                height={260}
+                className="w-full h-[260px] bg-[#0f1013]"
+              />
+            </div>
+          )}
         </div>
       </div>
 

@@ -22,30 +22,28 @@ const STORAGE_KEYS = {
   ONBOARDING_COMPLETED: 'marketmind_onboarding_completed',
 };
 
-// Default Initial Admin / User Profile
-export const DEFAULT_ADMIN_EMAIL = 'khomchatwongwai@gmail.com';
-
+// Default Initial User Profile
 const INITIAL_USER: UserProfile = {
-  id: 'usr_alpha_9921',
-  name: 'Khomchat Wongwai',
-  firstName: 'Khomchat',
-  lastName: 'Wongwai',
-  email: DEFAULT_ADMIN_EMAIL,
-  emailVerified: true,
+  id: 'usr_default_trader',
+  name: 'Trader',
+  firstName: 'Market',
+  lastName: 'Trader',
+  email: '',
+  emailVerified: false,
   avatarUrl: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=150&auto=format&fit=crop&q=80',
-  role: 'admin',
-  plan: 'premium',
-  planTier: 'PREMIUM',
-  selectedPlan: 'premium',
-  subscriptionStatus: 'active',
-  hasUsedTrial: true,
-  isGuest: false,
-  planBillingCycle: 'annual',
-  planRenewsAt: '2027-08-14',
-  monthlyPrice: 69.99,
+  role: 'user',
+  plan: 'free',
+  planTier: 'FREE',
+  selectedPlan: 'free',
+  subscriptionStatus: 'free',
+  hasUsedTrial: false,
+  isGuest: true,
+  planBillingCycle: 'monthly',
+  planRenewsAt: '',
+  monthlyPrice: 0,
   cancelAtPeriodEnd: false,
   createdAt: '2026-01-15',
-  tradingExperience: 'Pro Quant',
+  tradingExperience: 'Intermediate',
   defaultTicker: 'SPY',
   defaultTimeframe: '5m',
   riskTolerance: 'Moderate',
@@ -56,12 +54,12 @@ const INITIAL_USER: UserProfile = {
   preferredMarket: 'US (NYSE/NASDAQ)',
   aiResponseLanguage: 'en',
   notifications: {
-    emailAlerts: true,
-    pushAlerts: true,
+    emailAlerts: false,
+    pushAlerts: false,
     soundEnabled: true,
     telegramEnabled: false,
-    telegramChatId: '@quant_trader_bot',
-    discordWebhookUrl: 'https://discord.com/api/webhooks/1299/marketmind-signals',
+    telegramChatId: '',
+    discordWebhookUrl: '',
   },
   twoFactorEnabled: true,
   apiKeys: [
@@ -300,9 +298,9 @@ const INITIAL_PREDICTIONS: HistoricalPrediction[] = [
 const INITIAL_SUPPORT_TICKETS: SupportTicket[] = [
   {
     id: 'tkt_1092',
-    userId: 'usr_alpha_9921',
-    userEmail: DEFAULT_ADMIN_EMAIL,
-    userName: 'Khomchat Wongwai',
+    userId: 'usr_sample_1',
+    userEmail: 'trader@marketmind.ai',
+    userName: 'Market Trader',
     subject: 'WebSocket Latency optimization for high-frequency scalping',
     category: 'API & Webhooks',
     priority: 'High',
@@ -310,13 +308,13 @@ const INITIAL_SUPPORT_TICKETS: SupportTicket[] = [
     status: 'Resolved',
     createdAt: '2026-08-12 14:20 ET',
     updatedAt: '2026-08-12 14:35 ET',
-    response: 'Hello Khomchat, yes! Your Institutional Alpha tier includes direct access to our Chicago Equinix NY4 raw multicast relay. See docs in the API Keys tab.',
+    response: 'Hello, yes! Your Institutional Alpha tier includes direct access to our Chicago Equinix NY4 raw multicast relay. See docs in the API Keys tab.',
   },
   {
     id: 'tkt_1098',
-    userId: 'usr_alpha_9921',
-    userEmail: DEFAULT_ADMIN_EMAIL,
-    userName: 'Khomchat Wongwai',
+    userId: 'usr_sample_1',
+    userEmail: 'trader@marketmind.ai',
+    userName: 'Market Trader',
     subject: 'Feature Request: Custom Black-Scholes Greek sensitivity charts',
     category: 'Feature Request',
     priority: 'Medium',
@@ -395,8 +393,10 @@ export class UserService {
   // --- USER PROFILE & AUTH ---
   static getUser(): UserProfile {
     try {
-      const stored = localStorage.getItem(STORAGE_KEYS.USER);
-      if (stored) return JSON.parse(stored);
+      if (typeof localStorage !== 'undefined') {
+        const stored = localStorage.getItem(STORAGE_KEYS.USER);
+        if (stored) return JSON.parse(stored);
+      }
     } catch (e) {
       console.warn('Failed to load user profile from storage', e);
     }
@@ -409,21 +409,22 @@ export class UserService {
 
   static saveUser(user: UserProfile): void {
     try {
-      localStorage.setItem(STORAGE_KEYS.USER, JSON.stringify(user));
+      if (typeof localStorage !== 'undefined') {
+        localStorage.setItem(STORAGE_KEYS.USER, JSON.stringify(user));
+      }
     } catch (e) {
       console.error('Failed to save user profile', e);
     }
   }
 
   static login(email: string, name?: string): UserProfile {
-    const isMasterAdmin = email.toLowerCase() === DEFAULT_ADMIN_EMAIL.toLowerCase();
     const user: UserProfile = {
       ...INITIAL_USER,
       email,
-      name: name || (isMasterAdmin ? 'Khomchat Wongwai' : email.split('@')[0]),
-      role: isMasterAdmin ? 'admin' : 'user',
-      plan: isMasterAdmin ? 'institutional' : 'pro',
-      planTier: isMasterAdmin ? 'Institutional' : 'Pro',
+      name: name || (email.includes('@') ? email.split('@')[0] : 'Trader'),
+      role: 'user',
+      plan: 'free',
+      planTier: 'Free',
       isGuest: false,
     };
     this.saveUser(user);

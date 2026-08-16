@@ -23,12 +23,15 @@ import {
   ShieldCheck,
   Compass,
   Crown,
+  AlertTriangle,
 } from 'lucide-react';
 import { MarketQuote, Probabilities, TickerSymbol, LiveMarketDataSource } from '../types/market';
 import { UserProfile } from '../types/user';
 import { searchMarketSymbols } from '../services/marketDataService';
 import { useI18n } from '../i18n/I18nContext';
 import { LanguageSelector } from './LanguageSelector';
+import { ThemeToggle } from './ThemeToggle';
+import { AppConfig } from '../config/environment';
 
 interface HeaderProps {
   quote: MarketQuote;
@@ -43,6 +46,7 @@ interface HeaderProps {
   onOpenAlerts: () => void;
   onOpenChat?: () => void;
   onOpenUniversalSearch?: () => void;
+  onOpenReportIssue?: () => void;
   dataSource: LiveMarketDataSource;
   onChangeDataSource: (source: LiveMarketDataSource) => void;
   tickSpeed: number;
@@ -80,6 +84,7 @@ export const Header: React.FC<HeaderProps> = ({
   onOpenSettings,
   onOpenTour,
   onOpenUniversalSearch,
+  onOpenReportIssue,
 }) => {
   const { t } = useI18n();
   const [searchInput, setSearchInput] = useState('');
@@ -141,6 +146,21 @@ export const Header: React.FC<HeaderProps> = ({
 
   return (
     <header className="flex flex-col bg-[#0A0A0A] border border-[#242424] rounded-xl p-3.5 mb-2.5 gap-3.5 select-none text-[#E5E5E5] shadow-2xl">
+      {/* PERSISTENT DEMO MODE BANNER (When Simulation / Demo Mode is Active) */}
+      {AppConfig.isDemoMode && (
+        <div className="bg-amber-500/15 border border-amber-500/40 rounded-lg px-3 py-1.5 text-center text-amber-300 text-xs font-mono font-bold flex flex-wrap items-center justify-between gap-2 shadow-inner">
+          <div className="flex items-center gap-2">
+            <span className="px-1.5 py-0.5 bg-amber-500 text-black text-[10px] font-black rounded">
+              DEMO
+            </span>
+            <span># DEMO — SIMULATED MARKET DATA</span>
+          </div>
+          <span className="text-[11px] text-amber-200/80 font-normal">
+            Sandbox mode active. Switch data source to Yahoo/Google for verified live quotes.
+          </span>
+        </div>
+      )}
+
       {/* Top Row: Brand, Search, Data Source, User Controls */}
       <div className="flex flex-wrap items-center justify-between gap-3 border-b border-[#1C1C1C] pb-3">
         {/* Left: Minimal Luxury Brand Wordmark */}
@@ -263,6 +283,9 @@ export const Header: React.FC<HeaderProps> = ({
           {/* Language Selector Dropdown */}
           <LanguageSelector />
 
+          {/* Day / Night Visual Theme Switcher */}
+          <ThemeToggle variant="dropdown" />
+
           {/* Quick Tour Button */}
           <button
             onClick={onOpenTour}
@@ -295,6 +318,17 @@ export const Header: React.FC<HeaderProps> = ({
               {currentUser.isGuest ? 'Sign In' : currentUser.name.split(' ')[0]}
             </span>
           </button>
+
+          {/* Report Data Issue Feedback Button */}
+          {onOpenReportIssue && (
+            <button
+              onClick={onOpenReportIssue}
+              className="p-1.5 bg-[#101010] hover:bg-[#151515] border border-[#242424] hover:border-amber-500/50 text-[#9CA3AF] hover:text-amber-300 rounded-lg transition"
+              title="Report Data / Quality Issue"
+            >
+              <AlertTriangle className="w-4 h-4 text-amber-400" />
+            </button>
+          )}
 
           <button
             onClick={onOpenSettings}

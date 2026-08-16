@@ -30,6 +30,8 @@ export interface OptionContract {
   outOfTheMoney: boolean;
   is0DTE: boolean;
   isDelayed: boolean;
+  liquidityScore?: 'HIGH' | 'MEDIUM' | 'LOW' | 'VERY_LOW';
+  greeksSource?: 'CALCULATED_BLACK_SCHOLES' | 'PROVIDER_REAL_TIME';
   percentChange?: number;
   high?: number;
   low?: number;

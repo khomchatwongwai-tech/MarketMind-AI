@@ -10,7 +10,7 @@
         "firstName": { "type": "string", "maxLength": 50, "description": "First name" },
         "lastName": { "type": "string", "maxLength": 50, "description": "Last name" },
         "email": { "type": "string", "format": "email", "maxLength": 150, "description": "Email address" },
-        "role": { "type": "string", "enum": ["user", "admin"], "description": "User access role" },
+        "role": { "type": "string", "enum": ["user", "premium_user", "support", "moderator", "admin", "super_admin"], "description": "User access role" },
         "plan": { "type": "string", "enum": ["free", "basic", "pro", "premium", "institutional"], "description": "Active subscription plan" },
         "planTier": { "type": "string", "maxLength": 30, "description": "Subscription tier label" },
         "subscriptionStatus": { "type": "string", "enum": ["active", "trialing", "past_due", "canceled"], "description": "Subscription status" },

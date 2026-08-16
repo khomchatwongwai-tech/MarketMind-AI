@@ -1,41 +1,170 @@
 @import "tailwindcss";
 
-:root {
-  --bg-primary: #050505;
-  --bg-secondary: #0A0A0A;
-  --surface-card: #101010;
-  --surface-elevated: #151515;
-  --border-primary: #242424;
-  --border-subtle: #1C1C1C;
-  --border-gold-hover: rgba(212, 175, 55, 0.4);
+/* -------------------------------------------------------------
+ * MARKETMIND AI DESIGN SYSTEM THEME TOKENS
+ * ------------------------------------------------------------- */
 
+/* NIGHT MODE (Default / Primary Theme) */
+:root,
+[data-theme='dark'],
+html.dark {
+  --background-primary: #080808;
+  --background-secondary: #111111;
+  --surface-primary: #181818;
+  --surface-secondary: #1e1e1e;
+  --surface-elevated: #242424;
+  --surface-hover: #222222;
+  --surface-card: #181818;
+
+  --border-primary: #2A2A2A;
+  --border-subtle: #1F1F1F;
+  --border-gold: rgba(212, 175, 55, 0.4);
+  --border-gold-hover: rgba(212, 175, 55, 0.6);
+
+  --accent-gold: #D4AF37;
+  --accent-gold-bright: #FFD700;
+  --accent-gold-light: #F2D675;
+  --accent-gold-dark: #8C6B18;
+  --accent-gold-highlight: #FFE08A;
+  --accent-gold-bg: rgba(212, 175, 55, 0.12);
+  --accent-gold-border: rgba(212, 175, 55, 0.35);
+
+  /* Legacy aliases mapped to standardized design tokens */
   --gold-primary: #D4AF37;
   --gold-rich: #C9A227;
   --gold-light: #F2D675;
   --gold-dark: #8C6B18;
   --gold-highlight: #FFE08A;
+  --bg-primary: #080808;
+  --bg-secondary: #111111;
 
   --text-primary: #FFFFFF;
-  --text-secondary: #E5E5E5;
-  --text-muted: #9CA3AF;
-  --text-dark: #6B7280;
+  --text-secondary: #A7A7A7;
+  --text-muted: #737373;
+  --text-dark: #525252;
+  --text-inverse: #151515;
+
+  --market-positive: #22C55E;
+  --market-positive-bg: rgba(34, 197, 94, 0.12);
+  --market-positive-border: rgba(34, 197, 94, 0.35);
+
+  --market-negative: #EF4444;
+  --market-negative-bg: rgba(239, 68, 68, 0.12);
+  --market-negative-border: rgba(239, 68, 68, 0.35);
+
+  --warning: #F59E0B;
+  --warning-bg: rgba(245, 158, 11, 0.12);
+  --warning-border: rgba(245, 158, 11, 0.35);
 
   --bullish: #22C55E;
   --bearish: #EF4444;
   --neutral: #A3A3A3;
+
+  --shadow: 0 4px 20px -2px rgba(0, 0, 0, 0.85);
+  --shadow-lg: 0 10px 30px -5px rgba(0, 0, 0, 0.9);
+  --shadow-gold: 0 0 15px rgba(212, 175, 55, 0.25);
+
+  --scrollbar-track: #080808;
+  --scrollbar-thumb: #2A2A2A;
+  --scrollbar-thumb-hover: #D4AF37;
 }
 
+/* DAY MODE (Clean White & Soft Gray Institutional Theme) */
+[data-theme='light'],
+html.light {
+  --background-primary: #F8F9FA;
+  --background-secondary: #F1F3F5;
+  --surface-primary: #FFFFFF;
+  --surface-secondary: #F4F5F7;
+  --surface-elevated: #FFFFFF;
+  --surface-hover: #E9ECEF;
+  --surface-card: #FFFFFF;
+
+  --border-primary: #E2E5E9;
+  --border-subtle: #ECEFF2;
+  --border-gold: rgba(181, 138, 24, 0.4);
+  --border-gold-hover: rgba(181, 138, 24, 0.6);
+
+  --accent-gold: #B58A18;
+  --accent-gold-bright: #D4AF37;
+  --accent-gold-light: #D4AF37;
+  --accent-gold-dark: #8C6B18;
+  --accent-gold-highlight: #F59E0B;
+  --accent-gold-bg: rgba(181, 138, 24, 0.08);
+  --accent-gold-border: rgba(181, 138, 24, 0.3);
+
+  /* Legacy aliases mapped for light mode */
+  --gold-primary: #B58A18;
+  --gold-rich: #9A7210;
+  --gold-light: #D4AF37;
+  --gold-dark: #8C6B18;
+  --gold-highlight: #D4AF37;
+  --bg-primary: #F8F9FA;
+  --bg-secondary: #F1F3F5;
+
+  --text-primary: #151515;
+  --text-secondary: #62666D;
+  --text-muted: #8C929C;
+  --text-dark: #A0A5AD;
+  --text-inverse: #FFFFFF;
+
+  --market-positive: #16A34A;
+  --market-positive-bg: rgba(22, 163, 74, 0.1);
+  --market-positive-border: rgba(22, 163, 74, 0.3);
+
+  --market-negative: #DC2626;
+  --market-negative-bg: rgba(220, 38, 38, 0.1);
+  --market-negative-border: rgba(220, 38, 38, 0.3);
+
+  --warning: #D97706;
+  --warning-bg: rgba(217, 119, 6, 0.1);
+  --warning-border: rgba(217, 119, 6, 0.3);
+
+  --bullish: #16A34A;
+  --bearish: #DC2626;
+  --neutral: #62666D;
+
+  --shadow: 0 2px 10px -1px rgba(0, 0, 0, 0.06), 0 1px 3px rgba(0, 0, 0, 0.04);
+  --shadow-lg: 0 10px 25px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05);
+  --shadow-gold: 0 0 15px rgba(181, 138, 24, 0.2);
+
+  --scrollbar-track: #F1F3F5;
+  --scrollbar-thumb: #D1D5DB;
+  --scrollbar-thumb-hover: #B58A18;
+}
+
+/* Global Body & Typography */
 body {
-  background-color: #050505;
-  color: #E5E5E5;
+  background-color: var(--background-primary);
+  color: var(--text-primary);
   font-family: 'Inter', system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
   overflow-x: hidden;
   -webkit-font-smoothing: antialiased;
+  transition: background-color 250ms ease, color 250ms ease;
+}
+
+/* Smooth Theme Transitions for Visual UI Surfaces */
+div, header, nav, main, footer, section, article, aside,
+button, input, select, textarea, table, th, td, span, p, h1, h2, h3, h4, h5, h6 {
+  transition-property: background-color, border-color, color, box-shadow;
+  transition-duration: 220ms;
+  transition-timing-function: cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+/* Exclude Canvas & Chart Elements from global transition to maintain 60FPS render loop */
+canvas, svg, .chart-canvas-no-transition {
+  transition: none !important;
 }
 
 /* Metallic Gold Gradients and Accents */
 .gold-gradient-text {
   background: linear-gradient(135deg, #FFE08A 0%, #D4AF37 40%, #C9A227 75%, #8C6B18 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+}
+
+[data-theme='light'] .gold-gradient-text {
+  background: linear-gradient(135deg, #D4AF37 0%, #B58A18 50%, #8C6B18 100%);
   -webkit-background-clip: text;
   -webkit-text-fill-color: transparent;
 }
@@ -48,53 +177,191 @@ body {
   background: linear-gradient(135deg, #D4AF37 0%, #FFE08A 50%, #C9A227 100%);
   color: #050505;
   font-weight: 700;
+  border: 1px solid rgba(212, 175, 55, 0.5);
+  box-shadow: 0 2px 8px rgba(212, 175, 55, 0.2);
   transition: all 0.2s ease-in-out;
+}
+
+[data-theme='light'] .gold-gradient-btn {
+  background: linear-gradient(135deg, #B58A18 0%, #D4AF37 50%, #C9A227 100%);
+  color: #FFFFFF;
+  border: 1px solid rgba(181, 138, 24, 0.6);
+  box-shadow: 0 2px 8px rgba(181, 138, 24, 0.25);
 }
 
 .gold-gradient-btn:hover {
   background: linear-gradient(135deg, #FFE08A 0%, #D4AF37 50%, #F2D675 100%);
-  box-shadow: 0 0 15px rgba(212, 175, 55, 0.35);
+  color: #050505;
+  box-shadow: 0 0 16px rgba(212, 175, 55, 0.4);
+  transform: translateY(-1px);
+}
+
+[data-theme='light'] .gold-gradient-btn:hover {
+  background: linear-gradient(135deg, #D4AF37 0%, #B58A18 60%, #9A7210 100%);
+  color: #FFFFFF;
+  box-shadow: 0 0 16px rgba(181, 138, 24, 0.4);
   transform: translateY(-1px);
 }
 
 .gold-subtle-box {
-  background: linear-gradient(180deg, rgba(212, 175, 55, 0.08) 0%, rgba(10, 10, 10, 0.4) 100%);
-  border: 1px solid rgba(212, 175, 55, 0.3);
+  background: var(--accent-gold-bg);
+  border: 1px solid var(--accent-gold-border);
 }
 
 .gold-badge {
-  background: rgba(212, 175, 55, 0.12);
-  color: #F2D675;
-  border: 1px solid rgba(212, 175, 55, 0.35);
+  background: var(--accent-gold-bg);
+  color: var(--accent-gold);
+  border: 1px solid var(--accent-gold-border);
 }
 
 .card-luxury {
-  background: #101010;
-  border: 1px solid #242424;
+  background: var(--surface-primary);
+  border: 1px solid var(--border-primary);
   border-radius: 0.75rem;
-  transition: border-color 0.2s ease, box-shadow 0.2s ease;
+  box-shadow: var(--shadow);
+  transition: border-color 0.2s ease, box-shadow 0.2s ease, background-color 0.2s ease;
 }
 
 .card-luxury:hover {
-  border-color: rgba(212, 175, 55, 0.35);
-  box-shadow: 0 4px 20px -2px rgba(0, 0, 0, 0.7);
+  border-color: var(--border-gold);
+  box-shadow: var(--shadow-lg);
 }
 
-/* Custom Scrollbar for Luxury Dark Terminal */
+/* Custom Scrollbar */
 ::-webkit-scrollbar {
   width: 6px;
   height: 6px;
 }
 
 ::-webkit-scrollbar-track {
-  background: #050505;
+  background: var(--scrollbar-track);
 }
 
 ::-webkit-scrollbar-thumb {
-  background: #242424;
+  background: var(--scrollbar-thumb);
   border-radius: 3px;
 }
 
 ::-webkit-scrollbar-thumb:hover {
-  background: #D4AF37;
+  background: var(--scrollbar-thumb-hover);
+}
+
+/* Light / Day Mode Overrides for Hardcoded Dark Utility Containers */
+[data-theme='light'] .bg-\[\#050505\],
+[data-theme='light'] .bg-\[\#080808\],
+[data-theme='light'] .bg-\[\#0f1013\],
+[data-theme='light'] .bg-\[\#0d0e12\] {
+  background-color: var(--background-primary) !important;
+}
+
+[data-theme='light'] .bg-\[\#0A0A0A\],
+[data-theme='light'] .bg-\[\#111111\],
+[data-theme='light'] .bg-\[\#121316\],
+[data-theme='light'] .bg-\[\#131518\] {
+  background-color: var(--background-secondary) !important;
+}
+
+[data-theme='light'] .bg-\[\#101010\],
+[data-theme='light'] .bg-\[\#15171a\],
+[data-theme='light'] .bg-\[\#181818\],
+[data-theme='light'] .bg-\[\#181b24\],
+[data-theme='light'] .bg-\[\#1c1f24\] {
+  background-color: var(--surface-primary) !important;
+}
+
+[data-theme='light'] .bg-\[\#1e1e1e\],
+[data-theme='light'] .bg-\[\#202430\],
+[data-theme='light'] .bg-\[\#222634\] {
+  background-color: var(--surface-secondary) !important;
+}
+
+[data-theme='light'] .border-\[\#1C1C1C\],
+[data-theme='light'] .border-\[\#242424\],
+[data-theme='light'] .border-\[\#2A2A2A\],
+[data-theme='light'] .border-\[\#2b3040\],
+[data-theme='light'] .border-\[\#2d3139\],
+[data-theme='light'] .border-\[\#303646\],
+[data-theme='light'] .border-\[\#232736\] {
+  border-color: var(--border-primary) !important;
+}
+
+[data-theme='light'] .text-white,
+[data-theme='light'] .text-\[\#E5E5E5\],
+[data-theme='light'] .text-\[\#e2e8f0\] {
+  color: var(--text-primary) !important;
+}
+
+[data-theme='light'] .text-\[\#9CA3AF\],
+[data-theme='light'] .text-\[\#A7A7A7\],
+[data-theme='light'] .text-slate-400,
+[data-theme='light'] .text-slate-300 {
+  color: var(--text-secondary) !important;
+}
+
+[data-theme='light'] .text-slate-500,
+[data-theme='light'] .text-slate-600,
+[data-theme='light'] .text-\[\#6B7280\] {
+  color: var(--text-muted) !important;
+}
+
+/* Form Inputs in Day Mode */
+[data-theme='light'] input,
+[data-theme='light'] textarea,
+[data-theme='light'] select {
+  background-color: var(--surface-secondary) !important;
+  color: var(--text-primary) !important;
+  border-color: var(--border-primary) !important;
+}
+
+[data-theme='light'] input::placeholder,
+[data-theme='light'] textarea::placeholder {
+  color: var(--text-muted) !important;
+}
+
+/* Modals Backdrops */
+[data-theme='light'] .bg-black\/80,
+[data-theme='light'] .bg-black\/75 {
+  background-color: rgba(15, 23, 42, 0.45) !important;
+  backdrop-filter: blur(4px);
+}
+
+/* Skeleton Loading States */
+.skeleton-box {
+  background-color: var(--border-subtle);
+  position: relative;
+  overflow: hidden;
+}
+
+.skeleton-box::after {
+  content: '';
+  position: absolute;
+  top: 0;
+  right: 0;
+  bottom: 0;
+  left: 0;
+  transform: translateX(-100%);
+  background-image: linear-gradient(
+    90deg,
+    rgba(255, 255, 255, 0) 0,
+    rgba(255, 255, 255, 0.05) 20%,
+    rgba(255, 255, 255, 0.1) 60%,
+    rgba(255, 255, 255, 0)
+  );
+  animation: shimmer 2s infinite;
+}
+
+[data-theme='light'] .skeleton-box::after {
+  background-image: linear-gradient(
+    90deg,
+    rgba(0, 0, 0, 0) 0,
+    rgba(0, 0, 0, 0.03) 20%,
+    rgba(0, 0, 0, 0.06) 60%,
+    rgba(0, 0, 0, 0)
+  );
+}
+
+@keyframes shimmer {
+  100% {
+    transform: translateX(100%);
+  }
 }

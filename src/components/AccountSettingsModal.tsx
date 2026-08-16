@@ -18,11 +18,17 @@ import {
   Clock,
   Coins,
   Sparkles,
+  Palette,
+  Sun,
+  Moon,
+  Laptop,
+  Check,
 } from 'lucide-react';
 import { UserProfile, TickerSymbol } from '../types/user';
 import { UserService } from '../services/userService';
 import { useI18n } from '../i18n/I18nContext';
 import { LanguageCode, RegionCode } from '../i18n/types';
+import { useTheme, ThemeMode } from '../context/ThemeContext';
 
 interface AccountSettingsModalProps {
   isOpen: boolean;
@@ -55,7 +61,9 @@ export const AccountSettingsModal: React.FC<AccountSettingsModalProps> = ({
     t,
   } = useI18n();
 
-  const [activeTab, setActiveTab] = useState<'profile' | 'global' | 'notifications' | 'api' | 'security'>('profile');
+  const { theme, setTheme, resolvedTheme } = useTheme();
+
+  const [activeTab, setActiveTab] = useState<'profile' | 'appearance' | 'global' | 'notifications' | 'ai' | 'api' | 'security' | 'data_export'>('appearance');
   const [formData, setFormData] = useState<UserProfile>({
     ...currentUser,
     language: currentUser.language || language,
@@ -63,6 +71,7 @@ export const AccountSettingsModal: React.FC<AccountSettingsModalProps> = ({
     timezone: currentUser.timezone || timezone,
     preferredCurrency: currentUser.preferredCurrency || currency,
     aiResponseLanguage: currentUser.aiResponseLanguage || aiLanguage,
+    themePreference: currentUser.themePreference || theme,
   });
   const [isSaved, setIsSaved] = useState(false);
   const [copiedKeyId, setCopiedKeyId] = useState<string | null>(null);
@@ -72,17 +81,23 @@ export const AccountSettingsModal: React.FC<AccountSettingsModalProps> = ({
   if (!isOpen) return null;
 
   const handleSave = () => {
-    // Save to user profile and sync i18n context
+    // Save to user profile and sync i18n & theme context
     if (formData.language) setLanguage(formData.language as LanguageCode);
     if (formData.region) setRegion(formData.region as RegionCode);
     if (formData.timezone) setTimezone(formData.timezone);
     if (formData.preferredCurrency) setCurrency(formData.preferredCurrency);
     if (formData.aiResponseLanguage) setAiLanguage(formData.aiResponseLanguage as LanguageCode);
+    if (formData.themePreference) setTheme(formData.themePreference);
 
     UserService.saveUser(formData);
     onUserSaved(formData);
     setIsSaved(true);
     setTimeout(() => setIsSaved(false), 2000);
+  };
+
+  const handleSelectTheme = (mode: ThemeMode) => {
+    setFormData({ ...formData, themePreference: mode });
+    setTheme(mode);
   };
 
   const handleCreateApiKey = () => {
@@ -110,38 +125,49 @@ export const AccountSettingsModal: React.FC<AccountSettingsModalProps> = ({
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm animate-in fade-in select-none">
-      <div className="bg-[#15171a] border border-[#2d3139] rounded-xl w-full max-w-3xl max-h-[85vh] flex flex-col overflow-hidden shadow-2xl text-[#e2e8f0]">
+      <div className="bg-[var(--surface-primary)] border border-[var(--border-primary)] rounded-2xl w-full max-w-3xl max-h-[88vh] flex flex-col overflow-hidden shadow-2xl text-[var(--text-primary)]">
         {/* Modal Top Bar */}
-        <div className="p-4 bg-[#1c1f24] border-b border-[#2d3139] flex justify-between items-center">
+        <div className="p-4 bg-[var(--surface-secondary)] border-b border-[var(--border-primary)] flex justify-between items-center">
           <div className="flex items-center gap-2.5">
-            <div className="w-8 h-8 rounded-lg bg-[#6366f1]/20 border border-[#6366f1]/40 flex items-center justify-center text-[#818cf8]">
-              <User className="w-4 h-4" />
+            <div className="w-8 h-8 rounded-lg bg-[var(--accent-gold-bg)] border border-[var(--accent-gold-border)] flex items-center justify-center text-[var(--accent-gold)] font-bold">
+              <Palette className="w-4 h-4" />
             </div>
             <div>
-              <h2 className="text-sm font-black text-white uppercase tracking-wider">
+              <h2 className="text-sm font-black text-[var(--text-primary)] uppercase tracking-wider">
                 Account &amp; Terminal Settings
               </h2>
-              <p className="text-xs text-slate-400">
-                Manage profile, trading preferences, webhooks &amp; API keys
+              <p className="text-xs text-[var(--text-secondary)]">
+                Manage appearance themes, trading profile, localization &amp; API keys
               </p>
             </div>
           </div>
           <button
             onClick={onClose}
-            className="p-1.5 text-slate-400 hover:text-white hover:bg-[#2d3139] rounded transition"
+            className="p-1.5 text-[var(--text-muted)] hover:text-[var(--text-primary)] hover:bg-[var(--surface-hover)] rounded-lg transition"
           >
             <X className="w-4 h-4" />
           </button>
         </div>
 
         {/* Tab Selector */}
-        <div className="flex border-b border-[#2d3139] bg-[#121316] px-4 gap-2 text-xs font-bold">
+        <div className="flex border-b border-[var(--border-primary)] bg-[var(--background-secondary)] px-4 gap-1 text-xs font-bold overflow-x-auto scrollbar-none">
+          <button
+            onClick={() => setActiveTab('appearance')}
+            className={`py-2.5 px-3 border-b-2 flex items-center gap-1.5 whitespace-nowrap transition ${
+              activeTab === 'appearance'
+                ? 'border-[var(--accent-gold)] text-[var(--accent-gold)]'
+                : 'border-transparent text-[var(--text-secondary)] hover:text-[var(--text-primary)]'
+            }`}
+          >
+            <Palette className="w-3.5 h-3.5" />
+            <span>Appearance &amp; Theme</span>
+          </button>
           <button
             onClick={() => setActiveTab('profile')}
-            className={`py-2.5 px-3 border-b-2 flex items-center gap-1.5 transition ${
+            className={`py-2.5 px-3 border-b-2 flex items-center gap-1.5 whitespace-nowrap transition ${
               activeTab === 'profile'
-                ? 'border-[#6366f1] text-white'
-                : 'border-transparent text-slate-400 hover:text-slate-200'
+                ? 'border-[var(--accent-gold)] text-[var(--accent-gold)]'
+                : 'border-transparent text-[var(--text-secondary)] hover:text-[var(--text-primary)]'
             }`}
           >
             <User className="w-3.5 h-3.5" />
@@ -149,10 +175,10 @@ export const AccountSettingsModal: React.FC<AccountSettingsModalProps> = ({
           </button>
           <button
             onClick={() => setActiveTab('global')}
-            className={`py-2.5 px-3 border-b-2 flex items-center gap-1.5 transition ${
+            className={`py-2.5 px-3 border-b-2 flex items-center gap-1.5 whitespace-nowrap transition ${
               activeTab === 'global'
-                ? 'border-[#6366f1] text-white'
-                : 'border-transparent text-slate-400 hover:text-slate-200'
+                ? 'border-[var(--accent-gold)] text-[var(--accent-gold)]'
+                : 'border-transparent text-[var(--text-secondary)] hover:text-[var(--text-primary)]'
             }`}
           >
             <Globe className="w-3.5 h-3.5" />
@@ -160,21 +186,32 @@ export const AccountSettingsModal: React.FC<AccountSettingsModalProps> = ({
           </button>
           <button
             onClick={() => setActiveTab('notifications')}
-            className={`py-2.5 px-3 border-b-2 flex items-center gap-1.5 transition ${
+            className={`py-2.5 px-3 border-b-2 flex items-center gap-1.5 whitespace-nowrap transition ${
               activeTab === 'notifications'
-                ? 'border-[#6366f1] text-white'
-                : 'border-transparent text-slate-400 hover:text-slate-200'
+                ? 'border-[var(--accent-gold)] text-[var(--accent-gold)]'
+                : 'border-transparent text-[var(--text-secondary)] hover:text-[var(--text-primary)]'
             }`}
           >
             <Bell className="w-3.5 h-3.5" />
             <span>Notifications &amp; Webhooks</span>
           </button>
           <button
+            onClick={() => setActiveTab('ai')}
+            className={`py-2.5 px-3 border-b-2 flex items-center gap-1.5 whitespace-nowrap transition ${
+              activeTab === 'ai'
+                ? 'border-[var(--accent-gold)] text-[var(--accent-gold)]'
+                : 'border-transparent text-[var(--text-secondary)] hover:text-[var(--text-primary)]'
+            }`}
+          >
+            <Sparkles className="w-3.5 h-3.5" />
+            <span>AI Reasoning</span>
+          </button>
+          <button
             onClick={() => setActiveTab('api')}
-            className={`py-2.5 px-3 border-b-2 flex items-center gap-1.5 transition ${
+            className={`py-2.5 px-3 border-b-2 flex items-center gap-1.5 whitespace-nowrap transition ${
               activeTab === 'api'
-                ? 'border-[#6366f1] text-white'
-                : 'border-transparent text-slate-400 hover:text-slate-200'
+                ? 'border-[var(--accent-gold)] text-[var(--accent-gold)]'
+                : 'border-transparent text-[var(--text-secondary)] hover:text-[var(--text-primary)]'
             }`}
           >
             <Key className="w-3.5 h-3.5" />
@@ -182,123 +219,271 @@ export const AccountSettingsModal: React.FC<AccountSettingsModalProps> = ({
           </button>
           <button
             onClick={() => setActiveTab('security')}
-            className={`py-2.5 px-3 border-b-2 flex items-center gap-1.5 transition ${
+            className={`py-2.5 px-3 border-b-2 flex items-center gap-1.5 whitespace-nowrap transition ${
               activeTab === 'security'
-                ? 'border-[#6366f1] text-white'
-                : 'border-transparent text-slate-400 hover:text-slate-200'
+                ? 'border-[var(--accent-gold)] text-[var(--accent-gold)]'
+                : 'border-transparent text-[var(--text-secondary)] hover:text-[var(--text-primary)]'
             }`}
           >
             <Shield className="w-3.5 h-3.5" />
             <span>Security &amp; 2FA</span>
           </button>
+          <button
+            onClick={() => setActiveTab('data_export')}
+            className={`py-2.5 px-3 border-b-2 flex items-center gap-1.5 whitespace-nowrap transition ${
+              activeTab === 'data_export'
+                ? 'border-[var(--accent-gold)] text-[var(--accent-gold)]'
+                : 'border-transparent text-[var(--text-secondary)] hover:text-[var(--text-primary)]'
+            }`}
+          >
+            <Copy className="w-3.5 h-3.5" />
+            <span>Data &amp; Privacy</span>
+          </button>
         </div>
 
-        {/* Tab Content Body */}
+        {/* Tab Content Area */}
         <div className="p-5 overflow-y-auto flex-1 space-y-4">
-          {activeTab === 'profile' && (
-            <div className="space-y-4">
-              <div className="flex items-center justify-between p-3.5 bg-[#1c1f24] rounded-lg border border-[#2d3139]">
-                <div className="flex items-center gap-3">
-                  <div className="w-12 h-12 rounded-full bg-[#6366f1]/20 border border-[#6366f1]/40 flex items-center justify-center font-bold text-white text-lg">
-                    {formData.name.charAt(0)}
+          {/* ----------------- APPEARANCE & THEME TAB ----------------- */}
+          {activeTab === 'appearance' && (
+            <div className="space-y-5">
+              {/* Banner */}
+              <div className="p-4 bg-[var(--surface-secondary)] rounded-xl border border-[var(--border-primary)] flex items-center justify-between">
+                <div className="flex items-center gap-3.5">
+                  <div className="w-10 h-10 rounded-xl bg-[var(--accent-gold-bg)] border border-[var(--accent-gold-border)] flex items-center justify-center text-[var(--accent-gold)]">
+                    <Palette className="w-5 h-5" />
                   </div>
                   <div>
-                    <h3 className="text-sm font-bold text-white">{formData.name}</h3>
-                    <p className="text-xs text-slate-400 font-mono">{formData.email}</p>
-                    <span className="text-[10px] uppercase font-bold text-emerald-400 font-mono">
-                      Plan: {formData.plan.toUpperCase()} &bull; Role: {formData.role.toUpperCase()}
-                    </span>
+                    <h3 className="text-xs font-bold text-[var(--text-primary)] uppercase tracking-wide flex items-center gap-2">
+                      <span>MarketMind Dual-Theme Design Engine</span>
+                      <span className="text-[9px] px-2 py-0.5 rounded-full font-mono bg-[var(--accent-gold-bg)] text-[var(--accent-gold)] border border-[var(--accent-gold-border)]">
+                        DAY &amp; NIGHT
+                      </span>
+                    </h3>
+                    <p className="text-[11px] text-[var(--text-secondary)] mt-0.5">
+                      Switch effortlessly between High-End Night Mode (deep black &amp; metallic gold) and Professional Day Mode (clean white &amp; soft gray).
+                    </p>
                   </div>
                 </div>
-                {onOpenSubscription && (
-                  <button
-                    onClick={() => {
-                      onClose();
-                      onOpenSubscription();
-                    }}
-                    className="px-3 py-1.5 bg-[#6366f1] hover:bg-[#4f46e5] text-white text-xs font-bold rounded-lg transition"
-                  >
-                    Upgrade Tier
-                  </button>
-                )}
+                <div className="hidden sm:block text-right">
+                  <span className="text-[10px] font-mono text-[var(--accent-gold)] font-bold block">
+                    ACTIVE: {resolvedTheme === 'dark' ? 'NIGHT' : 'DAY'}
+                  </span>
+                  <span className="text-[9px] text-[var(--text-muted)]">
+                    Mode: {formData.themePreference || theme}
+                  </span>
+                </div>
               </div>
 
+              {/* Theme Options Cards */}
+              <div>
+                <label className="block text-[11px] font-black uppercase tracking-wider text-[var(--text-primary)] mb-2.5">
+                  Select Terminal Visual Theme
+                </label>
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+                  {/* Option 1: System */}
+                  <button
+                    type="button"
+                    onClick={() => handleSelectTheme('system')}
+                    className={`p-4 rounded-xl border text-left transition-all relative flex flex-col justify-between ${
+                      (formData.themePreference || theme) === 'system'
+                        ? 'bg-[var(--accent-gold-bg)] border-[var(--accent-gold)] shadow-md'
+                        : 'bg-[var(--surface-secondary)] border-[var(--border-primary)] hover:border-[var(--border-gold)]'
+                    }`}
+                  >
+                    <div>
+                      <div className="flex items-center justify-between mb-2">
+                        <div className="w-8 h-8 rounded-lg bg-[var(--surface-primary)] border border-[var(--border-subtle)] flex items-center justify-center text-[var(--accent-gold)]">
+                          <Laptop className="w-4 h-4" />
+                        </div>
+                        <div className={`w-4 h-4 rounded-full border flex items-center justify-center ${
+                          (formData.themePreference || theme) === 'system'
+                            ? 'border-[var(--accent-gold)] bg-[var(--accent-gold)] text-[var(--text-inverse)]'
+                            : 'border-[var(--border-primary)]'
+                        }`}>
+                          {(formData.themePreference || theme) === 'system' && <Check className="w-3 h-3 stroke-[3]" />}
+                        </div>
+                      </div>
+                      <div className="font-bold text-xs text-[var(--text-primary)]">
+                        Use Device Setting
+                      </div>
+                      <p className="text-[11px] text-[var(--text-secondary)] mt-1 leading-relaxed">
+                        Automatically mirrors your operating system (macOS/Windows/Linux/iOS) dark or light preference.
+                      </p>
+                    </div>
+
+                    <div className="mt-4 pt-2.5 border-t border-[var(--border-subtle)] flex items-center gap-1.5 text-[10px] text-[var(--text-muted)] font-mono">
+                      <span>Dynamic Auto-Sync</span>
+                    </div>
+                  </button>
+
+                  {/* Option 2: Day Mode */}
+                  <button
+                    type="button"
+                    onClick={() => handleSelectTheme('light')}
+                    className={`p-4 rounded-xl border text-left transition-all relative flex flex-col justify-between ${
+                      (formData.themePreference || theme) === 'light'
+                        ? 'bg-[var(--accent-gold-bg)] border-[var(--accent-gold)] shadow-md ring-1 ring-[var(--accent-gold)]'
+                        : 'bg-[var(--surface-secondary)] border-[var(--border-primary)] hover:border-[var(--border-gold)]'
+                    }`}
+                  >
+                    <div>
+                      <div className="flex items-center justify-between mb-2">
+                        <div className="w-8 h-8 rounded-lg bg-white border border-slate-200 flex items-center justify-center text-amber-600 shadow-sm">
+                          <Sun className="w-4 h-4" />
+                        </div>
+                        <div className={`w-4 h-4 rounded-full border flex items-center justify-center ${
+                          (formData.themePreference || theme) === 'light'
+                            ? 'border-[var(--accent-gold)] bg-[var(--accent-gold)] text-[var(--text-inverse)]'
+                            : 'border-[var(--border-primary)]'
+                        }`}>
+                          {(formData.themePreference || theme) === 'light' && <Check className="w-3 h-3 stroke-[3]" />}
+                        </div>
+                      </div>
+                      <div className="font-bold text-xs text-[var(--text-primary)] flex items-center gap-1.5">
+                        <span>Day Mode</span>
+                        <span className="text-[9px] px-1.5 py-0.2 bg-amber-500/15 text-amber-700 font-mono font-bold rounded">
+                          LIGHT
+                        </span>
+                      </div>
+                      <p className="text-[11px] text-[var(--text-secondary)] mt-1 leading-relaxed">
+                        Clean white background, soft gray cards, dark charcoal typography with warm metallic gold accents.
+                      </p>
+                    </div>
+
+                    {/* Color Swatch Preview */}
+                    <div className="mt-4 pt-2.5 border-t border-[var(--border-subtle)] flex items-center gap-1.5">
+                      <div className="w-3.5 h-3.5 rounded bg-[#FFFFFF] border border-slate-300" title="#FFFFFF" />
+                      <div className="w-3.5 h-3.5 rounded bg-[#F1F3F5] border border-slate-300" title="#F1F3F5" />
+                      <div className="w-3.5 h-3.5 rounded bg-[#B58A18]" title="#B58A18 Gold" />
+                      <div className="w-3.5 h-3.5 rounded bg-[#16A34A]" title="#16A34A Green" />
+                      <div className="w-3.5 h-3.5 rounded bg-[#DC2626]" title="#DC2626 Red" />
+                    </div>
+                  </button>
+
+                  {/* Option 3: Night Mode */}
+                  <button
+                    type="button"
+                    onClick={() => handleSelectTheme('dark')}
+                    className={`p-4 rounded-xl border text-left transition-all relative flex flex-col justify-between ${
+                      (formData.themePreference || theme) === 'dark'
+                        ? 'bg-[var(--accent-gold-bg)] border-[var(--accent-gold)] shadow-md ring-1 ring-[var(--accent-gold)]'
+                        : 'bg-[var(--surface-secondary)] border-[var(--border-primary)] hover:border-[var(--border-gold)]'
+                    }`}
+                  >
+                    <div>
+                      <div className="flex items-center justify-between mb-2">
+                        <div className="w-8 h-8 rounded-lg bg-black border border-[#333] flex items-center justify-center text-[#FFD700] shadow-sm">
+                          <Moon className="w-4 h-4" />
+                        </div>
+                        <div className={`w-4 h-4 rounded-full border flex items-center justify-center ${
+                          (formData.themePreference || theme) === 'dark'
+                            ? 'border-[var(--accent-gold)] bg-[var(--accent-gold)] text-[var(--text-inverse)]'
+                            : 'border-[var(--border-primary)]'
+                        }`}>
+                          {(formData.themePreference || theme) === 'dark' && <Check className="w-3 h-3 stroke-[3]" />}
+                        </div>
+                      </div>
+                      <div className="font-bold text-xs text-[var(--text-primary)] flex items-center gap-1.5">
+                        <span>Night Mode</span>
+                        <span className="text-[9px] px-1.5 py-0.2 bg-[#FFD700]/20 text-[#FFD700] font-mono font-bold rounded">
+                          PRIMARY
+                        </span>
+                      </div>
+                      <p className="text-[11px] text-[var(--text-secondary)] mt-1 leading-relaxed">
+                        Deep black canvas (#080808), charcoal cards (#181818), metallic gold accents and luminous text.
+                      </p>
+                    </div>
+
+                    {/* Color Swatch Preview */}
+                    <div className="mt-4 pt-2.5 border-t border-[var(--border-subtle)] flex items-center gap-1.5">
+                      <div className="w-3.5 h-3.5 rounded bg-[#080808] border border-neutral-700" title="#080808" />
+                      <div className="w-3.5 h-3.5 rounded bg-[#181818] border border-neutral-700" title="#181818" />
+                      <div className="w-3.5 h-3.5 rounded bg-[#D4AF37]" title="#D4AF37 Gold" />
+                      <div className="w-3.5 h-3.5 rounded bg-[#22C55E]" title="#22C55E Green" />
+                      <div className="w-3.5 h-3.5 rounded bg-[#EF4444]" title="#EF4444 Red" />
+                    </div>
+                  </button>
+                </div>
+              </div>
+
+              {/* Theme Settings Details Card */}
+              <div className="p-4 bg-[var(--surface-secondary)] rounded-xl border border-[var(--border-primary)] space-y-3">
+                <h4 className="text-xs font-bold text-[var(--text-primary)] uppercase tracking-wide">
+                  Theme Behavior &amp; Accessibility Details
+                </h4>
+
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs">
+                  <div className="p-3 bg-[var(--surface-primary)] rounded-lg border border-[var(--border-subtle)]">
+                    <div className="font-bold text-[var(--text-primary)] mb-1 flex items-center gap-1.5">
+                      <Sparkles className="w-3.5 h-3.5 text-[var(--accent-gold)]" />
+                      <span>Smooth 200–300ms Transitions</span>
+                    </div>
+                    <p className="text-[11px] text-[var(--text-secondary)]">
+                      Instant zero-reload theme toggling with smooth transitions across all cards, navigation bars, modals, tables, and buttons.
+                    </p>
+                  </div>
+
+                  <div className="p-3 bg-[var(--surface-primary)] rounded-lg border border-[var(--border-subtle)]">
+                    <div className="font-bold text-[var(--text-primary)] mb-1 flex items-center gap-1.5">
+                      <Shield className="w-3.5 h-3.5 text-emerald-500" />
+                      <span>WCAG AA Contrast Compliant</span>
+                    </div>
+                    <p className="text-[11px] text-[var(--text-secondary)]">
+                      Carefully balanced gold and neutral tones ensure legibility on both deep black and crisp white canvases.
+                    </p>
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* ----------------- PROFILE TAB ----------------- */}
+          {activeTab === 'profile' && (
+            <div className="space-y-4">
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div>
-                  <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1">
-                    Display Name
+                  <label className="block text-[10px] font-bold text-[var(--text-secondary)] uppercase tracking-wider mb-1">
+                    Display Name / Trader Handle
                   </label>
                   <input
                     type="text"
                     value={formData.name}
                     onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-                    className="w-full bg-[#1c1f24] border border-[#2d3139] rounded-lg px-3 py-2 text-xs text-white focus:outline-none focus:border-[#6366f1]"
+                    className="w-full bg-[var(--surface-secondary)] border border-[var(--border-primary)] rounded-lg px-3 py-2 text-xs text-[var(--text-primary)] focus:outline-none focus:border-[var(--accent-gold)]"
                   />
                 </div>
 
                 <div>
-                  <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1">
-                    Account Email
+                  <label className="block text-[10px] font-bold text-[var(--text-secondary)] uppercase tracking-wider mb-1">
+                    Email Address
                   </label>
                   <input
                     type="email"
                     value={formData.email}
-                    onChange={(e) => setFormData({ ...formData, email: e.target.value })}
-                    className="w-full bg-[#1c1f24] border border-[#2d3139] rounded-lg px-3 py-2 text-xs text-white focus:outline-none focus:border-[#6366f1] font-mono"
+                    disabled
+                    className="w-full bg-[var(--surface-secondary)] border border-[var(--border-primary)] rounded-lg px-3 py-2 text-xs text-[var(--text-muted)] cursor-not-allowed font-mono"
                   />
                 </div>
 
                 <div>
-                  <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1">
-                    Trading Experience Level
-                  </label>
-                  <select
-                    value={formData.tradingExperience}
-                    onChange={(e: any) =>
-                      setFormData({ ...formData, tradingExperience: e.target.value })
-                    }
-                    className="w-full bg-[#1c1f24] border border-[#2d3139] rounded-lg px-3 py-2 text-xs text-white focus:outline-none focus:border-[#6366f1]"
-                  >
-                    <option value="Beginner">Beginner (1-2 yrs)</option>
-                    <option value="Intermediate">Intermediate (3-5 yrs)</option>
-                    <option value="Pro Quant">Pro Quant (5+ yrs)</option>
-                    <option value="Institutional">Institutional / Prop Desk</option>
-                  </select>
-                </div>
-
-                <div>
-                  <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1">
-                    Risk Tolerance Profile
+                  <label className="block text-[10px] font-bold text-[var(--text-secondary)] uppercase tracking-wider mb-1">
+                    Trading Risk Tolerance
                   </label>
                   <select
                     value={formData.riskTolerance}
                     onChange={(e: any) =>
                       setFormData({ ...formData, riskTolerance: e.target.value })
                     }
-                    className="w-full bg-[#1c1f24] border border-[#2d3139] rounded-lg px-3 py-2 text-xs text-white focus:outline-none focus:border-[#6366f1]"
+                    className="w-full bg-[var(--surface-secondary)] border border-[var(--border-primary)] rounded-lg px-3 py-2 text-xs text-[var(--text-primary)] focus:outline-none focus:border-[var(--accent-gold)]"
                   >
                     <option value="Conservative">Conservative (Capital Preservation Focus)</option>
                     <option value="Moderate">Moderate (Balanced Risk/Reward)</option>
-                    <option value="Aggressive">Aggressive (High-Beta Momentum &amp; Options)</option>
+                    <option value="Aggressive">Aggressive (Maximum Alpha / Growth)</option>
                   </select>
                 </div>
 
                 <div>
-                  <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1">
-                    Default Terminal Ticker
-                  </label>
-                  <input
-                    type="text"
-                    value={formData.defaultTicker}
-                    onChange={(e) =>
-                      setFormData({ ...formData, defaultTicker: e.target.value.toUpperCase() as TickerSymbol })
-                    }
-                    className="w-full bg-[#1c1f24] border border-[#2d3139] rounded-lg px-3 py-2 text-xs text-white focus:outline-none focus:border-[#6366f1] font-mono"
-                  />
-                </div>
-
-                <div>
-                  <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1">
+                  <label className="block text-[10px] font-bold text-[var(--text-secondary)] uppercase tracking-wider mb-1">
                     Default Chart Timeframe
                   </label>
                   <select
@@ -306,7 +491,7 @@ export const AccountSettingsModal: React.FC<AccountSettingsModalProps> = ({
                     onChange={(e: any) =>
                       setFormData({ ...formData, defaultTimeframe: e.target.value })
                     }
-                    className="w-full bg-[#1c1f24] border border-[#2d3139] rounded-lg px-3 py-2 text-xs text-white focus:outline-none focus:border-[#6366f1] font-mono"
+                    className="w-full bg-[var(--surface-secondary)] border border-[var(--border-primary)] rounded-lg px-3 py-2 text-xs text-[var(--text-primary)] focus:outline-none focus:border-[var(--accent-gold)] font-mono"
                   >
                     <option value="1m">1m (Scalping)</option>
                     <option value="5m">5m (Intraday Trend)</option>
@@ -319,38 +504,37 @@ export const AccountSettingsModal: React.FC<AccountSettingsModalProps> = ({
             </div>
           )}
 
+          {/* ----------------- GLOBAL & REGIONAL TAB ----------------- */}
           {activeTab === 'global' && (
             <div className="space-y-4">
-              {/* Region & Localization banner */}
-              <div className="p-3.5 bg-[#1c1f24] rounded-lg border border-[#2d3139] flex items-center justify-between">
+              <div className="p-3.5 bg-[var(--surface-secondary)] rounded-lg border border-[var(--border-primary)] flex items-center justify-between">
                 <div className="flex items-center gap-3">
-                  <div className="w-10 h-10 rounded-lg bg-[#6366f1]/20 border border-[#6366f1]/40 flex items-center justify-center text-xl">
+                  <div className="w-10 h-10 rounded-lg bg-[var(--accent-gold-bg)] border border-[var(--accent-gold-border)] flex items-center justify-center text-xl">
                     🌐
                   </div>
                   <div>
-                    <h3 className="text-xs font-bold text-white uppercase tracking-wide">
+                    <h3 className="text-xs font-bold text-[var(--text-primary)] uppercase tracking-wide">
                       Multi-Region &amp; Global Internationalization
                     </h3>
-                    <p className="text-[11px] text-slate-400">
+                    <p className="text-[11px] text-[var(--text-secondary)]">
                       Configure interface language, market timezones, native currency and AI translation.
                     </p>
                   </div>
                 </div>
-                <span className="text-[10px] px-2 py-0.5 rounded bg-emerald-500/20 text-emerald-300 font-mono font-bold border border-emerald-500/40">
+                <span className="text-[10px] px-2 py-0.5 rounded bg-emerald-500/20 text-emerald-400 font-mono font-bold border border-emerald-500/40">
                   20 LANGUAGES READY
                 </span>
               </div>
 
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                {/* Interface Language */}
                 <div>
-                  <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1">
+                  <label className="block text-[10px] font-bold text-[var(--text-secondary)] uppercase tracking-wider mb-1">
                     Interface Language (UI)
                   </label>
                   <select
                     value={formData.language || language}
                     onChange={(e) => setFormData({ ...formData, language: e.target.value })}
-                    className="w-full bg-[#1c1f24] border border-[#2d3139] rounded-lg px-3 py-2 text-xs text-white focus:outline-none focus:border-[#6366f1]"
+                    className="w-full bg-[var(--surface-secondary)] border border-[var(--border-primary)] rounded-lg px-3 py-2 text-xs text-[var(--text-primary)] focus:outline-none focus:border-[var(--accent-gold)]"
                   >
                     {languages.map((l) => (
                       <option key={l.code} value={l.code}>
@@ -358,14 +542,10 @@ export const AccountSettingsModal: React.FC<AccountSettingsModalProps> = ({
                       </option>
                     ))}
                   </select>
-                  <p className="text-[10px] text-slate-500 mt-1">
-                    Translates navigation, buttons, decision cards and quantitative metrics.
-                  </p>
                 </div>
 
-                {/* Primary Region */}
                 <div>
-                  <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1">
+                  <label className="block text-[10px] font-bold text-[var(--text-secondary)] uppercase tracking-wider mb-1">
                     Primary Trading Region &amp; Legal Framework
                   </label>
                   <select
@@ -379,7 +559,7 @@ export const AccountSettingsModal: React.FC<AccountSettingsModalProps> = ({
                         timezone: selRegion?.defaultTimezone || formData.timezone,
                       });
                     }}
-                    className="w-full bg-[#1c1f24] border border-[#2d3139] rounded-lg px-3 py-2 text-xs text-white focus:outline-none focus:border-[#6366f1]"
+                    className="w-full bg-[var(--surface-secondary)] border border-[var(--border-primary)] rounded-lg px-3 py-2 text-xs text-[var(--text-primary)] focus:outline-none focus:border-[var(--accent-gold)]"
                   >
                     {regions.map((r) => (
                       <option key={r.code} value={r.code}>
@@ -387,20 +567,16 @@ export const AccountSettingsModal: React.FC<AccountSettingsModalProps> = ({
                       </option>
                     ))}
                   </select>
-                  <p className="text-[10px] text-slate-500 mt-1">
-                    Adapts macroeconomic calendar, regulatory disclaimers and benchmark indices.
-                  </p>
                 </div>
 
-                {/* Display Timezone */}
                 <div>
-                  <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1">
+                  <label className="block text-[10px] font-bold text-[var(--text-secondary)] uppercase tracking-wider mb-1">
                     Display Timezone
                   </label>
                   <select
                     value={formData.timezone || timezone}
                     onChange={(e) => setFormData({ ...formData, timezone: e.target.value })}
-                    className="w-full bg-[#1c1f24] border border-[#2d3139] rounded-lg px-3 py-2 text-xs text-white focus:outline-none focus:border-[#6366f1] font-mono"
+                    className="w-full bg-[var(--surface-secondary)] border border-[var(--border-primary)] rounded-lg px-3 py-2 text-xs text-[var(--text-primary)] focus:outline-none focus:border-[var(--accent-gold)] font-mono"
                   >
                     <option value="America/New_York">America/New_York (US Eastern Time - Market Core)</option>
                     <option value="America/Chicago">America/Chicago (US Central Time - CME Futures)</option>
@@ -418,20 +594,16 @@ export const AccountSettingsModal: React.FC<AccountSettingsModalProps> = ({
                     <option value="Australia/Sydney">Australia/Sydney (AEST - ASX)</option>
                     <option value="America/Sao_Paulo">America/Sao_Paulo (BRT - B3)</option>
                   </select>
-                  <p className="text-[10px] text-slate-500 mt-1">
-                    Rendered alongside standard New York market session hours.
-                  </p>
                 </div>
 
-                {/* Preferred Base Currency */}
                 <div>
-                  <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1">
+                  <label className="block text-[10px] font-bold text-[var(--text-secondary)] uppercase tracking-wider mb-1">
                     Display Currency Conversion
                   </label>
                   <select
                     value={formData.preferredCurrency || currency}
                     onChange={(e) => setFormData({ ...formData, preferredCurrency: e.target.value })}
-                    className="w-full bg-[#1c1f24] border border-[#2d3139] rounded-lg px-3 py-2 text-xs text-white focus:outline-none focus:border-[#6366f1] font-mono"
+                    className="w-full bg-[var(--surface-secondary)] border border-[var(--border-primary)] rounded-lg px-3 py-2 text-xs text-[var(--text-primary)] focus:outline-none focus:border-[var(--accent-gold)] font-mono"
                   >
                     <option value="USD">USD ($) - United States Dollar</option>
                     <option value="EUR">EUR (€) - Euro</option>
@@ -449,111 +621,83 @@ export const AccountSettingsModal: React.FC<AccountSettingsModalProps> = ({
                     <option value="CNY">CNY (¥) - Chinese Yuan</option>
                     <option value="KRW">KRW (₩) - South Korean Won</option>
                   </select>
-                  <p className="text-[10px] text-slate-500 mt-1">
-                    Equities remain in primary exchange currency with tooltip conversions.
-                  </p>
-                </div>
-
-                {/* Gemini AI Response Language */}
-                <div className="md:col-span-2 p-3 bg-[#121316] rounded-lg border border-[#2d3139]">
-                  <div className="flex items-center gap-2 mb-1.5">
-                    <Sparkles className="w-3.5 h-3.5 text-[#818cf8]" />
-                    <label className="text-[11px] font-bold text-white uppercase tracking-wider">
-                      Gemini AI Analysis &amp; Chat Generation Language
-                    </label>
-                  </div>
-                  <select
-                    value={formData.aiResponseLanguage || aiLanguage}
-                    onChange={(e) => setFormData({ ...formData, aiResponseLanguage: e.target.value })}
-                    className="w-full bg-[#1c1f24] border border-[#2d3139] rounded-lg px-3 py-2 text-xs text-white focus:outline-none focus:border-[#6366f1]"
-                  >
-                    {languages.map((l) => (
-                      <option key={`ai-${l.code}`} value={l.code}>
-                        {l.flag} Generate in {l.nativeName} ({l.name})
-                      </option>
-                    ))}
-                  </select>
-                  <p className="text-[10px] text-slate-400 mt-1">
-                    When active, Gemini analyzes multi-factor quantitative market evidence and answers questions directly in your chosen language while preserving precise English ticker symbols and dollar strikes.
-                  </p>
                 </div>
               </div>
             </div>
           )}
 
+          {/* ----------------- NOTIFICATIONS TAB ----------------- */}
           {activeTab === 'notifications' && (
-            <div className="space-y-4">
-              <div className="space-y-3">
-                <div className="flex items-center justify-between p-3 bg-[#1c1f24] rounded-lg border border-[#2d3139]">
-                  <div>
-                    <h4 className="text-xs font-bold text-white">Email Trade Alerts &amp; Reports</h4>
-                    <p className="text-[11px] text-slate-400">Receive morning briefs and high-confidence AI triggers.</p>
-                  </div>
-                  <input
-                    type="checkbox"
-                    checked={formData.notifications.emailAlerts}
-                    onChange={(e) =>
-                      setFormData({
-                        ...formData,
-                        notifications: { ...formData.notifications, emailAlerts: e.target.checked },
-                      })
-                    }
-                    className="w-4 h-4 accent-[#6366f1] cursor-pointer"
-                  />
+            <div className="space-y-3">
+              <div className="flex items-center justify-between p-3 bg-[var(--surface-secondary)] rounded-lg border border-[var(--border-primary)]">
+                <div>
+                  <h4 className="text-xs font-bold text-[var(--text-primary)]">Browser Push Alerts</h4>
+                  <p className="text-[11px] text-[var(--text-secondary)]">Instant alerts for target price reaches &amp; AI bias shifts.</p>
                 </div>
+                <input
+                  type="checkbox"
+                  checked={formData.notifications.pushAlerts}
+                  onChange={(e) =>
+                    setFormData({
+                      ...formData,
+                      notifications: { ...formData.notifications, pushAlerts: e.target.checked },
+                    })
+                  }
+                  className="w-4 h-4 accent-[#D4AF37] cursor-pointer"
+                />
+              </div>
 
-                <div className="flex items-center justify-between p-3 bg-[#1c1f24] rounded-lg border border-[#2d3139]">
-                  <div>
-                    <h4 className="text-xs font-bold text-white">Terminal Audio Notification Chime</h4>
-                    <p className="text-[11px] text-slate-400">Play low-latency audio cue when price alerts fire.</p>
-                  </div>
-                  <input
-                    type="checkbox"
-                    checked={formData.notifications.soundEnabled}
-                    onChange={(e) =>
-                      setFormData({
-                        ...formData,
-                        notifications: { ...formData.notifications, soundEnabled: e.target.checked },
-                      })
-                    }
-                    className="w-4 h-4 accent-[#6366f1] cursor-pointer"
-                  />
+              <div className="flex items-center justify-between p-3 bg-[var(--surface-secondary)] rounded-lg border border-[var(--border-primary)]">
+                <div>
+                  <h4 className="text-xs font-bold text-[var(--text-primary)]">Daily Pre-Market Intelligence Briefing</h4>
+                  <p className="text-[11px] text-[var(--text-secondary)]">Delivered to your email daily at 08:30 ET before market open.</p>
                 </div>
+                <input
+                  type="checkbox"
+                  checked={formData.notifications.emailAlerts}
+                  onChange={(e) =>
+                    setFormData({
+                      ...formData,
+                      notifications: { ...formData.notifications, emailAlerts: e.target.checked },
+                    })
+                  }
+                  className="w-4 h-4 accent-[#D4AF37] cursor-pointer"
+                />
+              </div>
 
-                <div className="p-3 bg-[#1c1f24] rounded-lg border border-[#2d3139] space-y-2">
-                  <h4 className="text-xs font-bold text-white">Discord Webhook Signal Forwarding</h4>
-                  <p className="text-[11px] text-slate-400">
-                    Instantly broadcast AI breakout triggers and unusual option sweeps into your private channel.
-                  </p>
-                  <input
-                    type="url"
-                    value={formData.notifications.discordWebhookUrl || ''}
-                    onChange={(e) =>
-                      setFormData({
-                        ...formData,
-                        notifications: { ...formData.notifications, discordWebhookUrl: e.target.value },
-                      })
-                    }
-                    placeholder="https://discord.com/api/webhooks/..."
-                    className="w-full bg-[#15171a] border border-[#2d3139] rounded px-3 py-1.5 text-xs text-white focus:outline-none focus:border-[#6366f1] font-mono"
-                  />
+              <div className="flex items-center justify-between p-3 bg-[var(--surface-secondary)] rounded-lg border border-[var(--border-primary)]">
+                <div>
+                  <h4 className="text-xs font-bold text-[var(--text-primary)]">Terminal Audio Notification Chime</h4>
+                  <p className="text-[11px] text-[var(--text-secondary)]">Play low-latency audio cue when price alerts fire.</p>
                 </div>
+                <input
+                  type="checkbox"
+                  checked={formData.notifications.soundEnabled}
+                  onChange={(e) =>
+                    setFormData({
+                      ...formData,
+                      notifications: { ...formData.notifications, soundEnabled: e.target.checked },
+                    })
+                  }
+                  className="w-4 h-4 accent-[#D4AF37] cursor-pointer"
+                />
               </div>
             </div>
           )}
 
+          {/* ----------------- API KEYS TAB ----------------- */}
           {activeTab === 'api' && (
             <div className="space-y-4">
               <div className="flex justify-between items-center">
                 <div>
-                  <h4 className="text-xs font-bold text-white">MarketMind Programmatic API Keys</h4>
-                  <p className="text-[11px] text-slate-400">
-                    Use these keys to access our low-latency REST and WebSocket order flow endpoints.
+                  <h4 className="text-xs font-bold text-[var(--text-primary)]">Programmatic API Keys</h4>
+                  <p className="text-[11px] text-[var(--text-secondary)]">
+                    Access our low-latency REST and WebSocket order flow endpoints.
                   </p>
                 </div>
                 <button
                   onClick={() => setShowNewKeyPrompt(!showNewKeyPrompt)}
-                  className="px-2.5 py-1 bg-[#6366f1] hover:bg-[#4f46e5] text-white text-xs font-bold rounded flex items-center gap-1 transition"
+                  className="px-2.5 py-1 bg-[var(--accent-gold)] hover:bg-[var(--accent-gold-bright)] text-[var(--text-inverse)] text-xs font-bold rounded-lg flex items-center gap-1 transition"
                 >
                   <Plus className="w-3.5 h-3.5" />
                   <span>Generate Key</span>
@@ -561,8 +705,8 @@ export const AccountSettingsModal: React.FC<AccountSettingsModalProps> = ({
               </div>
 
               {showNewKeyPrompt && (
-                <div className="p-3 bg-[#1c1f24] rounded-lg border border-[#6366f1]/50 space-y-2">
-                  <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-wider">
+                <div className="p-3 bg-[var(--surface-secondary)] rounded-lg border border-[var(--border-gold)] space-y-2">
+                  <label className="block text-[10px] font-bold text-[var(--text-secondary)] uppercase tracking-wider">
                     Key Name / Identifier
                   </label>
                   <div className="flex gap-2">
@@ -571,11 +715,11 @@ export const AccountSettingsModal: React.FC<AccountSettingsModalProps> = ({
                       value={newKeyName}
                       onChange={(e) => setNewKeyName(e.target.value)}
                       placeholder="e.g. Quant Execution Bot"
-                      className="flex-1 bg-[#15171a] border border-[#2d3139] rounded px-3 py-1.5 text-xs text-white focus:outline-none"
+                      className="flex-1 bg-[var(--surface-primary)] border border-[var(--border-primary)] rounded px-3 py-1.5 text-xs text-[var(--text-primary)] focus:outline-none"
                     />
                     <button
                       onClick={handleCreateApiKey}
-                      className="px-3 py-1.5 bg-[#6366f1] text-white text-xs font-bold rounded"
+                      className="px-3 py-1.5 bg-[var(--accent-gold)] text-[var(--text-inverse)] text-xs font-bold rounded"
                     >
                       Create
                     </button>
@@ -587,19 +731,19 @@ export const AccountSettingsModal: React.FC<AccountSettingsModalProps> = ({
                 {formData.apiKeys.map((key) => (
                   <div
                     key={key.id}
-                    className="p-3 bg-[#1c1f24] rounded-lg border border-[#2d3139] flex justify-between items-center"
+                    className="p-3 bg-[var(--surface-secondary)] rounded-lg border border-[var(--border-primary)] flex justify-between items-center"
                   >
                     <div>
                       <div className="flex items-center gap-2">
-                        <span className="font-bold text-xs text-white">{key.name}</span>
+                        <span className="font-bold text-xs text-[var(--text-primary)]">{key.name}</span>
                         <span className="text-[9px] px-1.5 py-0.2 bg-emerald-500/20 text-emerald-400 border border-emerald-500/40 rounded font-mono uppercase">
                           {key.status}
                         </span>
                       </div>
-                      <p className="text-[11px] font-mono text-slate-400 mt-1">
+                      <p className="text-[11px] font-mono text-[var(--text-secondary)] mt-1">
                         {key.secretKey ? key.secretKey : key.keyPrefix}
                       </p>
-                      <span className="text-[10px] text-slate-500 font-mono">
+                      <span className="text-[10px] text-[var(--text-muted)] font-mono">
                         Created: {key.createdAt} &bull; Limit: {key.rateLimitPerMin} req/min
                       </span>
                     </div>
@@ -607,7 +751,7 @@ export const AccountSettingsModal: React.FC<AccountSettingsModalProps> = ({
                     <div className="flex items-center gap-2">
                       <button
                         onClick={() => handleCopyKey(key.id, key.secretKey || key.keyPrefix)}
-                        className="p-1.5 bg-[#252830] hover:bg-[#2e323d] text-slate-300 rounded transition"
+                        className="p-1.5 bg-[var(--surface-primary)] hover:bg-[var(--surface-hover)] text-[var(--text-secondary)] hover:text-[var(--text-primary)] rounded transition"
                         title="Copy Key"
                       >
                         {copiedKeyId === key.id ? (
@@ -618,7 +762,7 @@ export const AccountSettingsModal: React.FC<AccountSettingsModalProps> = ({
                       </button>
                       <button
                         onClick={() => handleRevokeApiKey(key.id)}
-                        className="p-1.5 bg-[#252830] hover:bg-rose-950/50 hover:text-rose-400 text-slate-400 rounded transition"
+                        className="p-1.5 bg-[var(--surface-primary)] hover:bg-rose-950/50 hover:text-rose-400 text-[var(--text-muted)] rounded transition"
                         title="Revoke Key"
                       >
                         <Trash2 className="w-3.5 h-3.5" />
@@ -630,16 +774,17 @@ export const AccountSettingsModal: React.FC<AccountSettingsModalProps> = ({
             </div>
           )}
 
+          {/* ----------------- SECURITY TAB ----------------- */}
           {activeTab === 'security' && (
             <div className="space-y-4">
-              <div className="flex items-center justify-between p-3.5 bg-[#1c1f24] rounded-lg border border-[#2d3139]">
+              <div className="flex items-center justify-between p-3.5 bg-[var(--surface-secondary)] rounded-lg border border-[var(--border-primary)]">
                 <div className="flex items-center gap-3">
                   <div className="w-9 h-9 rounded-lg bg-emerald-500/20 border border-emerald-500/40 flex items-center justify-center text-emerald-400">
                     <Smartphone className="w-5 h-5" />
                   </div>
                   <div>
-                    <h4 className="text-xs font-bold text-white">Two-Factor Authentication (TOTP)</h4>
-                    <p className="text-[11px] text-slate-400">Google Authenticator, Authy or YubiKey protection.</p>
+                    <h4 className="text-xs font-bold text-[var(--text-primary)]">Two-Factor Authentication (TOTP)</h4>
+                    <p className="text-[11px] text-[var(--text-secondary)]">Google Authenticator, Authy or YubiKey protection.</p>
                   </div>
                 </div>
                 <div className="flex items-center gap-2">
@@ -648,48 +793,125 @@ export const AccountSettingsModal: React.FC<AccountSettingsModalProps> = ({
                     type="checkbox"
                     checked={formData.twoFactorEnabled}
                     onChange={(e) => setFormData({ ...formData, twoFactorEnabled: e.target.checked })}
-                    className="w-4 h-4 accent-[#6366f1] cursor-pointer"
+                    className="w-4 h-4 accent-[#D4AF37] cursor-pointer"
                   />
                 </div>
               </div>
+            </div>
+          )}
 
-              <div className="p-3.5 bg-[#1c1f24] rounded-lg border border-[#2d3139] space-y-2">
-                <h4 className="text-xs font-bold text-white">Active Terminal Sessions</h4>
-                <div className="space-y-1.5 text-[11px] font-mono text-slate-400">
-                  <div className="flex justify-between py-1 border-b border-[#2d3139]">
-                    <span className="text-slate-200">Current Web Session (Chrome MacOS)</span>
-                    <span className="text-emerald-400">Online Now &bull; IP: 198.51.100.24</span>
+          {/* ----------------- AI PREFERENCES TAB ----------------- */}
+          {activeTab === 'ai' && (
+            <div className="space-y-4">
+              <div className="p-3.5 bg-[var(--surface-secondary)] rounded-lg border border-[var(--border-primary)] space-y-3">
+                <div className="flex items-center gap-2 text-xs font-bold text-[var(--text-primary)]">
+                  <Sparkles className="w-4 h-4 text-[var(--accent-gold)]" />
+                  <span>Gemini Financial Intelligence Reasoning Depth</span>
+                </div>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs">
+                  <div className="p-3 bg-[var(--surface-primary)] rounded-lg border border-[var(--accent-gold)]/40 flex flex-col justify-between">
+                    <div className="font-bold text-[var(--accent-gold)]">Standard Multi-Factor (Fast)</div>
+                    <p className="text-[11px] text-[var(--text-secondary)] mt-1">
+                      Synthesizes technical, sentiment, and macro drivers in sub-second streaming speed.
+                    </p>
+                    <span className="text-[10px] text-emerald-400 font-mono mt-2 font-bold">ACTIVE (DEFAULT)</span>
                   </div>
-                  <div className="flex justify-between py-1">
-                    <span className="text-slate-400">Python Algo Terminal (AWS us-east-1)</span>
-                    <span className="text-slate-500">2h ago &bull; IP: 54.210.88.12</span>
+                  <div className="p-3 bg-[var(--surface-primary)] rounded-lg border border-[var(--border-primary)] flex flex-col justify-between">
+                    <div className="font-bold text-[var(--text-primary)]">Deep Grounded Institutional Audit</div>
+                    <p className="text-[11px] text-[var(--text-secondary)] mt-1">
+                      Performs full cross-verification against SEC filings, options chains, and intermarket yield curve ratios.
+                    </p>
+                    <span className="text-[10px] text-[var(--accent-gold)] font-mono mt-2 font-bold">PRO &amp; ENTERPRISE</span>
                   </div>
                 </div>
+              </div>
+
+              <div className="p-3.5 bg-[var(--surface-secondary)] rounded-lg border border-[var(--border-primary)] flex items-center justify-between">
+                <div>
+                  <h4 className="text-xs font-bold text-[var(--text-primary)]">Plain English Translation Mode</h4>
+                  <p className="text-[11px] text-[var(--text-secondary)]">Include simple analogies alongside quantitative metrics for non-institutional traders.</p>
+                </div>
+                <input
+                  type="checkbox"
+                  defaultChecked={true}
+                  className="w-4 h-4 accent-[#D4AF37] cursor-pointer"
+                />
+              </div>
+            </div>
+          )}
+
+          {/* ----------------- DATA & PRIVACY TAB ----------------- */}
+          {activeTab === 'data_export' && (
+            <div className="space-y-4">
+              <div className="p-3.5 bg-[var(--surface-secondary)] rounded-lg border border-[var(--border-primary)] space-y-2">
+                <h4 className="text-xs font-bold text-[var(--text-primary)]">Export Watchlists &amp; Trading Journals</h4>
+                <p className="text-[11px] text-[var(--text-secondary)]">Download all saved tickers, notes, custom alert triggers, and backtest results.</p>
+                <div className="flex gap-2 pt-2">
+                  <button
+                    onClick={() => {
+                      const jsonBlob = new Blob([JSON.stringify(formData, null, 2)], { type: 'application/json' });
+                      const url = URL.createObjectURL(jsonBlob);
+                      const a = document.createElement('a');
+                      a.href = url;
+                      a.download = `marketmind-data-${new Date().toISOString().slice(0, 10)}.json`;
+                      a.click();
+                    }}
+                    className="px-3 py-1.5 bg-[var(--surface-primary)] hover:bg-[var(--surface-hover)] border border-[var(--border-primary)] text-xs font-bold text-[var(--text-primary)] rounded-lg transition"
+                  >
+                    Export JSON
+                  </button>
+                  <button
+                    onClick={() => {
+                      const csvContent = 'data:text/csv;charset=utf-8,Symbol,AssetClass,AlertCount\nSPY,ETF,4\nQQQ,ETF,3\nNVDA,STOCK,8\nBTC,CRYPTO,12\n';
+                      const encodedUri = encodeURI(csvContent);
+                      const link = document.createElement('a');
+                      link.setAttribute('href', encodedUri);
+                      link.setAttribute('download', 'marketmind-watchlists.csv');
+                      document.body.appendChild(link);
+                      link.click();
+                    }}
+                    className="px-3 py-1.5 bg-[var(--surface-primary)] hover:bg-[var(--surface-hover)] border border-[var(--border-primary)] text-xs font-bold text-[var(--text-primary)] rounded-lg transition"
+                  >
+                    Export CSV
+                  </button>
+                </div>
+              </div>
+
+              <div className="p-3.5 bg-[var(--surface-secondary)] rounded-lg border border-[var(--border-primary)] flex items-center justify-between">
+                <div>
+                  <h4 className="text-xs font-bold text-[var(--text-primary)]">Anonymous Usage Telemetry &amp; Crash Reports</h4>
+                  <p className="text-[11px] text-[var(--text-secondary)]">Help us improve terminal stability. No financial data, portfolio values, or API keys are ever collected.</p>
+                </div>
+                <input
+                  type="checkbox"
+                  defaultChecked={true}
+                  className="w-4 h-4 accent-[#D4AF37] cursor-pointer"
+                />
               </div>
             </div>
           )}
         </div>
 
         {/* Footer Actions */}
-        <div className="p-3.5 bg-[#1c1f24] border-t border-[#2d3139] flex justify-between items-center">
+        <div className="p-4 bg-[var(--surface-secondary)] border-t border-[var(--border-primary)] flex justify-between items-center">
           <div>
             {isSaved && (
               <span className="text-xs text-emerald-400 font-bold flex items-center gap-1 animate-pulse">
                 <CheckCircle2 className="w-3.5 h-3.5" />
-                Settings saved successfully!
+                Settings &amp; Theme saved successfully!
               </span>
             )}
           </div>
           <div className="flex items-center gap-2">
             <button
               onClick={onClose}
-              className="px-3 py-1.5 bg-[#252830] hover:bg-[#2d3139] text-slate-300 text-xs font-semibold rounded-lg transition"
+              className="px-3.5 py-1.5 bg-[var(--surface-primary)] hover:bg-[var(--surface-hover)] text-[var(--text-secondary)] text-xs font-semibold rounded-lg border border-[var(--border-primary)] transition"
             >
               Cancel
             </button>
             <button
               onClick={handleSave}
-              className="px-4 py-1.5 bg-[#6366f1] hover:bg-[#4f46e5] text-white text-xs font-bold rounded-lg flex items-center gap-1.5 transition shadow-sm"
+              className="px-4 py-1.5 gold-gradient-btn text-xs font-bold rounded-lg flex items-center gap-1.5 transition shadow-sm"
             >
               <Save className="w-3.5 h-3.5" />
               <span>Save Changes</span>

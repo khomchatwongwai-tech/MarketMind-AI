@@ -60,6 +60,7 @@ import { newsIntelligenceService } from '../services/newsIntelligenceService';
 import { AIMarketBriefView } from './news/AIMarketBriefView';
 import { AdminNewsSourcesView } from './news/AdminNewsSourcesView';
 import { SavedArticlesView } from './news/SavedArticlesView';
+import { ShareAnalysisModal } from './news/ShareAnalysisModal';
 
 interface NewsAnalyzerViewProps {
   data: ComprehensiveMarketData;
@@ -115,6 +116,7 @@ export const NewsAnalyzerView: React.FC<NewsAnalyzerViewProps> = ({ data }) => {
   const [isLoading, setIsLoading] = useState<boolean>(false);
   const [lastRefreshed, setLastRefreshed] = useState<string>('');
   const [selectedEventForModal, setSelectedEventForModal] = useState<MarketMindEventCluster | null>(null);
+  const [shareModalArticle, setShareModalArticle] = useState<NewsItem | null>(null);
 
   // Mock User Portfolio Holdings
   const userHoldings = [
@@ -983,6 +985,14 @@ export const NewsAnalyzerView: React.FC<NewsAnalyzerViewProps> = ({ data }) => {
 
                     <div className="flex items-center gap-1.5 mt-1">
                       <button
+                        onClick={() => setShareModalArticle(item)}
+                        title="Share Analysis Social Card"
+                        className="px-2 py-1 rounded bg-[#181818] hover:bg-[#D4AF37]/20 text-[10px] font-mono text-[#D4AF37] border border-[#D4AF37]/40 hover:border-[#D4AF37] transition flex items-center gap-1 font-bold"
+                      >
+                        <Share2 className="w-2.5 h-2.5" />
+                        <span>Share Card</span>
+                      </button>
+                      <button
                         onClick={() =>
                           handleSaveArticle({
                             articleId: item.id,
@@ -1516,6 +1526,16 @@ export const NewsAnalyzerView: React.FC<NewsAnalyzerViewProps> = ({ data }) => {
             </div>
           </div>
         </div>
+      )}
+
+      {/* Share Analysis Social Card Modal */}
+      {shareModalArticle && (
+        <ShareAnalysisModal
+          isOpen={!!shareModalArticle}
+          onClose={() => setShareModalArticle(null)}
+          article={shareModalArticle}
+          ticker={shareModalArticle.tickers?.[0]}
+        />
       )}
     </div>
   );

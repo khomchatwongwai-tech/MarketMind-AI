@@ -1,0 +1,34 @@
+services:
+  - type: web
+    name: marketmind-ai
+    runtime: node
+    plan: starter
+    buildCommand: npm install && npm run build
+    startCommand: npm start
+    healthCheckPath: /api/health
+    autoDeployTrigger: checksPass
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: APP_URL
+        sync: false
+      - key: FIREBASE_PROJECT_ID
+        value: ai-studio-marketmindai-52b43fbe-5366-4a57-8a3b-5ac098b91d46
+      - key: FIREBASE_SERVICE_ACCOUNT_KEY
+        sync: false
+      - key: GEMINI_API_KEY
+        sync: false
+      - key: STRIPE_SECRET_KEY
+        sync: false
+      - key: STRIPE_WEBHOOK_SECRET
+        sync: false
+      - key: STRIPE_PRICE_BASIC
+        sync: false
+      - key: STRIPE_PRICE_PRO
+        sync: false
+      - key: STRIPE_PRICE_PREMIUM
+        sync: false
+      - key: MASSIVE_API_KEY
+        sync: false
+      - key: ALLOW_SIMULATED_MARKET_DATA
+        value: "false"

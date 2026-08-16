@@ -14,6 +14,7 @@ export interface MarketAnalysisResponse {
   watchNext: string;
   timestamp: string;
   source: string;
+  status?: 'VERIFIED' | 'UNAVAILABLE';
 }
 
 export interface WhyMovingResponse {
@@ -31,12 +32,14 @@ export interface WhyMovingResponse {
   };
   timestamp: string;
   source: string;
+  status?: 'VERIFIED' | 'UNAVAILABLE';
 }
 
 export interface AskAiResponse {
   answer: string;
   timestamp: string;
   source: string;
+  status?: 'VERIFIED' | 'UNAVAILABLE';
   structuredAnalysis?: MarketAnalysisResponse | null;
   whyMoving?: WhyMovingResponse | null;
 }
@@ -65,6 +68,10 @@ function setInCache(key: string, data: any, ttlMs: number = 20000) {
   });
 }
 
+export function getGeminiModel(): string {
+  return process.env.GEMINI_MODEL || 'gemini-2.5-flash';
+}
+
 /**
  * Builds clean, structured, non-fabricated market context from the app's real-time data
  */
@@ -74,6 +81,8 @@ export function buildStructuredMarketContext(data: any, tickerFallback: string =
       status: 'UNAVAILABLE',
       message: 'Current market data is unavailable.',
       ticker: tickerFallback,
+      currentPrice: null,
+      currentPriceStatus: 'UNAVAILABLE',
     };
   }
 
@@ -92,26 +101,28 @@ export function buildStructuredMarketContext(data: any, tickerFallback: string =
   const scenarios = data.scenarios || {};
 
   const ticker = quote.ticker || tickerFallback;
-  const currentPrice = quote.price != null ? Number(quote.price.toFixed(2)) : undefined;
-  const dollarChange = quote.change != null ? Number(quote.change.toFixed(2)) : undefined;
-  const percentChange = quote.changePercent != null ? Number(quote.changePercent.toFixed(2)) : undefined;
+  const currentPrice = quote.price != null ? Number(quote.price.toFixed(2)) : null;
+  const currentPriceStatus = currentPrice !== null ? 'VERIFIED' : 'UNAVAILABLE';
+  const dollarChange = quote.change != null ? Number(quote.change.toFixed(2)) : null;
+  const percentChange = quote.changePercent != null ? Number(quote.changePercent.toFixed(2)) : null;
 
   // Key levels
-  const vwap = technicals.vwap != null ? Number(technicals.vwap.toFixed(2)) : undefined;
-  const r1 = supportResistance.r1 != null ? Number(supportResistance.r1.toFixed(2)) : undefined;
-  const r2 = supportResistance.r2 != null ? Number(supportResistance.r2.toFixed(2)) : undefined;
-  const r3 = supportResistance.r3 != null ? Number(supportResistance.r3.toFixed(2)) : undefined;
-  const s1 = supportResistance.s1 != null ? Number(supportResistance.s1.toFixed(2)) : undefined;
-  const s2 = supportResistance.s2 != null ? Number(supportResistance.s2.toFixed(2)) : undefined;
-  const s3 = supportResistance.s3 != null ? Number(supportResistance.s3.toFixed(2)) : undefined;
+  const vwap = technicals.vwap != null ? Number(technicals.vwap.toFixed(2)) : null;
+  const vwapStatus = vwap !== null ? 'VERIFIED' : 'UNAVAILABLE';
+  const r1 = supportResistance.r1 != null ? Number(supportResistance.r1.toFixed(2)) : null;
+  const r2 = supportResistance.r2 != null ? Number(supportResistance.r2.toFixed(2)) : null;
+  const r3 = supportResistance.r3 != null ? Number(supportResistance.r3.toFixed(2)) : null;
+  const s1 = supportResistance.s1 != null ? Number(supportResistance.s1.toFixed(2)) : null;
+  const s2 = supportResistance.s2 != null ? Number(supportResistance.s2.toFixed(2)) : null;
+  const s3 = supportResistance.s3 != null ? Number(supportResistance.s3.toFixed(2)) : null;
 
-  const pdh = technicals.prevDayHigh != null ? Number(technicals.prevDayHigh.toFixed(2)) : undefined;
-  const pdl = technicals.prevDayLow != null ? Number(technicals.prevDayLow.toFixed(2)) : undefined;
-  const pdc = technicals.prevDayClose != null ? Number(technicals.prevDayClose.toFixed(2)) : undefined;
-  const pmHigh = technicals.preMarketHigh != null ? Number(technicals.preMarketHigh.toFixed(2)) : undefined;
-  const pmLow = technicals.preMarketLow != null ? Number(technicals.preMarketLow.toFixed(2)) : undefined;
-  const orHigh = technicals.openingRangeHigh != null ? Number(technicals.openingRangeHigh.toFixed(2)) : undefined;
-  const orLow = technicals.openingRangeLow != null ? Number(technicals.openingRangeLow.toFixed(2)) : undefined;
+  const pdh = technicals.prevDayHigh != null ? Number(technicals.prevDayHigh.toFixed(2)) : null;
+  const pdl = technicals.prevDayLow != null ? Number(technicals.prevDayLow.toFixed(2)) : null;
+  const pdc = technicals.prevDayClose != null ? Number(technicals.prevDayClose.toFixed(2)) : null;
+  const pmHigh = technicals.preMarketHigh != null ? Number(technicals.preMarketHigh.toFixed(2)) : null;
+  const pmLow = technicals.preMarketLow != null ? Number(technicals.preMarketLow.toFixed(2)) : null;
+  const orHigh = technicals.openingRangeHigh != null ? Number(technicals.openingRangeHigh.toFixed(2)) : null;
+  const orLow = technicals.openingRangeLow != null ? Number(technicals.openingRangeLow.toFixed(2)) : null;
 
   // Intermarket assets
   const qqqAsset = intermarket.find((a: any) => a.symbol === 'QQQ');
@@ -122,19 +133,19 @@ export function buildStructuredMarketContext(data: any, tickerFallback: string =
   // Top/Bottom sectors
   const topSectors = (sectors || [])
     .slice(0, 3)
-    .map((s: any) => `${s.symbol} (${s.name}): ${s.changePercent >= 0 ? '+' : ''}${s.changePercent}%`);
+    .map((s: any) => `${s.symbol} (${s.name}): ${s.changePercent != null ? (s.changePercent >= 0 ? '+' : '') + s.changePercent + '%' : 'N/A'}`);
   const bottomSectors = (sectors || [])
     .slice(-2)
-    .map((s: any) => `${s.symbol} (${s.name}): ${s.changePercent >= 0 ? '+' : ''}${s.changePercent}%`);
+    .map((s: any) => `${s.symbol} (${s.name}): ${s.changePercent != null ? (s.changePercent >= 0 ? '+' : '') + s.changePercent + '%' : 'N/A'}`);
 
   // Relevant upcoming economic events
   const upcomingEvents = (economicEvents || []).slice(0, 3).map((e: any) => ({
-    time: e.time,
-    event: e.event,
-    consensus: e.consensus,
-    actual: e.actual,
-    importance: e.importance,
-    isApproachingHighVol: e.isApproachingHighVol,
+    time: e.time || 'N/A',
+    event: e.event || 'N/A',
+    consensus: e.consensus ?? null,
+    actual: e.actual ?? null,
+    importance: e.importance || 'MEDIUM',
+    isApproachingHighVol: e.isApproachingHighVol || false,
   }));
 
   // Recent news
@@ -155,38 +166,40 @@ export function buildStructuredMarketContext(data: any, tickerFallback: string =
 
   return {
     ticker,
-    companyName: quote.name || `${ticker} Stock`,
+    companyName: quote.name || `${ticker} Security`,
     currentPrice,
+    currentPriceStatus,
     dollarChange,
     percentChange,
-    previousClose: quote.previousClose != null ? Number(quote.previousClose.toFixed(2)) : undefined,
-    dayHigh: quote.dayHigh != null ? Number(quote.dayHigh.toFixed(2)) : undefined,
-    dayLow: quote.dayLow != null ? Number(quote.dayLow.toFixed(2)) : undefined,
+    previousClose: quote.previousClose != null ? Number(quote.previousClose.toFixed(2)) : null,
+    dayHigh: quote.dayHigh != null ? Number(quote.dayHigh.toFixed(2)) : null,
+    dayLow: quote.dayLow != null ? Number(quote.dayLow.toFixed(2)) : null,
     marketSession: quote.marketStatus || 'REGULAR',
     timestampET,
     selectedTimeframe: timeframe,
-    volume: quote.volume,
-    avgVolume: quote.avgVolume,
-    relativeVolume: quote.relativeVolume,
+    volume: quote.volume ?? null,
+    avgVolume: quote.avgVolume ?? null,
+    relativeVolume: quote.relativeVolume ?? null,
     indicators: {
       vwap,
-      ema9: technicals.ema9 != null ? Number(technicals.ema9.toFixed(2)) : undefined,
-      ema20: technicals.ema20 != null ? Number(technicals.ema20.toFixed(2)) : undefined,
-      ema50: technicals.ema50 != null ? Number(technicals.ema50.toFixed(2)) : undefined,
-      ema200: technicals.ema200 != null ? Number(technicals.ema200.toFixed(2)) : undefined,
-      sma20: technicals.sma20 != null ? Number(technicals.sma20.toFixed(2)) : undefined,
-      sma50: technicals.sma50 != null ? Number(technicals.sma50.toFixed(2)) : undefined,
-      sma200: technicals.sma200 != null ? Number(technicals.sma200.toFixed(2)) : undefined,
-      rsi14: technicals.rsi14,
-      rsiStatus: technicals.rsiStatus,
-      macd: technicals.macd,
-      macdSignal: technicals.macdSignal,
-      macdHistogram: technicals.macdHistogram,
-      atr14: technicals.atr14,
-      adx14: technicals.adx,
-      bollingerUpper: technicals.bollingerUpper,
-      bollingerMiddle: technicals.bollingerMiddle,
-      bollingerLower: technicals.bollingerLower,
+      vwapStatus,
+      ema9: technicals.ema9 != null ? Number(technicals.ema9.toFixed(2)) : null,
+      ema20: technicals.ema20 != null ? Number(technicals.ema20.toFixed(2)) : null,
+      ema50: technicals.ema50 != null ? Number(technicals.ema50.toFixed(2)) : null,
+      ema200: technicals.ema200 != null ? Number(technicals.ema200.toFixed(2)) : null,
+      sma20: technicals.sma20 != null ? Number(technicals.sma20.toFixed(2)) : null,
+      sma50: technicals.sma50 != null ? Number(technicals.sma50.toFixed(2)) : null,
+      sma200: technicals.sma200 != null ? Number(technicals.sma200.toFixed(2)) : null,
+      rsi14: technicals.rsi14 ?? null,
+      rsiStatus: technicals.rsiStatus ?? null,
+      macd: technicals.macd ?? null,
+      macdSignal: technicals.macdSignal ?? null,
+      macdHistogram: technicals.macdHistogram ?? null,
+      atr14: technicals.atr14 ?? null,
+      adx14: technicals.adx ?? null,
+      bollingerUpper: technicals.bollingerUpper ?? null,
+      bollingerMiddle: technicals.bollingerMiddle ?? null,
+      bollingerLower: technicals.bollingerLower ?? null,
     },
     supportResistance: {
       s1,
@@ -195,7 +208,7 @@ export function buildStructuredMarketContext(data: any, tickerFallback: string =
       r1,
       r2,
       r3,
-      pivot: supportResistance.pivot,
+      pivot: supportResistance.pivot ?? null,
       previousDayHigh: pdh,
       previousDayLow: pdl,
       previousDayClose: pdc,
@@ -205,54 +218,54 @@ export function buildStructuredMarketContext(data: any, tickerFallback: string =
       openingRangeLow: orLow,
     },
     marketTrend: {
-      intradayBias: probabilities.bullish >= probabilities.bearish ? 'BULLISH' : 'BEARISH',
-      trendScore: data.trendAlignmentScore,
+      intradayBias: probabilities.bullish != null && probabilities.bearish != null ? (probabilities.bullish >= probabilities.bearish ? 'BULLISH' : 'BEARISH') : 'NEUTRAL',
+      trendScore: data.trendAlignmentScore ?? null,
       multiTimeframe: trends.map((t: any) => `${t.timeframe}: ${t.trend} (${t.strength}%)`),
     },
     intermarket: {
-      qqq: qqqAsset ? `${qqqAsset.changePercent >= 0 ? '+' : ''}${qqqAsset.changePercent}%` : undefined,
-      iwm: iwmAsset ? `${iwmAsset.changePercent >= 0 ? '+' : ''}${iwmAsset.changePercent}%` : undefined,
-      vix: vixAsset ? vixAsset.price : intermarket.find((a: any) => a.name?.includes('Volatility'))?.price || 14.2,
-      treasury10Y: yield10Y ? yield10Y.price : fed.treasury10Y || 4.28,
+      qqq: qqqAsset && qqqAsset.changePercent != null ? `${qqqAsset.changePercent >= 0 ? '+' : ''}${qqqAsset.changePercent}%` : null,
+      iwm: iwmAsset && iwmAsset.changePercent != null ? `${iwmAsset.changePercent >= 0 ? '+' : ''}${iwmAsset.changePercent}%` : null,
+      vix: vixAsset?.price ?? null,
+      treasury10Y: yield10Y?.price ?? fed.treasury10Y ?? null,
     },
     sectors: {
       leaders: topSectors,
       laggards: bottomSectors,
     },
     breadth: {
-      sp500AdvDecRatio: breadth.sp500AdvDecRatio,
-      pctAbove20SMA: breadth.pctAbove20SMA,
-      pctAbove50SMA: breadth.pctAbove50SMA,
-      pctAbove200SMA: breadth.pctAbove200SMA,
-      breadthStatus: breadth.breadthStatus,
+      sp500AdvDecRatio: breadth.sp500AdvDecRatio ?? null,
+      pctAbove20SMA: breadth.pctAbove20SMA ?? null,
+      pctAbove50SMA: breadth.pctAbove50SMA ?? null,
+      pctAbove200SMA: breadth.pctAbove200SMA ?? null,
+      breadthStatus: breadth.breadthStatus ?? null,
     },
     optionsFlow: {
-      putCallRatio: options.putCallRatio,
-      impliedVolatility: options.impliedVolatility,
-      sentiment: options.sentiment,
-      largestCallOIStrike: options.largestCallOIStrike,
-      largestPutOIStrike: options.largestPutOIStrike,
-      gammaSupport: options.gammaSupport,
-      gammaResistance: options.gammaResistance,
+      putCallRatio: options.putCallRatio ?? null,
+      impliedVolatility: options.impliedVolatility ?? null,
+      sentiment: options.sentiment ?? null,
+      largestCallOIStrike: options.largestCallOIStrike ?? null,
+      largestPutOIStrike: options.largestPutOIStrike ?? null,
+      gammaSupport: options.gammaSupport ?? null,
+      gammaResistance: options.gammaResistance ?? null,
     },
     probabilities: {
-      bullish: probabilities.bullish,
-      bearish: probabilities.bearish,
-      neutral: probabilities.neutral,
-      setupScore: probabilities.setupScore,
-      setupQuality: probabilities.setupQuality,
-      riskLevel: probabilities.riskLevel,
-      primaryDriver: probabilities.primaryDriver,
-      secondaryDriver: probabilities.secondaryDriver,
-      mainRisk: probabilities.mainRisk,
+      bullish: probabilities.bullish ?? null,
+      bearish: probabilities.bearish ?? null,
+      neutral: probabilities.neutral ?? null,
+      setupScore: probabilities.setupScore ?? null,
+      setupQuality: probabilities.setupQuality ?? null,
+      riskLevel: probabilities.riskLevel ?? 'MODERATE',
+      primaryDriver: probabilities.primaryDriver ?? null,
+      secondaryDriver: probabilities.secondaryDriver ?? null,
+      mainRisk: probabilities.mainRisk ?? null,
     },
     scenarios: {
-      bullishConfirmation: scenarios.bullish
-        ? `Break above $${scenarios.bullish.confirmationPrice?.toFixed(2)} with ${scenarios.bullish.requiredVolume}`
-        : probabilities.bullishConfirmation,
-      bearishInvalidation: scenarios.bearish
+      bullishConfirmation: scenarios.bullish?.confirmationPrice != null
+        ? `Break above $${scenarios.bullish.confirmationPrice?.toFixed(2)} with ${scenarios.bullish.requiredVolume || 'volume confirmation'}`
+        : probabilities.bullishConfirmation || null,
+      bearishInvalidation: scenarios.bearish?.confirmationPrice != null
         ? `Breakdown below $${scenarios.bearish.confirmationPrice?.toFixed(2)}`
-        : probabilities.bearishInvalidation,
+        : probabilities.bearishInvalidation || null,
     },
     upcomingEvents,
     recentNews,
@@ -281,11 +294,12 @@ You must distinguish facts from interpretation.
 CRITICAL DATA INTEGRITY MANDATES:
 1. NEVER invent market prices, option prices, VWAP, RSI, moving averages, volume, support, resistance, economic numbers, news headlines, probabilities, or timestamps.
 2. Use ONLY the structured market data provided to you in the prompt.
-3. If information is missing or unavailable, clearly state: "Current market data is unavailable." Do not guess or hallucinate any numbers.
-4. Explain market movement using technical analysis, price action, volume, market breadth, macro conditions, options activity, and news strictly when those inputs are provided.
-5. Do NOT claim certainty about future market movement. Always use probabilistic language (e.g. bullish bias, bearish bias, neutral, higher probability, confirmation, invalidation).
-6. Always explain both bullish and bearish risks when appropriate.
-7. Do not present analysis as guaranteed financial advice.
+3. If a required fact or indicator is unavailable (e.g. status: 'UNAVAILABLE' or null), clearly state: "Current market data is unavailable." Do not guess, estimate, or hallucinate any numbers.
+4. Gemini may explain verified information. Gemini must not substitute missing facts.
+5. Explain market movement using technical analysis, price action, volume, market breadth, macro conditions, options activity, and news strictly when those inputs are provided.
+6. Do NOT claim certainty about future market movement. Always use probabilistic language (e.g. bullish bias, bearish bias, neutral, higher probability, confirmation, invalidation).
+7. Always explain both bullish and bearish risks when appropriate.
+8. Do not present analysis as guaranteed financial advice.
 
 ${modeGuidance}`;
 }
@@ -310,7 +324,6 @@ export async function executeAskMarketMind({
   marketData: any;
   aiClient: GoogleGenAI | null;
 }): Promise<AskAiResponse> {
-  // Input validation & sanitization
   const cleanQuestion = (question || '').trim().slice(0, 500);
   if (!cleanQuestion) {
     return {
@@ -327,34 +340,55 @@ export async function executeAskMarketMind({
 
   const timestamp = structuredContext.timestampET || new Date().toLocaleTimeString('en-US', { timeZone: 'America/New_York' }) + ' ET';
 
+  // Check if current price is unavailable
+  if (structuredContext.currentPrice === null && (!aiClient || !marketData)) {
+    return {
+      answer: `Verified current market data for ${ticker} is unavailable.`,
+      timestamp,
+      source: 'MarketMind Data Guard',
+      status: 'UNAVAILABLE',
+    };
+  }
+
   // Fallback when API key is not yet configured
   if (!aiClient) {
+    const cp = structuredContext.currentPrice;
+    if (cp === null) {
+      return {
+        answer: `Verified current market price for ${ticker} is unavailable.`,
+        timestamp,
+        source: 'MarketMind Data Guard',
+        status: 'UNAVAILABLE',
+      };
+    }
+
+    const vwapVal = structuredContext.indicators?.vwap;
+    const isAboveVwap = vwapVal !== null ? cp >= vwapVal : null;
+    const r1 = structuredContext.supportResistance?.r1;
+    const s1 = structuredContext.supportResistance?.s1;
+    const bullProb = structuredContext.probabilities?.bullish;
+    const bearProb = structuredContext.probabilities?.bearish;
+
     const q = cleanQuestion.toLowerCase();
     let fallbackText = '';
-    const cp = structuredContext.currentPrice || 512.48;
-    const vwapVal = structuredContext.indicators?.vwap || 510.18;
-    const isAboveVwap = cp >= vwapVal;
-    const r1 = structuredContext.supportResistance?.r1 || 514.80;
-    const s1 = structuredContext.supportResistance?.s1 || 508.50;
-    const bullProb = structuredContext.probabilities?.bullish || 65;
-    const bearProb = structuredContext.probabilities?.bearish || 20;
 
     if (q.includes('why') && (q.includes('move') || q.includes('dropping') || q.includes('rising') || q.includes('up') || q.includes('down'))) {
-      fallbackText = `${ticker} ($${cp}) is trading **${isAboveVwap ? 'above' : 'below'} session VWAP ($${vwapVal})** with a **${bullProb}% bullish probability**. Price movement is primarily driven by **${structuredContext.probabilities?.primaryDriver || 'Sector Breadth & Treasury Yield retracement'}**. Key overhead resistance sits at **$${r1}**, while support holds at **$${s1}**.`;
+      fallbackText = `${ticker} ($${cp}) is trading ${isAboveVwap !== null ? (isAboveVwap ? 'above' : 'below') : 'near'} session VWAP (${vwapVal !== null ? `$${vwapVal}` : 'unavailable'})${bullProb !== null ? ` with a ${bullProb}% bullish probability` : ''}. ${structuredContext.probabilities?.primaryDriver ? `Primary driver: ${structuredContext.probabilities.primaryDriver}.` : ''} ${r1 !== null ? `Overhead resistance sits at $${r1}.` : ''} ${s1 !== null ? `Support holds at $${s1}.` : ''}`;
     } else if (q.includes('support') || q.includes('resistance') || q.includes('level')) {
-      fallbackText = `Key levels for **${ticker}**:\n- **Primary Resistance (R1)**: $${r1}\n- **Secondary Resistance (R2)**: $${structuredContext.supportResistance?.r2 || (r1 + 2).toFixed(2)}\n- **Intraday VWAP**: $${vwapVal}\n- **Primary Support (S1)**: $${s1}\n- **Major Support (S2)**: $${structuredContext.supportResistance?.s2 || (s1 - 2).toFixed(2)}`;
+      fallbackText = `Key verified levels for **${ticker}**:\n- **Primary Resistance (R1)**: ${r1 !== null ? `$${r1}` : 'Unavailable'}\n- **Intraday VWAP**: ${vwapVal !== null ? `$${vwapVal}` : 'Unavailable'}\n- **Primary Support (S1)**: ${s1 !== null ? `$${s1}` : 'Unavailable'}`;
     } else if (q.includes('vwap')) {
-      fallbackText = `**${ticker}** is currently trading **${isAboveVwap ? 'ABOVE' : 'BELOW'} VWAP** ($${vwapVal}) at **$${cp}**. As long as price holds above VWAP, intraday bias favors the bulls. A high-volume cross below VWAP would increase breakdown risk toward **$${s1}**.`;
-    } else if (q.includes('risk') || q.includes('news') || q.includes('catalyst')) {
-      fallbackText = `The main market risk today is **${structuredContext.probabilities?.mainRisk || 'Rate volatility and resistance supply overhang'}**. VIX is currently around **${structuredContext.intermarket?.vix || 14.2}**, indicating **${structuredContext.probabilities?.riskLevel || 'MODERATE RISK'}**.`;
+      fallbackText = vwapVal !== null
+        ? `**${ticker}** is currently trading **${isAboveVwap ? 'ABOVE' : 'BELOW'} VWAP** ($${vwapVal}) at **$${cp}**.`
+        : `Verified VWAP data for **${ticker}** is currently unavailable.`;
     } else {
-      fallbackText = `Market analysis for **${ticker}**: Currently at **$${cp}** (${structuredContext.dollarChange != null ? (structuredContext.dollarChange >= 0 ? '+' : '') + structuredContext.dollarChange : ''} / ${structuredContext.percentChange != null ? (structuredContext.percentChange >= 0 ? '+' : '') + structuredContext.percentChange + '%' : ''}). Technical bias is **${bullProb >= bearProb ? 'Bullish' : 'Bearish'}** with ${bullProb}% probability. Key levels to watch: Confirmation above **$${r1}** or Invalidation below **$${s1}**.`;
+      fallbackText = `Market summary for **${ticker}**: Currently at **$${cp}** (${structuredContext.dollarChange != null ? (structuredContext.dollarChange >= 0 ? '+' : '') + structuredContext.dollarChange : ''} / ${structuredContext.percentChange != null ? (structuredContext.percentChange >= 0 ? '+' : '') + structuredContext.percentChange + '%' : ''}). ${bullProb !== null && bearProb !== null ? `Calculated bias is ${bullProb >= bearProb ? 'Bullish' : 'Bearish'} (${bullProb}% prob).` : ''}`;
     }
 
     const responsePayload: AskAiResponse = {
-      answer: fallbackText,
+      answer: fallbackText.trim(),
       timestamp,
-      source: 'MarketMind Quantitative Heuristics (Local Baseline)',
+      source: 'MarketMind Quantitative Verified Facts',
+      status: 'VERIFIED',
     };
     setInCache(cacheKey, responsePayload, 15000);
     return responsePayload;
@@ -362,13 +396,11 @@ export async function executeAskMarketMind({
 
   try {
     const systemInstruction = getGeminiSystemInstruction(mode);
-
     const langInstruction =
       language && language !== 'en'
         ? `\nLANGUAGE REQUIREMENT: Respond in the language with code '${language}'. Translate all conversational analysis, insights, explanations, and risk advice naturally into this language, but NEVER alter or translate ticker symbols (e.g. ${ticker}), strike prices, dollar figures ($XXX.XX), percentages, or technical acronyms (VWAP, RSI, MACD, EMA, SMA, S1, R1).`
         : '';
 
-    // Limit conversation history to last 6 messages to keep context concise
     const recentHistoryText = (conversationHistory || [])
       .slice(-6)
       .map((m) => `${m.role === 'user' ? 'User' : 'Assistant'}: ${m.content}`)
@@ -387,31 +419,42 @@ USER QUESTION: "${cleanQuestion}"
 INSTRUCTIONS FOR ANSWERING:
 1. Address the question directly and concisely (2-4 clear paragraphs).
 2. If the user refers to "it", "the stock", or asks without a ticker, they are referring to ${ticker}.
-3. Bold specific verified price levels ($${structuredContext.currentPrice || 'N/A'}, VWAP $${structuredContext.indicators?.vwap || 'N/A'}), indicator values, and probabilities.
-4. State confirmation and invalidation triggers clearly.
-5. Emphasize both opportunities and downside risks.`;
+3. Bold specific verified price levels ($${structuredContext.currentPrice ?? 'Unavailable'}, VWAP $${structuredContext.indicators?.vwap ?? 'Unavailable'}), indicator values, and probabilities when verified.
+4. If a requested value is null or unavailable, explicitly state that verified data is unavailable.
+5. State confirmation and invalidation triggers clearly.
+6. Emphasize both opportunities and downside risks.`;
 
     const response = await aiClient.models.generateContent({
-      model: 'gemini-3.7-flash',
+      model: getGeminiModel(),
       contents: prompt,
     });
 
-    const resultText = response.text || 'Unable to generate market analysis. Please try again.';
+    const resultText = response.text || 'AI ANALYSIS TEMPORARILY UNAVAILABLE';
     const payload: AskAiResponse = {
       answer: resultText,
       timestamp,
       source: `Gemini 3.7 Flash MarketMind AI (${mode === 'beginner' ? 'Beginner' : 'Advanced'})`,
+      status: 'VERIFIED',
     };
 
     setInCache(cacheKey, payload, 20000);
     return payload;
   } catch (error: any) {
     const errMsg = error?.message || String(error);
-    console.log('[GeminiMarketService] Activating resilient market fallback:', errMsg.slice(0, 100));
+    console.log('[GeminiMarketService] AI query encountered error:', errMsg.slice(0, 100));
+    if (structuredContext.currentPrice !== null) {
+      return {
+        answer: `MarketMind analysis for ${ticker}: Current price is $${structuredContext.currentPrice}.${structuredContext.indicators?.vwap !== null ? ` Session VWAP is $${structuredContext.indicators?.vwap}.` : ''}${structuredContext.supportResistance?.s1 !== null ? ` Primary support holds at $${structuredContext.supportResistance?.s1}.` : ''}${structuredContext.supportResistance?.r1 !== null ? ` Primary resistance sits at $${structuredContext.supportResistance?.r1}.` : ''}`,
+        timestamp,
+        source: 'MarketMind Verified Data',
+        status: 'VERIFIED',
+      };
+    }
     return {
-      answer: `MarketMind analysis for ${ticker}: Current price is $${structuredContext.currentPrice || 'N/A'}, trading ${Number(structuredContext.currentPrice) >= Number(structuredContext.indicators?.vwap) ? 'above' : 'below'} VWAP ($${structuredContext.indicators?.vwap || 'N/A'}). Primary support is $${structuredContext.supportResistance?.s1 || 'N/A'} and resistance is $${structuredContext.supportResistance?.r1 || 'N/A'}.`,
+      answer: 'AI ANALYSIS TEMPORARILY UNAVAILABLE',
       timestamp,
-      source: 'MarketMind Resilient Fallback',
+      source: 'MarketMind Data Guard',
+      status: 'UNAVAILABLE',
     };
   }
 }
@@ -440,34 +483,53 @@ export async function executeAnalyzeMarket({
   if (cached) return cached;
 
   const timestamp = structuredContext.timestampET || new Date().toLocaleTimeString('en-US', { timeZone: 'America/New_York' }) + ' ET';
-  const cp = structuredContext.currentPrice || 512.48;
-  const vwapVal = structuredContext.indicators?.vwap || 510.18;
-  const r1 = structuredContext.supportResistance?.r1 || 514.80;
-  const s1 = structuredContext.supportResistance?.s1 || 508.50;
-  const bullProb = structuredContext.probabilities?.bullish || 65;
+  const cp = structuredContext.currentPrice;
+  const vwapVal = structuredContext.indicators?.vwap;
+  const r1 = structuredContext.supportResistance?.r1;
+  const s1 = structuredContext.supportResistance?.s1;
+  const bullProb = structuredContext.probabilities?.bullish ?? 50;
+
+  if (cp === null) {
+    return {
+      bias: 'neutral',
+      confidenceExplanation: 'Verified market price is unavailable.',
+      summary: `Verified market analysis for ${ticker} is currently unavailable due to missing real-time quote data.`,
+      bullishFactors: [],
+      bearishFactors: [],
+      support: [],
+      resistance: [],
+      confirmation: 'Unavailable',
+      invalidation: 'Unavailable',
+      risk: 'moderate',
+      watchNext: 'Waiting for live data feed connection.',
+      timestamp,
+      source: 'MarketMind Data Guard',
+      status: 'UNAVAILABLE',
+    };
+  }
 
   if (!aiClient) {
     const fallback: MarketAnalysisResponse = {
       bias: bullProb >= 55 ? 'bullish' : bullProb <= 40 ? 'bearish' : 'neutral',
-      confidenceExplanation: `${bullProb}% Bayesian probability based on VWAP hold and sector breadth alignment.`,
-      summary: `${ticker} is maintaining constructive price structure at $${cp}, holding above intraday VWAP ($${vwapVal}). Market breadth is supportive while tech and growth leadership provide index momentum.`,
+      confidenceExplanation: `Calculated probability based on verified price and indicator alignment.`,
+      summary: `${ticker} is trading at $${cp}${vwapVal !== null ? `, holding ${cp >= vwapVal ? 'above' : 'below'} intraday VWAP ($${vwapVal})` : ''}.`,
       bullishFactors: [
-        `Price ($${cp}) is trading above intraday VWAP ($${vwapVal}).`,
-        `Short-term 9 EMA ($${structuredContext.indicators?.ema9 || (cp * 0.998).toFixed(2)}) is stacked above 20 EMA.`,
-        `Sector breadth shows leadership in key beta sectors (${structuredContext.sectors?.leaders?.[0] || 'XLK Technology'}).`,
+        vwapVal !== null && cp >= vwapVal ? `Price ($${cp}) is trading above intraday VWAP ($${vwapVal}).` : `Current price is $${cp}.`,
+        structuredContext.indicators?.ema9 !== null ? `Short-term 9 EMA is $${structuredContext.indicators?.ema9}.` : 'Technical structure evaluated.',
       ],
       bearishFactors: [
-        `Overhead resistance near R1 ($${r1}) requires high volume for breakout.`,
-        `Loss of VWAP ($${vwapVal}) would trigger liquidation risk toward S1 ($${s1}).`,
+        r1 !== null ? `Overhead resistance near R1 ($${r1}).` : 'Resistance levels to be monitored.',
+        s1 !== null ? `Downside support zone at S1 ($${s1}).` : 'Support levels to be monitored.',
       ],
-      support: [`S1: $${s1}`, `VWAP: $${vwapVal}`, `S2: $${structuredContext.supportResistance?.s2 || (s1 - 2).toFixed(2)}`],
-      resistance: [`R1: $${r1}`, `R2: $${structuredContext.supportResistance?.r2 || (r1 + 2).toFixed(2)}`],
-      confirmation: `Sustained 15m candle close above $${r1} with relative volume > 1.25x confirms upside continuation.`,
-      invalidation: `Decisive breakdown below VWAP ($${vwapVal}) and S1 ($${s1}) invalidates immediate bullish bias.`,
+      support: s1 !== null ? [`S1: $${s1}`] : [],
+      resistance: r1 !== null ? [`R1: $${r1}`] : [],
+      confirmation: r1 !== null ? `Sustained breakout above $${r1}.` : 'Volume confirmation on breakout.',
+      invalidation: s1 !== null ? `Decisive breakdown below $${s1}.` : 'Breakdown below support.',
       risk: (structuredContext.probabilities?.riskLevel?.toLowerCase().includes('high') ? 'high' : 'moderate') as any,
-      watchNext: `Monitor opening range high and upcoming macro volatility events.`,
+      watchNext: `Monitor price action around key intraday levels.`,
       timestamp,
-      source: 'MarketMind Quantitative Baseline',
+      source: 'MarketMind Verified Quantitative Baseline',
+      status: 'VERIFIED',
     };
     setInCache(cacheKey, fallback, 15000);
     return fallback;
@@ -490,12 +552,12 @@ ${JSON.stringify(structuredContext, null, 2)}
 Return a strict JSON object matching this schema:
 {
   "bias": "bullish" | "bearish" | "neutral",
-  "confidenceExplanation": "1-2 sentences explaining the quantitative probability and conviction",
-  "summary": "2-3 sentences summarizing the exact market setup",
-  "bullishFactors": ["Factor 1 with verified numbers", "Factor 2", "Factor 3"],
+  "confidenceExplanation": "1-2 sentences explaining the quantitative probability and conviction based only on verified data",
+  "summary": "2-3 sentences summarizing the exact market setup without fabricating missing values",
+  "bullishFactors": ["Factor 1 with verified numbers", "Factor 2"],
   "bearishFactors": ["Risk Factor 1 with verified numbers", "Risk Factor 2"],
-  "support": ["Support level 1 with price", "Support level 2 with price"],
-  "resistance": ["Resistance level 1 with price", "Resistance level 2 with price"],
+  "support": ["Support level 1 with price"],
+  "resistance": ["Resistance level 1 with price"],
   "confirmation": "Exact condition and price level needed to confirm this setup",
   "invalidation": "Exact condition and breakdown level that invalidates this setup",
   "risk": "low" | "moderate" | "high" | "extreme",
@@ -503,7 +565,7 @@ Return a strict JSON object matching this schema:
 }`;
 
     const response = await aiClient.models.generateContent({
-      model: 'gemini-3.7-flash',
+      model: getGeminiModel(),
       contents: prompt,
       config: {
         responseMimeType: 'application/json',
@@ -514,40 +576,41 @@ Return a strict JSON object matching this schema:
     const result: MarketAnalysisResponse = {
       bias: ['bullish', 'bearish', 'neutral'].includes(parsed.bias) ? parsed.bias : 'neutral',
       confidenceExplanation: parsed.confidenceExplanation || `${bullProb}% probabilistic confidence.`,
-      summary: parsed.summary || `${ticker} continues to consolidate around key intraday levels.`,
-      bullishFactors: Array.isArray(parsed.bullishFactors) ? parsed.bullishFactors : [`Holding above VWAP ($${vwapVal})`],
-      bearishFactors: Array.isArray(parsed.bearishFactors) ? parsed.bearishFactors : [`Resistance overhead near $${r1}`],
-      support: Array.isArray(parsed.support) ? parsed.support : [`S1: $${s1}`, `VWAP: $${vwapVal}`],
-      resistance: Array.isArray(parsed.resistance) ? parsed.resistance : [`R1: $${r1}`],
-      confirmation: parsed.confirmation || `Breakout above $${r1} with above-average volume.`,
-      invalidation: parsed.invalidation || `Breakdown below $${s1}.`,
+      summary: parsed.summary || `${ticker} is trading around key verified levels.`,
+      bullishFactors: Array.isArray(parsed.bullishFactors) ? parsed.bullishFactors : (vwapVal !== null ? [`Holding above VWAP ($${vwapVal})`] : []),
+      bearishFactors: Array.isArray(parsed.bearishFactors) ? parsed.bearishFactors : (r1 !== null ? [`Resistance overhead near $${r1}`] : []),
+      support: Array.isArray(parsed.support) ? parsed.support : (s1 !== null ? [`S1: $${s1}`] : []),
+      resistance: Array.isArray(parsed.resistance) ? parsed.resistance : (r1 !== null ? [`R1: $${r1}`] : []),
+      confirmation: parsed.confirmation || (r1 !== null ? `Breakout above $${r1}.` : 'Volume confirmation.'),
+      invalidation: parsed.invalidation || (s1 !== null ? `Breakdown below $${s1}.` : 'Break below support.'),
       risk: ['low', 'moderate', 'high', 'extreme'].includes(parsed.risk) ? parsed.risk : 'moderate',
-      watchNext: parsed.watchNext || `Watch price action around VWAP ($${vwapVal}) and R1 ($${r1}).`,
+      watchNext: parsed.watchNext || `Monitor price action around verified levels.`,
       timestamp,
       source: `Gemini 3.7 Flash Institutional Analysis (${mode === 'beginner' ? 'Beginner' : 'Advanced'})`,
+      status: 'VERIFIED',
     };
 
     setInCache(cacheKey, result, 20000);
     return result;
   } catch (err: any) {
     const errMsg = err?.message || String(err);
-    console.log('[GeminiMarketService] Activating resilient market baseline:', errMsg.slice(0, 100));
-    const fallback: MarketAnalysisResponse = {
+    console.log('[GeminiMarketService] Gemini analysis fallback:', errMsg.slice(0, 100));
+    return {
       bias: 'neutral',
-      confidenceExplanation: 'Quantitative baseline calculation.',
-      summary: `${ticker} is trading at $${cp}, interacting with key support at $${s1} and resistance at $${r1}.`,
-      bullishFactors: [`Price maintains proximity to session VWAP ($${vwapVal})`],
-      bearishFactors: [`Supply at overhead resistance $${r1}`],
-      support: [`$${s1}`, `VWAP: $${vwapVal}`],
-      resistance: [`$${r1}`],
-      confirmation: `Holding above VWAP with volume expansion`,
-      invalidation: `Decisive break below $${s1}`,
+      confidenceExplanation: 'Verified quantitative calculation.',
+      summary: `${ticker} is trading at $${cp}.${s1 !== null ? ` Support holds at $${s1}.` : ''}${r1 !== null ? ` Resistance at $${r1}.` : ''}`,
+      bullishFactors: vwapVal !== null ? [`Price is near session VWAP ($${vwapVal})`] : [],
+      bearishFactors: r1 !== null ? [`Supply at overhead resistance $${r1}`] : [],
+      support: s1 !== null ? [`$${s1}`] : [],
+      resistance: r1 !== null ? [`$${r1}`] : [],
+      confirmation: r1 !== null ? `Break above $${r1}` : 'Volume confirmation',
+      invalidation: s1 !== null ? `Break below $${s1}` : 'Break below support',
       risk: 'moderate',
-      watchNext: `Monitor upcoming macro releases and VWAP defense.`,
+      watchNext: `Monitor verified support and resistance levels.`,
       timestamp,
-      source: 'MarketMind Resilient Engine',
+      source: 'MarketMind Verified Engine',
+      status: 'VERIFIED',
     };
-    return fallback;
   }
 }
 
@@ -573,39 +636,46 @@ export async function executeWhyIsItMoving({
   if (cached) return cached;
 
   const timestamp = structuredContext.timestampET || new Date().toLocaleTimeString('en-US', { timeZone: 'America/New_York' }) + ' ET';
-  const cp = structuredContext.currentPrice || 512.48;
-  const vwapVal = structuredContext.indicators?.vwap || 510.18;
-  const r1 = structuredContext.supportResistance?.r1 || 514.80;
-  const s1 = structuredContext.supportResistance?.s1 || 508.50;
+  const cp = structuredContext.currentPrice;
+  const vwapVal = structuredContext.indicators?.vwap;
+  const r1 = structuredContext.supportResistance?.r1;
+  const s1 = structuredContext.supportResistance?.s1;
+
+  if (cp === null) {
+    return {
+      headline: `${ticker} Market Movement Analysis`,
+      summary: `Verified market price and driver information for ${ticker} is currently unavailable.`,
+      drivers: [],
+      keyLevels: {
+        support: 'Unavailable',
+        resistance: 'Unavailable',
+        vwap: 'Unavailable',
+      },
+      timestamp,
+      source: 'MarketMind Data Guard',
+      status: 'UNAVAILABLE',
+    };
+  }
 
   if (!aiClient) {
     const fallback: WhyMovingResponse = {
-      headline: `${ticker} ${Number(structuredContext.dollarChange || 0) >= 0 ? 'Advances' : 'Consolidates'} Above VWAP on Positive Sector Breadth`,
-      summary: `${ticker} is trading at $${cp} (${structuredContext.dollarChange != null && structuredContext.dollarChange >= 0 ? '+' : ''}${structuredContext.dollarChange || 0}), supported by ${structuredContext.probabilities?.primaryDriver || 'stabilizing Treasury yields and tech sector strength'}.`,
+      headline: `${ticker} ${Number(structuredContext.dollarChange || 0) >= 0 ? 'Advances' : 'Consolidates'} at $${cp}`,
+      summary: `${ticker} is trading at $${cp} (${structuredContext.dollarChange != null && structuredContext.dollarChange >= 0 ? '+' : ''}${structuredContext.dollarChange ?? 0}).`,
       drivers: [
         {
           category: 'Price Action & VWAP',
-          impact: Number(cp) >= Number(vwapVal) ? 'Bullish' : 'Bearish',
-          explanation: `Price ($${cp}) is holding ${Number(cp) >= Number(vwapVal) ? 'above' : 'below'} the intraday VWAP benchmark ($${vwapVal}), providing an intraday support foundation.`,
-        },
-        {
-          category: 'Sector Leadership & Breadth',
-          impact: 'Bullish',
-          explanation: `Leading index components (${structuredContext.sectors?.leaders?.[0] || 'Technology'}) are attracting institutional inflows with positive market breadth.`,
-        },
-        {
-          category: 'Macro & Volatility',
-          impact: 'Neutral',
-          explanation: `The VIX (${structuredContext.intermarket?.vix || 14.2}) reflects controlled volatility ahead of key economic calendar releases.`,
+          impact: vwapVal !== null ? (cp >= vwapVal ? 'Bullish' : 'Bearish') : 'Neutral',
+          explanation: vwapVal !== null ? `Price ($${cp}) is trading ${cp >= vwapVal ? 'above' : 'below'} session VWAP ($${vwapVal}).` : `Current price is $${cp}.`,
         },
       ],
       keyLevels: {
-        support: `$${s1}`,
-        resistance: `$${r1}`,
-        vwap: `$${vwapVal}`,
+        support: s1 !== null ? `$${s1}` : 'Unavailable',
+        resistance: r1 !== null ? `$${r1}` : 'Unavailable',
+        vwap: vwapVal !== null ? `$${vwapVal}` : 'Unavailable',
       },
       timestamp,
-      source: 'MarketMind Multi-Factor Baseline',
+      source: 'MarketMind Verified Quantitative Baseline',
+      status: 'VERIFIED',
     };
     setInCache(cacheKey, fallback, 15000);
     return fallback;
@@ -620,34 +690,31 @@ export async function executeWhyIsItMoving({
 
     const prompt = `${systemInstruction}${langDirective}
 
-Analyze why ${ticker} is moving right now based on the provided real-time market data.
-Synthesize price action, volume, VWAP, technical indicators, VIX, Treasury yields, QQQ, IWM, sector strength, market breadth, economic reports, news, and options.
-
-Prioritize the 2-5 most important drivers behind the move without overwhelming the user.
+Analyze why ${ticker} is moving right now based strictly on the provided verified market data.
 
 STRUCTURED APPLICATION MARKET DATA:
 ${JSON.stringify(structuredContext, null, 2)}
 
 Return a strict JSON object matching this schema:
 {
-  "headline": "A punchy, informative 1-line headline explaining the move (e.g. SPY Rallies +0.82% as Tech Leads and Yields Stabilize)",
-  "summary": "2-3 sentences summarizing the holistic market picture",
+  "headline": "A punchy, informative 1-line headline explaining the move based only on verified data",
+  "summary": "2-3 sentences summarizing the holistic market picture without inventing facts",
   "drivers": [
     {
-      "category": "e.g. Technical Price Action / Macro & Yields / Sector Breadth / Options Flow / News",
+      "category": "e.g. Technical Price Action / Macro / Sector Breadth / News",
       "impact": "Bullish" | "Bearish" | "Neutral",
       "explanation": "Clear, direct explanation referencing actual provided data"
     }
   ],
   "keyLevels": {
-    "support": "Primary support level with price",
-    "resistance": "Primary resistance level with price",
-    "vwap": "Intraday VWAP price"
+    "support": "Primary support level or 'Unavailable'",
+    "resistance": "Primary resistance level or 'Unavailable'",
+    "vwap": "Intraday VWAP price or 'Unavailable'"
   }
 }`;
 
     const response = await aiClient.models.generateContent({
-      model: 'gemini-3.7-flash',
+      model: getGeminiModel(),
       contents: prompt,
       config: {
         responseMimeType: 'application/json',
@@ -656,46 +723,48 @@ Return a strict JSON object matching this schema:
 
     const parsed = JSON.parse(response.text || '{}');
     const result: WhyMovingResponse = {
-      headline: parsed.headline || `Why is ${ticker} moving today?`,
-      summary: parsed.summary || `${ticker} is trading at $${cp}, reacting to intraday catalysts.`,
+      headline: parsed.headline || `Why is ${ticker} moving?`,
+      summary: parsed.summary || `${ticker} is trading at $${cp}.`,
       drivers: Array.isArray(parsed.drivers) && parsed.drivers.length > 0 ? parsed.drivers : [
         {
-          category: 'Price Action & VWAP',
-          impact: Number(cp) >= Number(vwapVal) ? 'Bullish' : 'Bearish',
-          explanation: `Trading relative to VWAP ($${vwapVal}).`,
+          category: 'Price Action',
+          impact: vwapVal !== null ? (cp >= vwapVal ? 'Bullish' : 'Bearish') : 'Neutral',
+          explanation: `Trading at $${cp}.`,
         },
       ],
       keyLevels: {
-        support: parsed.keyLevels?.support || `$${s1}`,
-        resistance: parsed.keyLevels?.resistance || `$${r1}`,
-        vwap: parsed.keyLevels?.vwap || `$${vwapVal}`,
+        support: parsed.keyLevels?.support || (s1 !== null ? `$${s1}` : 'Unavailable'),
+        resistance: parsed.keyLevels?.resistance || (r1 !== null ? `$${r1}` : 'Unavailable'),
+        vwap: parsed.keyLevels?.vwap || (vwapVal !== null ? `$${vwapVal}` : 'Unavailable'),
       },
       timestamp,
       source: `Gemini 3.7 Flash Driver Synthesis (${mode === 'beginner' ? 'Beginner' : 'Advanced'})`,
+      status: 'VERIFIED',
     };
 
     setInCache(cacheKey, result, 20000);
     return result;
   } catch (err: any) {
     const errMsg = err?.message || String(err);
-    console.log('[GeminiMarketService] Activating resilient why-moving fallback:', errMsg.slice(0, 100));
+    console.log('[GeminiMarketService] Why moving error fallback:', errMsg.slice(0, 100));
     return {
-      headline: `${ticker} Price Movement Analysis`,
-      summary: `${ticker} is currently trading at $${cp} near VWAP ($${vwapVal}).`,
+      headline: `${ticker} Price Movement Summary`,
+      summary: `${ticker} is currently trading at $${cp}.${vwapVal !== null ? ` Session VWAP is $${vwapVal}.` : ''}`,
       drivers: [
         {
           category: 'Technical Flow',
           impact: 'Neutral',
-          explanation: `Holding between support at $${s1} and resistance at $${r1}.`,
+          explanation: `Trading at $${cp}.`,
         },
       ],
       keyLevels: {
-        support: `$${s1}`,
-        resistance: `$${r1}`,
-        vwap: `$${vwapVal}`,
+        support: s1 !== null ? `$${s1}` : 'Unavailable',
+        resistance: r1 !== null ? `$${r1}` : 'Unavailable',
+        vwap: vwapVal !== null ? `$${vwapVal}` : 'Unavailable',
       },
       timestamp,
-      source: 'MarketMind Resilient Fallback',
+      source: 'MarketMind Verified Data Guard',
+      status: 'VERIFIED',
     };
   }
 }

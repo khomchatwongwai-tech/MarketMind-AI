@@ -43,9 +43,9 @@ const STORAGE_PREFIX = 'marketmind_social_';
 const INITIAL_COMMUNITY_PROFILES: Record<string, CommunityUserProfile> = {
   usr_admin: {
     id: 'usr_admin',
-    email: 'khomchatwongwai@gmail.com',
-    name: 'Khomchat Wongwai',
-    username: 'khomchat',
+    email: 'admin@marketmind.ai',
+    name: 'MarketMind Architect',
+    username: 'marketmind_quant',
     bio: 'Lead Quant Architect @ MarketMind AI. Institutional order flow, gamma curves, and macro regime forecasting.',
     website: 'https://marketmind.ai',
     avatarUrl: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=150&auto=format&fit=crop&q=80',
@@ -337,7 +337,7 @@ export class CommunityService {
       ? currentUser.email.split('@')[0].toLowerCase().replace(/[^a-z0-9_]/g, '_')
       : 'trader_' + currentUser.id.slice(0, 5);
 
-    const isMasterAdmin = currentUser.email.toLowerCase() === 'khomchatwongwai@gmail.com';
+    const isPrivileged = currentUser.role === 'admin' || currentUser.role === 'super_admin';
 
     const newProfile: CommunityUserProfile = {
       id: currentUser.id,
@@ -347,8 +347,8 @@ export class CommunityService {
       bio: 'MarketMind AI quantitative market analyst and active trader.',
       avatarUrl: currentUser.avatarUrl || 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=150&auto=format&fit=crop&q=80',
       coverImageUrl: 'https://images.unsplash.com/photo-1611974789855-9c2a0a7236a3?w=1200&auto=format&fit=crop&q=80',
-      isVerified: isMasterAdmin, // Only master admin is verified by default
-      role: isMasterAdmin ? 'admin' : 'user',
+      isVerified: isPrivileged,
+      role: isPrivileged ? 'admin' : 'user',
       plan: currentUser.plan,
       planTier: currentUser.planTier,
       investingInterests: ['Equities', 'Options', 'Macro'],
@@ -383,10 +383,10 @@ export class CommunityService {
     }
 
     // Security Gate: Regular users are FORBIDDEN from elevating verification badge or role
-    const isMasterAdmin = actingUser?.email.toLowerCase() === 'khomchatwongwai@gmail.com' || actingUser?.role === 'admin';
+    const isPrivileged = actingUser?.role === 'admin' || actingUser?.role === 'super_admin';
     const sanitizedUpdates: Partial<CommunityUserProfile> = { ...updates };
 
-    if (!isMasterAdmin) {
+    if (!isPrivileged) {
       delete sanitizedUpdates.isVerified;
       delete sanitizedUpdates.role;
     }
@@ -1508,8 +1508,8 @@ export class CommunityService {
   }
 
   static async setVerifiedBadge(targetUserId: string, isVerified: boolean, adminUser: UserProfile): Promise<void> {
-    const isMasterAdmin = adminUser.email.toLowerCase() === 'khomchatwongwai@gmail.com' || adminUser.role === 'admin';
-    if (!isMasterAdmin) {
+    const isPrivileged = adminUser.role === 'admin' || adminUser.role === 'super_admin';
+    if (!isPrivileged) {
       throw new Error('Unauthorized: Only administrators can modify verification status.');
     }
 

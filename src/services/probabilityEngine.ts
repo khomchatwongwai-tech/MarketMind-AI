@@ -129,9 +129,9 @@ export function calculateWeightedProbability(
   if (vix > 24 || Math.abs(scores.macroEconomics) > 75) {
     riskLevel = 'EXTREME RISK';
   } else if (vix > 18 || rsi > 75 || rsi < 25) {
-    riskLevel = 'HIGH RISK';
+    riskLevel = 'HIGHER RISK';
   } else if (vix <= 14.5 && confidenceScore > 65) {
-    riskLevel = 'LOW RISK';
+    riskLevel = 'LOWER RISK';
   } else {
     riskLevel = 'MODERATE RISK';
   }

@@ -70,7 +70,7 @@ export const PostCard: React.FC<PostCardProps> = ({
 
   // Check permissions
   const isAuthor = currentUser.id === post.authorId;
-  const isAdmin = currentUser.role === 'admin' || currentUser.email.toLowerCase() === 'khomchatwongwai@gmail.com';
+  const isAdmin = currentUser.role === 'admin' || currentUser.role === 'super_admin';
 
   const handleReaction = async (type: 'LIKE' | 'BULL' | 'BEAR') => {
     try {

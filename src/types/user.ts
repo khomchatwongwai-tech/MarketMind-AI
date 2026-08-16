@@ -11,6 +11,8 @@ export type SubscriptionPlanTier =
   | 'institutional'
   | 'enterprise';
 
+export type UserRole = 'user' | 'premium_user' | 'support' | 'moderator' | 'admin' | 'super_admin';
+
 export interface UserProfile {
   id: string;
   name: string;
@@ -19,7 +21,7 @@ export interface UserProfile {
   email: string;
   emailVerified?: boolean;
   avatarUrl?: string;
-  role: 'user' | 'admin';
+  role: UserRole;
   plan: SubscriptionPlanTier;
   planTier?: string; // UI display alias e.g. 'Pro' or 'Free'
   selectedPlan?: SubscriptionPlanId;
@@ -58,6 +60,7 @@ export interface UserProfile {
   preferredCurrency?: string;
   preferredMarket?: string;
   aiResponseLanguage?: string;
+  themePreference?: 'light' | 'dark' | 'system';
   
   notifications: {
     emailAlerts: boolean;

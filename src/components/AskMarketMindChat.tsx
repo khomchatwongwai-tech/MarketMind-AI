@@ -24,6 +24,7 @@ import {
 } from 'lucide-react';
 import { ComprehensiveMarketData } from '../services/marketDataService';
 import { MarketAnalysisResponse, WhyMovingResponse } from '../services/geminiMarketService';
+import { auth } from '../config/firebase';
 
 interface Message {
   id: string;
@@ -86,6 +87,18 @@ Ask any question below or trigger an instant institutional scenario breakdown!`,
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   };
 
+  const getAuthorizedHeaders = async (): Promise<Record<string, string>> => {
+    const firebaseUser = auth.currentUser;
+    if (!firebaseUser) {
+      throw new Error('Please sign in before using MarketMind AI.');
+    }
+    const token = await firebaseUser.getIdToken();
+    return {
+      'Content-Type': 'application/json',
+      Authorization: `Bearer ${token}`,
+    };
+  };
+
   useEffect(() => {
     scrollToBottom();
   }, [messages, isLoading]);
@@ -123,9 +136,9 @@ Ask any question below or trigger an instant institutional scenario breakdown!`,
 
     try {
       // Simulate/call AI endpoint with prompt & market data
-      const response = await fetch('/api/market/ask', {
+      const response = await fetch('/api/ai/ask', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: await getAuthorizedHeaders(),
         body: JSON.stringify({
           question: query,
           ticker,
@@ -187,9 +200,9 @@ Ask any question below or trigger an instant institutional scenario breakdown!`,
     setMessages((prev) => [...prev, userMsg]);
 
     try {
-      const response = await fetch('/api/market/analysis', {
+      const response = await fetch('/api/ai/analyze', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: await getAuthorizedHeaders(),
         body: JSON.stringify({ ticker, marketData: data, language: aiLanguage || language || 'en' }),
       });
       if (!response.ok) throw new Error('API request failed');
@@ -255,9 +268,9 @@ Ask any question below or trigger an instant institutional scenario breakdown!`,
     setMessages((prev) => [...prev, userMsg]);
 
     try {
-      const response = await fetch('/api/market/why-moving', {
+      const response = await fetch('/api/ai/why-moving', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: await getAuthorizedHeaders(),
         body: JSON.stringify({ ticker, marketData: data, language: aiLanguage || language || 'en' }),
       });
       if (!response.ok) throw new Error('API request failed');

@@ -61,7 +61,7 @@ import { MASTER_INSTRUMENTS } from './services/marketProviders/InstrumentDirecto
 import { UserProfile } from './types/user';
 import { UserService } from './services/userService';
 import { auth } from './config/firebase';
-import { onAuthStateChanged } from 'firebase/auth';
+import { onAuthStateChanged, signOut } from 'firebase/auth';
 import { FirestoreService } from './services/firestoreService';
 import { ShieldCheck, HelpCircle, Activity, FileText, Lock, MessageSquare } from 'lucide-react';
 
@@ -168,6 +168,14 @@ export default function App() {
 
   const handleUserChange = (updatedUser: UserProfile) => {
     setCurrentUser(updatedUser);
+  };
+
+  const handleSignOut = async () => {
+    await signOut(auth);
+    const guestUser = UserService.logout();
+    setCurrentUser(guestUser);
+    setIsSettingsModalOpen(false);
+    setIsAuthModalOpen(true);
   };
 
   const [alerts, setAlerts] = useState<MarketAlert[]>([]);
@@ -527,6 +535,7 @@ export default function App() {
         onClose={() => setIsSettingsModalOpen(false)}
         currentUser={currentUser}
         onUserSaved={handleUserChange}
+        onSignOut={handleSignOut}
         onOpenSubscription={() => {
           setIsSettingsModalOpen(false);
           setIsSubscriptionModalOpen(true);

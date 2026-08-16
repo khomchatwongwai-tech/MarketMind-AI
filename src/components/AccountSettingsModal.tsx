@@ -23,6 +23,7 @@ import {
   Moon,
   Laptop,
   Check,
+  LogOut,
 } from 'lucide-react';
 import { UserProfile, TickerSymbol } from '../types/user';
 import { UserService } from '../services/userService';
@@ -36,6 +37,7 @@ interface AccountSettingsModalProps {
   currentUser: UserProfile;
   onUserSaved: (user: UserProfile) => void;
   onOpenSubscription?: () => void;
+  onSignOut: () => void | Promise<void>;
 }
 
 export const AccountSettingsModal: React.FC<AccountSettingsModalProps> = ({
@@ -44,6 +46,7 @@ export const AccountSettingsModal: React.FC<AccountSettingsModalProps> = ({
   currentUser,
   onUserSaved,
   onOpenSubscription,
+  onSignOut,
 }) => {
   const {
     language,
@@ -894,7 +897,14 @@ export const AccountSettingsModal: React.FC<AccountSettingsModalProps> = ({
 
         {/* Footer Actions */}
         <div className="p-4 bg-[var(--surface-secondary)] border-t border-[var(--border-primary)] flex justify-between items-center">
-          <div>
+          <div className="flex items-center gap-3">
+            <button
+              onClick={onSignOut}
+              className="px-3.5 py-1.5 bg-red-500/10 hover:bg-red-500/20 text-red-400 text-xs font-semibold rounded-lg border border-red-500/30 transition flex items-center gap-1.5"
+            >
+              <LogOut className="w-3.5 h-3.5" />
+              Sign Out
+            </button>
             {isSaved && (
               <span className="text-xs text-emerald-400 font-bold flex items-center gap-1 animate-pulse">
                 <CheckCircle2 className="w-3.5 h-3.5" />

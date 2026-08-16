@@ -4,11 +4,12 @@ import {
   InstrumentSearchResultGroup,
   ProviderSymbolMap,
 } from '../../types/instrument';
+import { ADDITIONAL_INSTRUMENTS } from './additionalInstrumentCatalog';
 
 // ==========================================
 // Master Universal Multi-Asset Reference Database
 // ==========================================
-export const MASTER_INSTRUMENTS: NormalizedInstrument[] = [
+const CORE_INSTRUMENTS: NormalizedInstrument[] = [
   // --- 1. U.S. & INTERNATIONAL STOCKS ---
   {
     instrumentId: 'inst_stock_nvda_nasdaq',
@@ -1672,6 +1673,12 @@ export const MASTER_INSTRUMENTS: NormalizedInstrument[] = [
   },
 ];
 
+const coreSymbols = new Set(CORE_INSTRUMENTS.map((instrument) => instrument.symbol.toUpperCase()));
+export const MASTER_INSTRUMENTS: NormalizedInstrument[] = [
+  ...CORE_INSTRUMENTS,
+  ...ADDITIONAL_INSTRUMENTS.filter((instrument) => !coreSymbols.has(instrument.symbol.toUpperCase())),
+];
+
 export class InstrumentDirectoryService {
   private static directory: Map<string, NormalizedInstrument> = new Map();
   private static symbolIndex: Map<string, NormalizedInstrument> = new Map();
@@ -1680,10 +1687,10 @@ export class InstrumentDirectoryService {
     // Populate indices
     for (const inst of MASTER_INSTRUMENTS) {
       this.directory.set(inst.instrumentId, inst);
-      this.symbolIndex.set(inst.symbol.toUpperCase(), inst);
-      this.symbolIndex.set(inst.displaySymbol.toUpperCase(), inst);
+      if (!this.symbolIndex.has(inst.symbol.toUpperCase())) this.symbolIndex.set(inst.symbol.toUpperCase(), inst);
+      if (!this.symbolIndex.has(inst.displaySymbol.toUpperCase())) this.symbolIndex.set(inst.displaySymbol.toUpperCase(), inst);
       if (inst.providerSymbol) {
-        this.symbolIndex.set(inst.providerSymbol.toUpperCase(), inst);
+        if (!this.symbolIndex.has(inst.providerSymbol.toUpperCase())) this.symbolIndex.set(inst.providerSymbol.toUpperCase(), inst);
       }
     }
   }

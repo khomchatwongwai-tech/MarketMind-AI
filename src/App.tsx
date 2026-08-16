@@ -55,7 +55,7 @@ import {
 } from './services/marketDataService';
 import { TickerSymbol, MarketAlert, LiveMarketDataSource } from './types/market';
 import { NormalizedInstrument } from './types/instrument';
-import { MASTER_INSTRUMENTS } from './services/marketProviders/InstrumentDirectoryService';
+import { MASTER_INSTRUMENTS, InstrumentDirectoryService } from './services/marketProviders/InstrumentDirectoryService';
 import { UserProfile } from './types/user';
 import { UserService } from './services/userService';
 import { auth } from './config/firebase';
@@ -196,11 +196,14 @@ export default function App() {
 
   // Load new ticker data when selection changes
   const handleSelectTicker = (ticker: TickerSymbol) => {
-    setSelectedTicker(ticker);
-    const newData = getComprehensiveMarketData(ticker);
+    const cleanTicker = ticker.trim().toUpperCase() as TickerSymbol;
+    setSelectedTicker(cleanTicker);
+    const matchedInstrument = InstrumentDirectoryService.getBySymbol(cleanTicker);
+    if (matchedInstrument) setSelectedInstrument(matchedInstrument);
+    const newData = getComprehensiveMarketData(cleanTicker);
     setMarketData(newData);
     // Fetch live quote immediately for new ticker
-    syncLiveMarket(ticker, dataSource);
+    syncLiveMarket(cleanTicker, dataSource);
   };
 
   // Initial load sync
@@ -329,8 +332,8 @@ export default function App() {
             selectedInstrument={selectedInstrument}
             onSelectInstrument={(inst) => {
               setSelectedInstrument(inst);
-              if (inst.symbol) {
-                handleSelectTicker(inst.symbol as TickerSymbol);
+              if (inst.providerSymbol) {
+                handleSelectTicker(inst.providerSymbol as TickerSymbol);
               }
             }}
             onOpenAiAnalysis={(inst) => setAiAnalysisInstrument(inst)}
@@ -559,8 +562,8 @@ export default function App() {
         onClose={() => setIsUniversalSearchOpen(false)}
         onSelectInstrument={(inst) => {
           setSelectedInstrument(inst);
-          if (inst.symbol) {
-            handleSelectTicker(inst.symbol as TickerSymbol);
+          if (inst.providerSymbol) {
+            handleSelectTicker(inst.providerSymbol as TickerSymbol);
           }
           setIsUniversalSearchOpen(false);
         }}

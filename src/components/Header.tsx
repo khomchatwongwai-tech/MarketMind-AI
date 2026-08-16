@@ -32,6 +32,7 @@ import { useI18n } from '../i18n/I18nContext';
 import { LanguageSelector } from './LanguageSelector';
 import { ThemeToggle } from './ThemeToggle';
 import { AppConfig } from '../config/environment';
+import { MASTER_INSTRUMENTS } from '../services/marketProviders/InstrumentDirectoryService';
 
 interface HeaderProps {
   quote: MarketQuote;
@@ -59,7 +60,9 @@ interface HeaderProps {
   onOpenTour: () => void;
 }
 
-const PRESET_TICKERS: TickerSymbol[] = ['SPY', 'QQQ', 'NVDA', 'TSLA', 'AAPL', 'MSFT', 'AMZN', 'META', 'AMD', 'IWM', 'COIN', 'PLTR'];
+const DIRECTORY_TICKERS = Array.from(
+  new Map(MASTER_INSTRUMENTS.map((instrument) => [instrument.providerSymbol, instrument])).values()
+);
 
 export const Header: React.FC<HeaderProps> = ({
   quote,
@@ -356,12 +359,20 @@ export const Header: React.FC<HeaderProps> = ({
                 onChange={(e) => onSelectTicker(e.target.value as TickerSymbol)}
                 className="bg-[#101010] text-2xl md:text-3xl font-black text-white px-2 py-0.5 rounded-lg border border-[#242424] hover:border-[#D4AF37] focus:outline-none cursor-pointer tracking-tight"
               >
-                {PRESET_TICKERS.map((t) => (
-                  <option key={t} value={t} className="bg-[#101010] text-white">
-                    {t}
-                  </option>
-                ))}
-                {!PRESET_TICKERS.includes(selectedTicker) && (
+                {(['STOCK', 'ADR', 'ETF', 'FUND', 'CRYPTO', 'CRYPTO_PAIR', 'FOREX', 'FUTURES', 'COMMODITY', 'BOND', 'TREASURY', 'INDEX', 'OPTION', 'INDEX_OPTION', 'ECONOMIC_INDICATOR'] as const).map((assetClass) => {
+                  const instruments = DIRECTORY_TICKERS.filter((instrument) => instrument.assetClass === assetClass);
+                  if (!instruments.length) return null;
+                  return (
+                    <optgroup key={assetClass} label={assetClass.replace('_', ' ')} className="bg-[#101010] text-[#D4AF37]">
+                      {instruments.map((instrument) => (
+                        <option key={instrument.instrumentId} value={instrument.providerSymbol} className="bg-[#101010] text-white">
+                          {instrument.displaySymbol} — {instrument.name}
+                        </option>
+                      ))}
+                    </optgroup>
+                  );
+                })}
+                {!DIRECTORY_TICKERS.some((instrument) => instrument.providerSymbol === selectedTicker) && (
                   <option value={selectedTicker} className="bg-[#101010] text-white">{selectedTicker}</option>
                 )}
               </select>

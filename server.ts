@@ -1126,6 +1126,14 @@ app.get('/api/market/search', async (req, res) => {
   const query = (req.query.q as string || '').trim();
   if (!query) return res.json({ quotes: [] });
 
+  const localQuotes = InstrumentDirectoryService.search(query).results.slice(0, 20).map((instrument) => ({
+    symbol: instrument.providerSymbol,
+    displaySymbol: instrument.displaySymbol,
+    name: instrument.name,
+    exchange: instrument.exchange,
+    type: instrument.assetClass,
+  }));
+
   try {
     const yahooUrl = `https://query1.finance.yahoo.com/v1/finance/search?q=${encodeURIComponent(
       query
@@ -1135,24 +1143,20 @@ app.get('/api/market/search', async (req, res) => {
     });
     if (response.ok) {
       const data = await response.json();
-      const quotes = (data.quotes || []).map((q: any) => ({
+      const providerQuotes = (data.quotes || []).map((q: any) => ({
         symbol: q.symbol,
         name: q.shortname || q.longname || q.symbol,
         exchange: q.exchange,
         type: q.quoteType,
       }));
+      const quotes = Array.from(new Map([...localQuotes, ...providerQuotes].map((item) => [item.symbol, item])).values()).slice(0, 20);
       return res.json({ quotes });
     }
   } catch (e) {
     // ignore
   }
 
-  // Fallback popular symbols
-  const popular = ['SPY', 'QQQ', 'NVDA', 'TSLA', 'AAPL', 'MSFT', 'AMZN', 'META', 'AMD', 'IWM', 'PLTR', 'COIN', 'GOOGL', 'AVGO', 'NFLX'];
-  const filtered = popular
-    .filter((s) => s.toLowerCase().includes(query.toLowerCase()))
-    .map((s) => ({ symbol: s, name: `${s} Stock`, exchange: 'NASDAQ/NYSE', type: 'EQUITY' }));
-  return res.json({ quotes: filtered });
+  return res.json({ quotes: localQuotes });
 });
 
 // ==========================================

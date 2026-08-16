@@ -2,6 +2,7 @@ import { parseFirebaseServiceAccount } from './firebaseAdmin';
 
 const REQUIRED = [
   'APP_URL', 'FIREBASE_PROJECT_ID', 'FIREBASE_DATABASE_ID', 'FIREBASE_SERVICE_ACCOUNT_KEY',
+  'SUPABASE_URL', 'SUPABASE_SECRET_KEY',
   'GEMINI_API_KEY', 'STRIPE_SECRET_KEY', 'STRIPE_WEBHOOK_SECRET',
   'STRIPE_PRICE_BASIC', 'STRIPE_PRICE_PRO', 'STRIPE_PRICE_PREMIUM',
   'STRIPE_PRICE_BASIC_ANNUAL', 'STRIPE_PRICE_PRO_ANNUAL', 'STRIPE_PRICE_PREMIUM_ANNUAL',
@@ -20,6 +21,11 @@ export function validateProductionEnvironment(env: NodeJS.ProcessEnv = process.e
     try { if (new URL(env.APP_URL).protocol !== 'https:') errors.push('APP_URL must use HTTPS'); }
     catch { errors.push('APP_URL must be a valid URL'); }
   }
+  if (env.SUPABASE_URL) {
+    try { if (new URL(env.SUPABASE_URL).protocol !== 'https:') errors.push('SUPABASE_URL must use HTTPS'); }
+    catch { errors.push('SUPABASE_URL must be a valid URL'); }
+  }
+  if (env.SUPABASE_SECRET_KEY && !env.SUPABASE_SECRET_KEY.startsWith('sb_secret_') && !env.SUPABASE_SECRET_KEY.startsWith('eyJ')) errors.push('SUPABASE_SECRET_KEY has an invalid format');
   if (env.FIREBASE_SERVICE_ACCOUNT_KEY) {
     try { parseFirebaseServiceAccount(env.FIREBASE_SERVICE_ACCOUNT_KEY, env.FIREBASE_PROJECT_ID); }
     catch (error) { errors.push((error as Error).message); }

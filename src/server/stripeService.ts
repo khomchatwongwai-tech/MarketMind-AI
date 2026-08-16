@@ -2,6 +2,7 @@ import Stripe from 'stripe';
 import { SubscriptionPlanId } from '../types/subscription';
 import { SUBSCRIPTION_PLANS } from '../config/plans';
 import { getFirebaseFirestore } from './firebaseAdmin';
+import { getSupabaseAdmin } from './supabaseAdmin';
 
 let stripeClient: Stripe | null = null;
 
@@ -81,6 +82,37 @@ export async function persistVerifiedStripeEvent(event: Stripe.Event, db: any): 
     transaction.create(eventRef, { eventId: event.id, type: event.type, processedAt: now });
     return 'processed';
   });
+}
+
+function stripePersistenceUpdate(event: Stripe.Event): { uid: string | null; updates: Record<string, unknown> | null } {
+  if (event.type === 'checkout.session.completed') {
+    const session = event.data.object as Stripe.Checkout.Session;
+    const uid = session.client_reference_id || session.metadata?.firebaseUid || null;
+    const plan = session.metadata?.planId as SubscriptionPlanId;
+    if (!uid || !['basic', 'pro', 'premium'].includes(plan)) throw new Error('Webhook subscription identity is invalid');
+    return { uid, updates: { plan, planTier: plan.toUpperCase(), subscriptionStatus: 'active', paymentProvider: 'stripe', paymentCustomerId: session.customer, paymentSubscriptionId: session.subscription } };
+  }
+  if (['customer.subscription.created', 'customer.subscription.updated', 'customer.subscription.deleted'].includes(event.type)) {
+    const subscription = event.data.object as Stripe.Subscription;
+    const uid = subscription.metadata?.firebaseUid || null;
+    if (!uid) throw new Error('Webhook subscription identity is invalid');
+    const deleted = event.type === 'customer.subscription.deleted';
+    return { uid, updates: deleted ? { plan: 'free', planTier: 'FREE', subscriptionStatus: 'canceled', cancelAtPeriodEnd: true }
+      : { paymentSubscriptionId: subscription.id, paymentCustomerId: subscription.customer, paymentProvider: 'stripe', subscriptionStatus: subscription.status === 'active' ? 'active' : subscription.status === 'past_due' ? 'past_due' : subscription.status === 'trialing' ? 'trialing' : 'canceled', cancelAtPeriodEnd: subscription.cancel_at_period_end } };
+  }
+  if (['invoice.paid', 'invoice.payment_succeeded', 'invoice.payment_failed'].includes(event.type)) {
+    const invoice = event.data.object as any;
+    const uid = invoice.metadata?.firebaseUid || invoice.parent?.subscription_details?.metadata?.firebaseUid || null;
+    return { uid, updates: uid ? { subscriptionStatus: event.type === 'invoice.payment_failed' ? 'past_due' : 'active' } : null };
+  }
+  return { uid: null, updates: null };
+}
+
+async function persistVerifiedStripeEventInSupabase(event: Stripe.Event): Promise<'processed' | 'duplicate'> {
+  const { uid, updates } = stripePersistenceUpdate(event);
+  const { data, error } = await getSupabaseAdmin().rpc('persist_stripe_event', { p_event_id: event.id, p_firebase_uid: uid, p_updates: updates });
+  if (error) throw new Error(`Stripe persistence failed: ${error.message}`);
+  return data ? 'processed' : 'duplicate';
 }
 
 export class StripeService {
@@ -203,14 +235,13 @@ export class StripeService {
       return { error: 'Webhook signature verification failed.', received: false };
     }
 
-    // This cache is only an optimization. Firestore is the authority.
+    // This cache is only an optimization. Supabase is the durable authority.
     if (processedWebhookEvents.has(event.id)) {
       return { received: true, eventType: event.type };
     }
 
     try {
-      const db = getFirebaseFirestore();
-      const outcome = await persistVerifiedStripeEvent(event, db);
+      const outcome = await persistVerifiedStripeEventInSupabase(event);
       processedWebhookEvents.add(event.id);
       if (outcome === 'processed') console.log(`[Stripe Webhook] Processed verified ${event.type} event`);
       return { received: true, eventType: event.type };

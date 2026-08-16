@@ -7,6 +7,7 @@ import { getStripePriceId, isAllowedPriceId } from '../src/server/stripeService'
 const validAccount = JSON.stringify({ project_id: 'marketmind', client_email: 'firebase-admin@example.iam.gserviceaccount.com', private_key: '-----BEGIN PRIVATE KEY-----\nabc\n-----END PRIVATE KEY-----\n' });
 const completeEnv = (): NodeJS.ProcessEnv => ({ NODE_ENV: 'production', APP_URL: 'https://marketmind.example',
   FIREBASE_PROJECT_ID: 'marketmind', FIREBASE_DATABASE_ID: '(default)', FIREBASE_SERVICE_ACCOUNT_KEY: validAccount,
+  SUPABASE_URL: 'https://marketmind.supabase.co', SUPABASE_SECRET_KEY: 'sb_secret_configured',
   GEMINI_API_KEY: 'configured', STRIPE_SECRET_KEY: 'sk_test_configured', STRIPE_WEBHOOK_SECRET: 'whsec_configured',
   STRIPE_PRICE_BASIC: 'price_basic_m', STRIPE_PRICE_PRO: 'price_pro_m', STRIPE_PRICE_PREMIUM: 'price_premium_m',
   STRIPE_PRICE_BASIC_ANNUAL: 'price_basic_y', STRIPE_PRICE_PRO_ANNUAL: 'price_pro_y', STRIPE_PRICE_PREMIUM_ANNUAL: 'price_premium_y',

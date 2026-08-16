@@ -16,6 +16,7 @@
   },
   "dependencies": {
     "@google/genai": "^2.4.0",
+    "@supabase/supabase-js": "^2.112.3",
     "@tailwindcss/vite": "^4.1.14",
     "@types/ws": "^8.18.1",
     "@vitejs/plugin-react": "^5.0.4",
@@ -33,13 +34,13 @@
     "ws": "^8.21.3"
   },
   "devDependencies": {
+    "@types/express": "^4.17.21",
     "@types/node": "^22.14.0",
     "autoprefixer": "^10.4.21",
     "esbuild": "^0.25.0",
     "tailwindcss": "^4.1.14",
     "tsx": "^4.21.0",
     "typescript": "~5.8.2",
-    "vite": "^6.2.3",
-    "@types/express": "^4.17.21"
+    "vite": "^6.2.3"
   }
 }

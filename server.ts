@@ -23,6 +23,7 @@ import { UniversalAssetClass } from './src/types/instrument';
 import { requireAuth, requireRole, requireAnyRole, requireEntitlement, AuthenticatedRequest } from './src/server/authMiddleware';
 import { StripeService } from './src/server/stripeService';
 import { assertProductionEnvironment } from './src/server/productionPreflight';
+import { AlpacaMarketDataService, AlpacaProviderError } from './src/server/alpacaMarketDataService';
 
 dotenv.config();
 
@@ -504,7 +505,27 @@ app.get('/api/market/candles/:ticker', async (req, res) => {
     }
   }
 
-  // 2. Fallback to Yahoo Finance live query
+  // 2. Alpaca IEX fallback. This is an exchange feed, not consolidated SIP data.
+  if (process.env.ALPACA_API_KEY && process.env.ALPACA_API_SECRET) {
+    try {
+      const alpacaTimeframes: Record<string, string> = { '1m': '1Min', '5m': '5Min', '15m': '15Min', '30m': '30Min', '1h': '1Hour', '1d': '1Day', '1w': '1Week' };
+      const bars = await new AlpacaMarketDataService().getBars(ticker, alpacaTimeframes[timeframe.toLowerCase()] || '5Min', 500);
+      if (bars.length) {
+        const last = bars[bars.length - 1];
+        const previous = bars.length > 1 ? bars[bars.length - 2].close : last.close;
+        return res.json({ source: 'Alpaca IEX Market Data', feed: 'iex', isConsolidated: false, status: 'SUCCESS', ticker, timeframe,
+          price: last.close, change: last.close - previous, changePercent: previous > 0 ? (last.close - previous) / previous * 100 : 0,
+          previousClose: previous, dayHigh: last.high, dayLow: last.low,
+          candles: bars.map((bar) => ({ time: Math.floor(bar.timestamp / 1000), open: bar.open, high: bar.high, low: bar.low,
+            close: bar.close, volume: bar.volume, vwap: bar.vwap, session: 'REGULAR' })), timestamp: Date.now() });
+      }
+    } catch (error) {
+      const code = error instanceof AlpacaProviderError ? error.code : 'UNAVAILABLE';
+      console.warn(`[AlpacaIEX] Candle provider ${code} for ${ticker}`);
+    }
+  }
+
+  // 3. Fallback to Yahoo Finance live query
   try {
     const yahooUrl = `https://query1.finance.yahoo.com/v8/finance/chart/${encodeURIComponent(
       ticker
@@ -931,7 +952,23 @@ app.get('/api/market/live/:ticker', async (req, res) => {
     }
   }
 
-  // 2. Fallback to Yahoo Finance / Real-Time Proxy
+  // 2. Alpaca IEX fallback. Do not label IEX as consolidated SIP data.
+  if (process.env.ALPACA_API_KEY && process.env.ALPACA_API_SECRET) {
+    try {
+      const quote = await new AlpacaMarketDataService().getSnapshot(ticker);
+      const change = quote.price - quote.previousClose;
+      return res.json({ source: 'Alpaca IEX Market Data', feed: 'iex', isConsolidated: false, status: 'SUCCESS', ticker,
+        name: `${ticker} Equity`, currency: 'USD', exchangeName: 'IEX', price: quote.price, bid: quote.bid, ask: quote.ask,
+        change, changePercent: quote.previousClose > 0 ? change / quote.previousClose * 100 : 0,
+        previousClose: quote.previousClose, openPrice: quote.open, dayHigh: quote.high, dayLow: quote.low,
+        volume: quote.volume, marketState: 'REGULAR', dataTimestamp: quote.timestamp, lastSyncTime: new Date().toISOString() });
+    } catch (error) {
+      const code = error instanceof AlpacaProviderError ? error.code : 'UNAVAILABLE';
+      console.warn(`[AlpacaIEX] Quote provider ${code} for ${ticker}`);
+    }
+  }
+
+  // 3. Fallback to Yahoo Finance / Real-Time Proxy
   try {
     const yahooUrl = `https://query1.finance.yahoo.com/v8/finance/chart/${encodeURIComponent(
       ticker

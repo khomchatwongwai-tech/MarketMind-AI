@@ -42,6 +42,10 @@ services:
         sync: false
       - key: MASSIVE_API_KEY
         sync: false
+      - key: ALPACA_API_KEY
+        sync: false
+      - key: ALPACA_API_SECRET
+        sync: false
       - key: ALLOW_SIMULATED_MARKET_DATA
         value: "false"
       - key: MARKET_DATA_MODE

@@ -40,6 +40,49 @@ export function isAllowedPriceId(priceId: string): boolean {
 // Idempotency tracking set for processed webhook event IDs
 const processedWebhookEvents = new Set<string>();
 
+export function verifyStripeWebhookEvent(rawBody: Buffer | string, signature: string, secret: string, stripe: Stripe): Stripe.Event {
+  return stripe.webhooks.constructEvent(rawBody, signature, secret);
+}
+
+export async function persistVerifiedStripeEvent(event: Stripe.Event, db: any): Promise<'processed' | 'duplicate'> {
+  const eventRef = db.collection('processed_webhooks').doc(event.id);
+  return db.runTransaction(async (transaction: any) => {
+    if ((await transaction.get(eventRef)).exists) return 'duplicate';
+    const now = new Date().toISOString();
+    let uid: string | undefined;
+    let updates: Record<string, unknown> | undefined;
+    if (event.type === 'checkout.session.completed') {
+      const session = event.data.object as Stripe.Checkout.Session;
+      uid = session.client_reference_id || session.metadata?.firebaseUid || undefined;
+      const plan = session.metadata?.planId as SubscriptionPlanId;
+      if (!uid || !['basic', 'pro', 'premium'].includes(plan)) throw new Error('Webhook subscription identity is invalid');
+      updates = { plan, planTier: plan.toUpperCase(), subscriptionStatus: 'active', paymentProvider: 'stripe',
+        paymentCustomerId: session.customer, paymentSubscriptionId: session.subscription, updatedAt: now };
+    } else if (['customer.subscription.created', 'customer.subscription.updated', 'customer.subscription.deleted'].includes(event.type)) {
+      const subscription = event.data.object as Stripe.Subscription;
+      uid = subscription.metadata?.firebaseUid;
+      if (!uid) throw new Error('Webhook subscription identity is invalid');
+      const deleted = event.type === 'customer.subscription.deleted';
+      updates = deleted
+        ? { plan: 'free', planTier: 'FREE', subscriptionStatus: 'canceled', cancelAtPeriodEnd: true, updatedAt: now }
+        : { paymentSubscriptionId: subscription.id, paymentCustomerId: subscription.customer, paymentProvider: 'stripe',
+            subscriptionStatus: subscription.status === 'active' ? 'active' : subscription.status === 'past_due' ? 'past_due' : subscription.status === 'trialing' ? 'trialing' : 'canceled',
+            cancelAtPeriodEnd: subscription.cancel_at_period_end, updatedAt: now };
+    } else if (['invoice.paid', 'invoice.payment_succeeded', 'invoice.payment_failed'].includes(event.type)) {
+      const invoice = event.data.object as any;
+      uid = invoice.metadata?.firebaseUid || invoice.parent?.subscription_details?.metadata?.firebaseUid;
+      if (uid) updates = { subscriptionStatus: event.type === 'invoice.payment_failed' ? 'past_due' : 'active', updatedAt: now };
+    }
+    if (uid && updates) {
+      const userRef = db.collection('users').doc(uid);
+      if (!(await transaction.get(userRef)).exists) throw new Error('Webhook user account was not found');
+      transaction.set(userRef, updates, { merge: true });
+    }
+    transaction.create(eventRef, { eventId: event.id, type: event.type, processedAt: now });
+    return 'processed';
+  });
+}
+
 export class StripeService {
   static isConfigured(): boolean {
     return !!process.env.STRIPE_SECRET_KEY;
@@ -154,7 +197,7 @@ export class StripeService {
 
     let event: Stripe.Event;
     try {
-      event = stripe.webhooks.constructEvent(rawBody, signature, webhookSecret);
+      event = verifyStripeWebhookEvent(rawBody, signature, webhookSecret, stripe);
     } catch (err: any) {
       console.error('[Stripe Webhook] Signature verification failed:', err?.message);
       return { error: 'Webhook signature verification failed.', received: false };
@@ -167,36 +210,7 @@ export class StripeService {
 
     try {
       const db = getFirebaseFirestore();
-      const eventRef = db.collection('processed_webhooks').doc(event.id);
-      const outcome = await db.runTransaction(async (transaction) => {
-        if ((await transaction.get(eventRef)).exists) return 'duplicate';
-        const now = new Date().toISOString();
-        let uid: string | undefined;
-        let updates: Record<string, unknown> | undefined;
-        if (event.type === 'checkout.session.completed') {
-          const session = event.data.object as Stripe.Checkout.Session;
-          uid = session.client_reference_id || session.metadata?.firebaseUid || undefined;
-          const plan = session.metadata?.planId as SubscriptionPlanId;
-          if (!uid || !['basic', 'pro', 'premium'].includes(plan)) throw new Error('Webhook subscription identity is invalid');
-          updates = { plan, planTier: plan.toUpperCase(), subscriptionStatus: 'active', paymentProvider: 'stripe',
-            paymentCustomerId: session.customer, paymentSubscriptionId: session.subscription, updatedAt: now };
-        } else if (event.type === 'customer.subscription.updated' || event.type === 'customer.subscription.deleted') {
-          const subscription = event.data.object as Stripe.Subscription;
-          uid = subscription.metadata?.firebaseUid;
-          if (!uid) throw new Error('Webhook subscription identity is invalid');
-          const deleted = event.type === 'customer.subscription.deleted';
-          updates = deleted
-            ? { plan: 'free', planTier: 'FREE', subscriptionStatus: 'canceled', cancelAtPeriodEnd: true, updatedAt: now }
-            : { subscriptionStatus: subscription.status === 'active' ? 'active' : subscription.status === 'past_due' ? 'past_due' : 'canceled', cancelAtPeriodEnd: subscription.cancel_at_period_end, updatedAt: now };
-        }
-        if (uid && updates) {
-          const userRef = db.collection('users').doc(uid);
-          if (!(await transaction.get(userRef)).exists) throw new Error('Webhook user account was not found');
-          transaction.set(userRef, updates, { merge: true });
-        }
-        transaction.create(eventRef, { eventId: event.id, type: event.type, processedAt: now });
-        return 'processed';
-      });
+      const outcome = await persistVerifiedStripeEvent(event, db);
       processedWebhookEvents.add(event.id);
       if (outcome === 'processed') console.log(`[Stripe Webhook] Processed verified ${event.type} event`);
       return { received: true, eventType: event.type };

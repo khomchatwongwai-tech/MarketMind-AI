@@ -7,6 +7,7 @@ import {
 import { MarketDataMetadata, MarketDataMode } from '../../types/market';
 import { InstrumentDirectoryService } from './InstrumentDirectoryService';
 import { InstrumentResolver } from './InstrumentResolver';
+import { AlpacaMarketDataService } from '../../server/alpacaMarketDataService';
 
 // ==========================================
 // MarketMind AI — Provider Architecture & Neutral Data Router
@@ -76,7 +77,7 @@ export class DataProviderRouter {
       'alpaca',
       {
         providerId: 'alpaca',
-        name: 'Alpaca Market Data v2',
+        name: 'Alpaca IEX Market Data',
         status: process.env.ALPACA_API_KEY ? 'ONLINE' : 'CONFIGURATION_REQUIRED',
         supportedAssetClasses: ['STOCK', 'ETF', 'CRYPTO', 'OPTION'],
         latencyMs: 38,
@@ -230,7 +231,9 @@ export class DataProviderRouter {
   public static routeProvider(instrument: NormalizedInstrument): ProviderCapability {
     const massive = this.providerCapabilities.get('massive');
     const finnhub = this.providerCapabilities.get('finnhub');
-    const alpaca = this.providerCapabilities.get('alpaca');
+    const configuredAlpaca = Boolean(process.env.ALPACA_API_KEY && process.env.ALPACA_API_SECRET);
+    const storedAlpaca = this.providerCapabilities.get('alpaca');
+    const alpaca = storedAlpaca ? { ...storedAlpaca, isConfigured: configuredAlpaca, name: 'Alpaca IEX Market Data' } : undefined;
     const yahoo = this.providerCapabilities.get('yahoo')!;
 
     if (instrument.assetClass === 'OPTION' || instrument.assetClass === 'INDEX_OPTION') {
@@ -367,12 +370,15 @@ export class DataProviderRouter {
       if (liveData) {
         const validation = this.validateQuoteValues(liveData);
         if (validation.isValid) {
+          const actualProvider = liveData.providerId
+            ? { ...provider, providerId: liveData.providerId as ProviderCapability['providerId'], name: liveData.providerName || provider.name }
+            : provider;
           const marketState = this.determineMarketState(instrument);
           const mode: MarketDataMode = instrument.realTimeStatus === 'REAL_TIME' ? 'REAL_TIME' : 'DELAYED';
 
           const metadata: MarketDataMetadata = {
-            provider: provider.name,
-            source: provider.providerId,
+            provider: actualProvider.name,
+            source: actualProvider.providerId,
             timestamp: liveData.timestamp || now,
             receivedAt: now,
             mode,
@@ -410,10 +416,10 @@ export class DataProviderRouter {
               vwap: liveData.vwap,
               marketState,
               timestamp: new Date(liveData.timestamp || now).toLocaleTimeString('en-US', { timeZone: instrument.marketTimezone }) + ' ' + (instrument.marketTimezone.includes('New_York') ? 'ET' : 'UTC'),
-              dataSource: `${provider.name} (${mode === 'REAL_TIME' ? 'Real-Time' : '15-min Delayed'})`,
+              dataSource: `${actualProvider.name} (${mode === 'REAL_TIME' ? 'Real-Time' : '15-min Delayed'})`,
               isRealTime: mode === 'REAL_TIME',
               feedDelayMinutes: instrument.feedDelayMinutes,
-              latencyMs: provider.averageLatencyMs,
+              latencyMs: actualProvider.averageLatencyMs,
               currency: instrument.currency,
               metadata,
             },
@@ -439,7 +445,7 @@ export class DataProviderRouter {
           });
 
           // Record Health Success
-          this.recordProviderSuccess(provider.providerId, provider.averageLatencyMs);
+          this.recordProviderSuccess(actualProvider.providerId, actualProvider.averageLatencyMs);
 
           return response;
         }
@@ -521,6 +527,8 @@ export class DataProviderRouter {
     ask?: number;
     spread?: number;
     timestamp?: number;
+    providerId?: string;
+    providerName?: string;
   } | null> {
     const symbol = instrument.symbol;
     const providerSymbol = instrument.providerSymbols?.[provider.providerId as keyof typeof instrument.providerSymbols] || symbol;
@@ -585,6 +593,35 @@ export class DataProviderRouter {
           }
         }
       }
+    }
+
+    // 3. Alpaca IEX. IEX is real-time but is not a consolidated SIP/full-market feed.
+    if (provider.providerId === 'alpaca') {
+      const snapshot = await new AlpacaMarketDataService().getSnapshot(providerSymbol);
+      const change = snapshot.price - snapshot.previousClose;
+      return {
+        price: snapshot.price,
+        change,
+        changePercent: snapshot.previousClose > 0 ? (change / snapshot.previousClose) * 100 : 0,
+        dayHigh: snapshot.high,
+        dayLow: snapshot.low,
+        openPrice: snapshot.open,
+        previousClose: snapshot.previousClose,
+        volume: snapshot.volume,
+        bid: snapshot.bid,
+        ask: snapshot.ask,
+        spread: snapshot.ask - snapshot.bid,
+        timestamp: snapshot.timestamp,
+      };
+    }
+
+    if (['STOCK', 'ETF'].includes(instrument.assetClass) && process.env.ALPACA_API_KEY && process.env.ALPACA_API_SECRET) {
+      const snapshot = await new AlpacaMarketDataService().getSnapshot(providerSymbol);
+      const change = snapshot.price - snapshot.previousClose;
+      return { price: snapshot.price, change, changePercent: snapshot.previousClose > 0 ? change / snapshot.previousClose * 100 : 0,
+        dayHigh: snapshot.high, dayLow: snapshot.low, openPrice: snapshot.open, previousClose: snapshot.previousClose,
+        volume: snapshot.volume, bid: snapshot.bid, ask: snapshot.ask, spread: snapshot.ask - snapshot.bid,
+        timestamp: snapshot.timestamp, providerId: 'alpaca', providerName: 'Alpaca IEX Market Data' };
     }
 
     return null;

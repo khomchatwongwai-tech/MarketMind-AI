@@ -218,8 +218,7 @@ export class MassiveWebSocketManager {
     this.state.isDelayed = isDelayedEndpoint;
 
     try {
-      const maskedKey = apiKey.length > 4 ? `****${apiKey.slice(-4)}` : '****';
-      console.log(`[MassiveWS] Connecting to Massive WebSocket at ${wsUrl} (Key: ${maskedKey})...`);
+      console.log(`[MassiveWS] Connecting to Massive WebSocket at ${wsUrl} with configured credentials...`);
       this.massiveWs = new WebSocket(wsUrl);
 
       this.massiveWs.on('open', () => {

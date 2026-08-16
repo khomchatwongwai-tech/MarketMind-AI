@@ -17,6 +17,12 @@ export interface AuthenticatedRequest extends Request {
   user?: AuthenticatedUser;
 }
 
+let authProvider: () => Pick<ReturnType<typeof getFirebaseAuth>, 'verifyIdToken'> = () => getFirebaseAuth();
+export function setAuthProviderForTests(provider: (() => any) | null): void {
+  if (process.env.NODE_ENV === 'production') throw new Error('Test authentication injection is disabled in production.');
+  authProvider = provider || (() => getFirebaseAuth());
+}
+
 /**
  * Verifies Firebase ID token from Authorization: Bearer <token> header.
  * Attaches verified UID and claims to req.user.
@@ -43,7 +49,7 @@ export async function requireAuth(
   }
 
   try {
-    const auth = getFirebaseAuth();
+    const auth = authProvider();
     let decodedToken: any;
 
     try {

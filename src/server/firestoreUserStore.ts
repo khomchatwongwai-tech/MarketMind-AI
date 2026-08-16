@@ -5,14 +5,23 @@ import { SUBSCRIPTION_PLANS } from '../config/plans';
 import { UserProfile, UserRole } from '../types/user';
 
 export class FirestoreUserStore {
+  private static databaseProvider: () => any = () => getFirebaseFirestore();
+
+  static setDatabaseProviderForTests(provider: (() => any) | null): void {
+    if (process.env.NODE_ENV === 'production') throw new Error('Test database injection is disabled in production.');
+    this.databaseProvider = provider || (() => getFirebaseFirestore());
+  }
+
+  private static db(): any { return this.databaseProvider(); }
+
   static async findById(uid: string): Promise<StoredUserAccount | null> {
     if (!uid) return null;
-    const snapshot = await getFirebaseFirestore().collection('users').doc(uid).get();
+    const snapshot = await this.db().collection('users').doc(uid).get();
     return snapshot.exists ? snapshot.data() as StoredUserAccount : null;
   }
 
   static async getOrCreateUser(input: { uid: string; email: string; name?: string; firstName?: string; lastName?: string; role?: UserRole }): Promise<StoredUserAccount> {
-    const db = getFirebaseFirestore();
+    const db = this.db();
     const ref = db.collection('users').doc(input.uid);
     return db.runTransaction(async (transaction) => {
       const snapshot = await transaction.get(ref);
@@ -47,7 +56,7 @@ export class FirestoreUserStore {
   }
 
   static async updateAccount(uid: string, updates: Partial<StoredUserAccount>): Promise<StoredUserAccount> {
-    const db = getFirebaseFirestore();
+    const db = this.db();
     const ref = db.collection('users').doc(uid);
     return db.runTransaction(async (transaction) => {
       const snapshot = await transaction.get(ref);
@@ -59,12 +68,12 @@ export class FirestoreUserStore {
   }
 
   static async getInvoicesForUser(uid: string): Promise<BillingInvoice[]> {
-    const snapshot = await getFirebaseFirestore().collection('users').doc(uid).collection('invoices').orderBy('createdAt', 'desc').limit(100).get();
+    const snapshot = await this.db().collection('users').doc(uid).collection('invoices').orderBy('createdAt', 'desc').limit(100).get();
     return snapshot.docs.map((doc) => doc.data() as BillingInvoice);
   }
 
   static async getAdminMetrics(): Promise<AdminSubscriptionMetrics> {
-    const snapshot = await getFirebaseFirestore().collection('users').get();
+    const snapshot = await this.db().collection('users').get();
     const accounts = snapshot.docs.map((doc) => doc.data() as StoredUserAccount);
     const counts = { free: 0, trial: 0, basic: 0, pro: 0, premium: 0, active: 0, canceled: 0 };
     let mrr = 0;

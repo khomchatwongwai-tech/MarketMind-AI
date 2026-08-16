@@ -63,19 +63,9 @@ describe('Production Blocker & Zero Fabricated Data Tests', () => {
     assert.strictEqual(notifs.length, 0);
   });
 
-  it('InstitutionalMarketDataProvider options generator is deterministic and free of NaN', async () => {
+  it('InstitutionalMarketDataProvider never fabricates an options chain', async () => {
     const provider = new InstitutionalMarketDataProvider();
-    const chain = await provider.getOptionsChain('SPY');
-    assert.ok(chain.calls.length > 0);
-    assert.ok(chain.puts.length > 0);
-    for (const call of chain.calls) {
-      assert.strictEqual(typeof call.volume, 'number');
-      assert.strictEqual(typeof call.openInterest, 'number');
-      assert.ok(!isNaN(call.volume));
-      assert.ok(!isNaN(call.openInterest));
-      assert.ok(call.volume >= 0);
-      assert.ok(call.openInterest >= 0);
-    }
+    await assert.rejects(() => provider.getOptionsChain('SPY'), /Verified options-chain data/);
   });
 
   it('AppConfig.allowSimulatedMarketData is disabled by default in production', () => {

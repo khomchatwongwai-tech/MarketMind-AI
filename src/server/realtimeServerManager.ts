@@ -19,6 +19,7 @@ export class RealtimeServerManager {
 
   private massiveWs: WebSocket | null = null;
   private finnhubWs: WebSocket | null = null;
+  private alpacaWs: WebSocket | null = null;
   private cryptoWs: WebSocket | null = null;
 
   private activeSymbols = new Set<string>(['SPY', 'QQQ', 'NVDA', 'AAPL', 'BTC-USD', 'ETH-USD']);
@@ -43,6 +44,12 @@ export class RealtimeServerManager {
       isConfigured: Boolean(process.env.FINNHUB_API_KEY),
       wsStatus: 'DISCONNECTED',
       tickCount: 0,
+    });
+
+    this.upstreamStatuses.set('alpaca_iex', {
+      id: 'alpaca_iex', name: 'Alpaca IEX Market Data',
+      isConfigured: Boolean(process.env.ALPACA_API_KEY && process.env.ALPACA_API_SECRET),
+      wsStatus: 'DISCONNECTED', tickCount: 0,
     });
 
     this.upstreamStatuses.set('crypto_247', {
@@ -107,6 +114,7 @@ export class RealtimeServerManager {
       massiveStatus.lastError = 'Massive equities are served by the canonical /ws/massive server gateway.';
     }
     this.initFinnhubStream();
+    this.initAlpacaStream();
     this.startVerifiedPolling();
   }
 
@@ -444,6 +452,54 @@ export class RealtimeServerManager {
   private resubscribeUpstreams() {
     this.resubscribePolygon();
     this.resubscribeFinnhub();
+    this.resubscribeAlpaca();
+  }
+
+  // --- Upstream 4: Alpaca IEX equities stream (not consolidated SIP) ---
+  private initAlpacaStream() {
+    const key = process.env.ALPACA_API_KEY;
+    const secret = process.env.ALPACA_API_SECRET;
+    const status = this.upstreamStatuses.get('alpaca_iex')!;
+    if (this.isPlaceholderKey(key) || this.isPlaceholderKey(secret)) {
+      status.isConfigured = false; status.wsStatus = 'DISCONNECTED'; return;
+    }
+    status.isConfigured = true;
+    try {
+      status.wsStatus = 'CONNECTING';
+      this.alpacaWs = new WebSocket('wss://stream.data.alpaca.markets/v2/iex');
+      this.alpacaWs.on('open', () => this.alpacaWs?.send(JSON.stringify({ action: 'auth', key, secret })));
+      this.alpacaWs.on('message', (raw: any) => {
+        try {
+          const events = JSON.parse(raw.toString());
+          for (const event of Array.isArray(events) ? events : [events]) {
+            if (event.T === 'success' && event.msg === 'authenticated') { status.wsStatus = 'CONNECTED'; this.resubscribeAlpaca(); continue; }
+            if (event.T === 'error') {
+              status.wsStatus = event.code === 402 || event.code === 404 ? 'AUTH_ERROR' : 'FAILED';
+              status.lastError = `Alpaca stream error ${event.code || 'unknown'}`;
+              if (status.wsStatus === 'AUTH_ERROR') this.alpacaWs?.close();
+              continue;
+            }
+            if (!['t', 'q', 'b'].includes(event.T)) continue;
+            status.tickCount++; status.lastTickTimestamp = Date.now();
+            const timestamp = Date.parse(event.t) || Date.now();
+            if (event.T === 't' && Number(event.p) > 0) this.broadcast({ type: 'TRADE', symbol: event.S, price: Number(event.p), size: Number(event.s || 0), timestamp, provider: 'Alpaca IEX', feed: 'iex', isConsolidated: false, mode: 'REAL_TIME' });
+            if (event.T === 'q' && Number(event.bp) > 0 && Number(event.ap) > 0) {
+              const quote = { type: 'QUOTE', symbol: event.S, price: (Number(event.bp) + Number(event.ap)) / 2, bid: Number(event.bp), ask: Number(event.ap), bidSize: Number(event.bs || 0), askSize: Number(event.as || 0), timestamp, provider: 'Alpaca IEX', feed: 'iex', isConsolidated: false, mode: 'REAL_TIME' };
+              this.latestQuotes.set(event.S, quote); this.broadcast(quote);
+            }
+            if (event.T === 'b') this.broadcast({ type: 'BAR', symbol: event.S, open: Number(event.o), high: Number(event.h), low: Number(event.l), close: Number(event.c), volume: Number(event.v || 0), timestamp, provider: 'Alpaca IEX', feed: 'iex', isConsolidated: false, mode: 'REAL_TIME' });
+          }
+        } catch { status.lastError = 'Alpaca stream returned malformed data'; }
+      });
+      this.alpacaWs.on('error', () => { status.wsStatus = 'FAILED'; status.lastError = 'Alpaca stream connection failed'; });
+      this.alpacaWs.on('close', () => { if (status.wsStatus === 'AUTH_ERROR') return; status.wsStatus = 'DISCONNECTED'; setTimeout(() => this.initAlpacaStream(), 10000); });
+    } catch { status.wsStatus = 'FAILED'; status.lastError = 'Alpaca stream initialization failed'; }
+  }
+
+  private resubscribeAlpaca() {
+    if (this.alpacaWs?.readyState !== WebSocket.OPEN) return;
+    const symbols = Array.from(this.activeSymbols).filter((symbol) => !symbol.includes('-USD'));
+    if (symbols.length) this.alpacaWs.send(JSON.stringify({ action: 'subscribe', trades: symbols, quotes: symbols, bars: symbols }));
   }
 
   private resubscribePolygon() {

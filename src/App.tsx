@@ -509,7 +509,8 @@ export default function App() {
       <AuthModal
         isOpen={isAuthModalOpen}
         onClose={() => setIsAuthModalOpen(false)}
-        onUserLoggedIn={handleUserChange}
+        currentUser={currentUser}
+        onUserChange={handleUserChange}
       />
 
       {/* Subscription Pricing Modal */}

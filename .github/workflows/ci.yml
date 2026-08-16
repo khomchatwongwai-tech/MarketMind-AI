@@ -7,6 +7,7 @@ on:
     branches:
       - main
       - agent/real-market-data-hardening
+      - agent/final-production-hardening
 
 permissions:
   contents: read
@@ -29,14 +30,17 @@ jobs:
         with:
           node-version: 22
 
+      - name: Enable pnpm
+        run: corepack enable
+
       - name: Install dependencies
-        run: npm install --no-audit --no-fund
+        run: pnpm install --frozen-lockfile
 
       - name: Type-check
-        run: npm run lint
+        run: pnpm run typecheck
 
       - name: Test
-        run: npm test
+        run: pnpm run test
 
       - name: Production build
-        run: npm run build
+        run: pnpm run build

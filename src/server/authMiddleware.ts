@@ -1,7 +1,8 @@
 import { Request, Response, NextFunction } from 'express';
 import { getFirebaseAuth } from './firebaseAdmin';
 import { UserRole, SubscriptionPlanTier } from '../types/user';
-import { ServerUserStore } from '../services/serverUserStore';
+import { FirestoreUserStore } from './firestoreUserStore';
+import { StoredUserAccount } from '../services/serverUserStore';
 import { EntitlementService } from '../services/entitlementService';
 
 export interface AuthenticatedUser {
@@ -9,6 +10,7 @@ export interface AuthenticatedUser {
   email?: string;
   role: UserRole;
   emailVerified?: boolean;
+  account: StoredUserAccount;
 }
 
 export interface AuthenticatedRequest extends Request {
@@ -54,12 +56,17 @@ export async function requireAuth(
       });
     }
 
-    const role: UserRole = (decodedToken.role as UserRole) || 'user';
+    const account = await FirestoreUserStore.getOrCreateUser({
+      uid: decodedToken.uid,
+      email: decodedToken.email || '',
+      name: decodedToken.name,
+    });
     req.user = {
       uid: decodedToken.uid,
       email: decodedToken.email,
-      role,
+      role: account.role,
       emailVerified: decodedToken.email_verified || false,
+      account,
     };
 
     next();
@@ -73,7 +80,7 @@ export async function requireAuth(
  * Middleware ensuring the authenticated user has a specific privileged role.
  */
 export function requireRole(allowedRole: UserRole) {
-  return (req: AuthenticatedRequest, res: Response, next: NextFunction) => {
+  return async (req: AuthenticatedRequest, res: Response, next: NextFunction) => {
     if (!req.user) {
       return res.status(401).json({ error: 'Unauthorized: Authentication required.', code: 'AUTH_REQUIRED' });
     }
@@ -121,13 +128,12 @@ export function requireAnyRole(allowedRoles: UserRole[]) {
  * Middleware ensuring the authenticated user has the required subscription plan tier or entitlement.
  */
 export function requireEntitlement(minPlanTier: SubscriptionPlanTier | ((user: AuthenticatedUser, account?: any) => boolean)) {
-  return (req: AuthenticatedRequest, res: Response, next: NextFunction) => {
+  return async (req: AuthenticatedRequest, res: Response, next: NextFunction) => {
     if (!req.user) {
       return res.status(401).json({ error: 'Unauthorized: Authentication required.', code: 'AUTH_REQUIRED' });
     }
 
-    const account = ServerUserStore.findById(req.user.uid);
-    const userProfile = account ? ServerUserStore.convertToUserProfile(account) : null;
+    const account = await FirestoreUserStore.findById(req.user.uid);
     const plan = (account?.plan as SubscriptionPlanTier) || 'free';
 
     if (typeof minPlanTier === 'function') {

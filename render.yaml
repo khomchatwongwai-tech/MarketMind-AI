@@ -3,13 +3,15 @@ services:
     name: marketmind-ai
     runtime: node
     plan: starter
-    buildCommand: npm install && npm run build
-    startCommand: npm start
+    buildCommand: corepack enable && pnpm install --frozen-lockfile && pnpm run build
+    startCommand: pnpm start
     healthCheckPath: /api/health
     autoDeployTrigger: checksPass
     envVars:
       - key: NODE_ENV
         value: production
+      - key: NODE_VERSION
+        value: "22"
       - key: APP_URL
         sync: false
       - key: FIREBASE_PROJECT_ID
@@ -20,6 +22,8 @@ services:
         sync: false
       - key: GEMINI_API_KEY
         sync: false
+      - key: GEMINI_MODEL
+        value: gemini-2.5-flash
       - key: STRIPE_SECRET_KEY
         sync: false
       - key: STRIPE_WEBHOOK_SECRET
@@ -29,6 +33,12 @@ services:
       - key: STRIPE_PRICE_PRO
         sync: false
       - key: STRIPE_PRICE_PREMIUM
+        sync: false
+      - key: STRIPE_PRICE_BASIC_ANNUAL
+        sync: false
+      - key: STRIPE_PRICE_PRO_ANNUAL
+        sync: false
+      - key: STRIPE_PRICE_PREMIUM_ANNUAL
         sync: false
       - key: MASSIVE_API_KEY
         sync: false

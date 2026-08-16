@@ -26,7 +26,7 @@ describe('Phase 4.5 Production Security & Entitlements Suite', () => {
   });
 
   it('Authentication & Role Protection: Default created users are unprivileged with free plan', async () => {
-    const newUser = ServerUserStore.getOrCreateUser({
+    const newUser = await ServerUserStore.getOrCreateUser({
       uid: 'sec_test_user_001',
       email: 'sec_test_user_001@example.com',
       name: 'Security Tester',
@@ -74,7 +74,7 @@ describe('Phase 4.5 Production Security & Entitlements Suite', () => {
 
   it('Stripe Plan Transition: Plan updates persist in ServerUserStore only upon verified request', async () => {
     const testEmail = `stripe_test_${Date.now()}@example.com`;
-    const user = ServerUserStore.getOrCreateUser({
+    const user = await ServerUserStore.getOrCreateUser({
       uid: `uid_stripe_${Date.now()}`,
       email: testEmail,
       name: 'Stripe Tester',
@@ -82,7 +82,7 @@ describe('Phase 4.5 Production Security & Entitlements Suite', () => {
     assert.equal(user.plan, 'free');
 
     // Simulate verified Stripe subscription update
-    const updated = ServerUserStore.updateAccount(user.id, {
+    const updated = await ServerUserStore.updateAccount(user.id, {
       plan: 'pro',
       subscriptionStatus: 'active',
       paymentCustomerId: 'cus_test_12345',
@@ -100,4 +100,3 @@ describe('Phase 4.5 Production Security & Entitlements Suite', () => {
     assert.equal(currentUser.role, 'user', 'Client state cannot self-elevate');
   });
 });
-

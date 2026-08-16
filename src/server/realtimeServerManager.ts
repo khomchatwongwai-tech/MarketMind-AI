@@ -251,6 +251,12 @@ export class RealtimeServerManager {
   private initMassiveStream() {
     const rawApiKey = process.env.MASSIVE_API_KEY || process.env.POLYGON_API_KEY;
     const status = this.upstreamStatuses.get('massive')!;
+    if ((process.env.MARKET_DATA_MODE || 'end_of_day') === 'end_of_day') {
+      status.wsStatus = 'DISCONNECTED';
+      status.isConfigured = Boolean(rawApiKey && !this.isPlaceholderKey(rawApiKey));
+      status.lastError = 'End-of-day mode enabled; real-time WebSocket is intentionally disabled.';
+      return;
+    }
     if (!rawApiKey || this.isPlaceholderKey(rawApiKey)) {
       status.wsStatus = 'DISCONNECTED';
       status.isConfigured = false;

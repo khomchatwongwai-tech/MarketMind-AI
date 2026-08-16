@@ -34,3 +34,7 @@ services:
         sync: false
       - key: ALLOW_SIMULATED_MARKET_DATA
         value: "false"
+      - key: MARKET_DATA_MODE
+        value: end_of_day
+      - key: VITE_MARKET_DATA_MODE
+        value: end_of_day

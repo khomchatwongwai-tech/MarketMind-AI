@@ -11,6 +11,7 @@ export interface EnvironmentConfig {
   isProduction: boolean;
   apiBaseUrl: string;
   defaultTimezone: string;
+  marketDataMode: 'end_of_day' | 'delayed' | 'real_time';
 }
 
 const isNode = typeof process !== 'undefined' && Boolean(process.versions?.node);
@@ -44,6 +45,16 @@ const envAllowSim = isNode
   ? nodeEnv.ALLOW_SIMULATED_MARKET_DATA === 'true'
   : clientEnv.VITE_ALLOW_SIMULATED_MARKET_DATA === 'true';
 
+const configuredMarketDataMode = String(
+  isNode ? nodeEnv.MARKET_DATA_MODE : clientEnv.VITE_MARKET_DATA_MODE
+).toLowerCase();
+const marketDataMode: EnvironmentConfig['marketDataMode'] =
+  configuredMarketDataMode === 'real_time'
+    ? 'real_time'
+    : configuredMarketDataMode === 'delayed'
+    ? 'delayed'
+    : 'end_of_day';
+
 // Client-side demo mode state with local override support for testing
 let clientDemoOverride: boolean | null = null;
 
@@ -65,6 +76,7 @@ export const AppConfig: EnvironmentConfig = {
   isProduction: !isDev,
   apiBaseUrl: '/api',
   defaultTimezone: 'America/New_York',
+  marketDataMode,
 };
 
 export function setClientDemoMode(enabled: boolean) {

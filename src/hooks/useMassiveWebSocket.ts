@@ -5,6 +5,7 @@ import {
   CalculatedMarketSignals,
   MassiveAiInsight,
 } from '../types/massiveWs';
+import { AppConfig } from '../config/environment';
 
 export interface UseMassiveWebSocketReturn {
   status: MassiveWsStatus;
@@ -35,8 +36,9 @@ export interface UseMassiveWebSocketReturn {
 }
 
 export function useMassiveWebSocket(initialTicker: string = 'SPY'): UseMassiveWebSocketReturn {
-  const [status, setStatus] = useState<MassiveWsStatus>('CONNECTING');
-  const [isDelayed, setIsDelayed] = useState<boolean>(false);
+  const endOfDayMode = AppConfig.marketDataMode === 'end_of_day';
+  const [status, setStatus] = useState<MassiveWsStatus>(endOfDayMode ? 'DELAYED DATA' : 'CONNECTING');
+  const [isDelayed, setIsDelayed] = useState<boolean>(endOfDayMode);
   const [ticker, setTicker] = useState<string>(initialTicker);
   const [livePrice, setLivePrice] = useState<number>(0);
   const [liveTrade, setLiveTrade] = useState<UseMassiveWebSocketReturn['liveTrade']>(null);
@@ -49,6 +51,12 @@ export function useMassiveWebSocket(initialTicker: string = 'SPY'): UseMassiveWe
   const reconnectTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
   const connect = useCallback(() => {
+    if (endOfDayMode) {
+      setStatus('DELAYED DATA');
+      setIsDelayed(true);
+      setIsConnected(false);
+      return;
+    }
     try {
       if (wsRef.current && (wsRef.current.readyState === WebSocket.OPEN || wsRef.current.readyState === WebSocket.CONNECTING)) {
         return;
@@ -126,7 +134,7 @@ export function useMassiveWebSocket(initialTicker: string = 'SPY'): UseMassiveWe
     } catch (err) {
       console.error('[useMassiveWebSocket] Connection exception:', err);
     }
-  }, [ticker]);
+  }, [ticker, endOfDayMode]);
 
   useEffect(() => {
     connect();
@@ -174,4 +182,3 @@ export function useMassiveWebSocket(initialTicker: string = 'SPY'): UseMassiveWe
     reconnect,
   };
 }
-

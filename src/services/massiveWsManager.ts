@@ -231,6 +231,13 @@ export class MassiveWebSocketManager {
   private connectMassive() {
     const rawApiKey = process.env.MASSIVE_API_KEY || process.env.POLYGON_API_KEY;
 
+    if ((process.env.MARKET_DATA_MODE || 'end_of_day') === 'end_of_day') {
+      this.state.isDelayed = true;
+      this.updateStatus('DELAYED DATA');
+      console.log('[MassiveWS] End-of-day mode enabled; real-time WebSocket connection is disabled.');
+      return;
+    }
+
     if (!rawApiKey || this.isPlaceholderKey(rawApiKey)) {
       console.log('[MassiveWS] Provider credentials pending configuration. Operating in baseline quantitative intelligence mode.');
       this.updateStatus('DISCONNECTED');
@@ -777,4 +784,3 @@ Return a strictly valid JSON object matching this schema:
     }
   }
 }
-

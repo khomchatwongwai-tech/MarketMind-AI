@@ -815,8 +815,56 @@ app.get('/api/market/live/:ticker', async (req, res) => {
   const ticker = (req.params.ticker || 'SPY').toUpperCase().trim();
   const massiveKey = getMassiveApiKey();
 
+  // Massive Stocks Basic is an end-of-day product. Use its supported previous
+  // close aggregate instead of making unsupported snapshot/WebSocket claims.
+  if (massiveKey && (process.env.MARKET_DATA_MODE || 'end_of_day') === 'end_of_day') {
+    try {
+      const previousCloseUrl = `https://api.massive.com/v2/aggs/ticker/${encodeURIComponent(
+        ticker
+      )}/prev?adjusted=true&apiKey=${encodeURIComponent(massiveKey)}`;
+      const previousCloseResponse = await fetch(previousCloseUrl);
+      if (previousCloseResponse.ok) {
+        const previousCloseData = await previousCloseResponse.json();
+        const bar = previousCloseData?.results?.[0];
+        if (bar && Number(bar.c) > 0) {
+          const open = Number(bar.o ?? bar.c);
+          const close = Number(bar.c);
+          const change = Number((close - open).toFixed(2));
+          const changePercent = open > 0 ? Number(((change / open) * 100).toFixed(2)) : 0;
+          return res.json({
+            source: 'Massive Stocks Basic End-of-Day Aggregate',
+            status: 'END_OF_DAY',
+            isDelayed: true,
+            ticker,
+            name: `${ticker} Equity`,
+            currency: 'USD',
+            exchangeName: 'US Equities',
+            price: Number(close.toFixed(2)),
+            change,
+            changePercent,
+            previousClose: Number(open.toFixed(2)),
+            dayHigh: Number(Number(bar.h ?? close).toFixed(2)),
+            dayLow: Number(Number(bar.l ?? close).toFixed(2)),
+            volume: Number(bar.v ?? 0),
+            marketState: 'CLOSED',
+            dataTimestamp: bar.t ?? null,
+            lastSyncTime: new Date().toLocaleTimeString('en-US', {
+              hour: '2-digit',
+              minute: '2-digit',
+              second: '2-digit',
+              timeZone: 'America/New_York',
+            }) + ' ET',
+          });
+        }
+      }
+      console.warn(`[MassiveEOD] Previous-close data unavailable for ${ticker}: ${previousCloseResponse.status}`);
+    } catch (err: any) {
+      console.warn(`[MassiveEOD] Failed for ${ticker}:`, err.message);
+    }
+  }
+
   // 1. Try Massive Snapshot if API key is provided
-  if (massiveKey) {
+  if (massiveKey && (process.env.MARKET_DATA_MODE || 'end_of_day') !== 'end_of_day') {
     try {
       const snapUrl = `https://api.polygon.io/v2/snapshot/locale/us/markets/stocks/tickers/${encodeURIComponent(
         ticker

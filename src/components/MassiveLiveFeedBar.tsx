@@ -16,6 +16,7 @@ import {
   Lock,
 } from 'lucide-react';
 import { CalculatedMarketSignals, MassiveWsStatus, MassiveAiInsight } from '../types/massiveWs';
+import { AppConfig } from '../config/environment';
 
 interface MassiveLiveFeedBarProps {
   status: MassiveWsStatus;
@@ -43,6 +44,7 @@ export const MassiveLiveFeedBar: React.FC<MassiveLiveFeedBarProps> = ({
 }) => {
   const isAboveVwap = signals?.priceVsVwap === 'ABOVE_VWAP';
   const isEmaBull = signals?.emaStack === 'BULLISH_STACK';
+  const endOfDayMode = AppConfig.marketDataMode === 'end_of_day';
 
   // Determine user status label based on connection
   const displayStatus: 'LIVE' | 'RECONNECTING' | 'DISCONNECTED' | 'DELAYED DATA' =
@@ -65,14 +67,16 @@ export const MassiveLiveFeedBar: React.FC<MassiveLiveFeedBarProps> = ({
           <div>
             <div className="flex items-center gap-2">
               <span className="text-sm font-black text-white font-mono tracking-tight">
-                MASSIVE REAL-TIME FEED & QUANT SIGNALS
+                {endOfDayMode ? 'MASSIVE END-OF-DAY DATA & QUANT SIGNALS' : 'MASSIVE REAL-TIME FEED & QUANT SIGNALS'}
               </span>
               <span className="px-2 py-0.5 bg-[#151515] text-[#F2D675] border border-[#D4AF37]/40 text-[10px] font-bold rounded-md font-mono">
-                {ticker} ACTIVE STREAM
+                {ticker} {endOfDayMode ? 'FREE PLAN' : 'ACTIVE STREAM'}
               </span>
             </div>
             <p className="text-[11px] text-[#9CA3AF] font-mono">
-              Direct WebSocket &bull; Real-Time Indicators &bull; MarketMind Quantitative Engine
+              {endOfDayMode
+                ? 'Historical / End-of-Day Data • No Real-Time Claims • MarketMind Quantitative Engine'
+                : 'Direct WebSocket • Real-Time Indicators • MarketMind Quantitative Engine'}
             </p>
           </div>
         </div>
@@ -101,7 +105,7 @@ export const MassiveLiveFeedBar: React.FC<MassiveLiveFeedBarProps> = ({
                   : 'bg-[#EF4444]'
               }`}
             />
-            {displayStatus}
+            {endOfDayMode ? 'END-OF-DAY' : displayStatus}
           </div>
 
           <button
@@ -119,14 +123,14 @@ export const MassiveLiveFeedBar: React.FC<MassiveLiveFeedBarProps> = ({
       <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-2.5 mt-3">
         {/* Live Ticker & Price */}
         <div className="bg-[#101010] border border-[#242424] hover:border-[rgba(212,175,55,0.4)] rounded-lg p-2.5 flex flex-col justify-between transition">
-          <span className="text-[10px] text-[#9CA3AF] font-mono uppercase">Live Trade ({ticker})</span>
+          <span className="text-[10px] text-[#9CA3AF] font-mono uppercase">{endOfDayMode ? 'Latest Close' : 'Live Trade'} ({ticker})</span>
           <div className="flex items-baseline gap-1 mt-1">
             <span className="text-lg font-black font-mono text-white">
               {signals ? `$${signals.price.toFixed(2)}` : '--'}
             </span>
           </div>
           <span className="text-[10px] text-[#9CA3AF] font-mono">
-            {liveTrade?.size ? `Size: ${liveTrade.size} shares` : 'Awaiting ticks'}
+            {endOfDayMode ? 'Free plan • End-of-day' : liveTrade?.size ? `Size: ${liveTrade.size} shares` : 'Awaiting ticks'}
           </span>
         </div>
 

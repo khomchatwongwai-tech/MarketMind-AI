@@ -732,7 +732,9 @@ export const RealTimeStockChart: React.FC<RealTimeStockChartProps> = ({
 
   // Derive explicit display status from authoritative RealTimeMarketManager stream
   const currentStreamStatus: 'LIVE' | 'DELAYED DATA' | 'RECONNECTING' | 'DISCONNECTED' | 'LIVE DATA UNAVAILABLE' =
-    rtMode === 'REAL_TIME'
+    AppConfig.marketDataMode === 'end_of_day'
+      ? 'DELAYED DATA'
+      : rtMode === 'REAL_TIME'
       ? 'LIVE'
       : rtMode === 'DELAYED'
       ? 'DELAYED DATA'
@@ -971,7 +973,7 @@ export const RealTimeStockChart: React.FC<RealTimeStockChartProps> = ({
                 </span>
               ) : currentStreamStatus === 'DELAYED DATA' ? (
                 <span className="flex items-center gap-1.5 px-2 py-0.5 bg-purple-500/10 border border-purple-500/30 text-purple-300 text-[10px] font-bold font-mono rounded cursor-pointer" title="Delayed data feed">
-                  🟣 DELAYED DATA
+                  {AppConfig.marketDataMode === 'end_of_day' ? '🟣 END-OF-DAY DATA' : '🟣 DELAYED DATA'}
                 </span>
               ) : currentStreamStatus === 'DISCONNECTED' ? (
                 <span className="flex items-center gap-1.5 px-2 py-0.5 bg-rose-500/10 border border-rose-500/30 text-rose-400 text-[10px] font-bold font-mono rounded cursor-pointer">

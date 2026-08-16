@@ -14,7 +14,7 @@ export function getFirebaseApp(): App {
 
     const projectId =
       process.env.FIREBASE_PROJECT_ID ||
-      'ai-studio-marketmindai-52b43fbe-5366-4a57-8a3b-5ac098b91d46';
+      'gen-lang-client-0282286222';
     const serviceAccountKey = process.env.FIREBASE_SERVICE_ACCOUNT_KEY;
 
     if (serviceAccountKey) {
@@ -46,5 +46,8 @@ export function getFirebaseAuth(): Auth {
 
 export function getFirebaseFirestore(): Firestore {
   const app = getFirebaseApp();
-  return getFirestore(app);
+  const databaseId =
+    process.env.FIREBASE_DATABASE_ID ||
+    'ai-studio-marketmindai-52b43fbe-5366-4a57-8a3b-5ac098b91d46';
+  return getFirestore(app, databaseId);
 }

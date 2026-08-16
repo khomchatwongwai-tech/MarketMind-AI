@@ -28,6 +28,7 @@ import { RealTimeStockChart } from './RealTimeStockChart';
 import { MassiveLiveFeedBar } from './MassiveLiveFeedBar';
 import { MarketMindSummaryCard } from './MarketMindSummaryCard';
 import { useMassiveWebSocket } from '../hooks/useMassiveWebSocket';
+import { AppConfig } from '../config/environment';
 import { WhatChangedRetentionCard } from './WhatChangedRetentionCard';
 import { ExplainSimplyModal } from './ExplainSimplyModal';
 import { MASTER_INSTRUMENTS } from '../services/marketProviders/InstrumentDirectoryService';
@@ -165,14 +166,18 @@ export const DashboardOverview: React.FC<DashboardOverviewProps> = ({
                 </span>
               </div>
               <p className="text-[11px] text-[#9CA3AF] font-mono">
-                Institutional Overview &bull; Cross-Asset Flows &bull; Real-Time Correlation Matrix
+                Institutional Overview &bull; Cross-Asset Flows &bull; {AppConfig.marketDataMode === 'end_of_day' ? 'End-of-Day Correlation Matrix' : 'Real-Time Correlation Matrix'}
               </p>
             </div>
           </div>
 
           <div className="flex items-center gap-2">
             <div className="text-[10px] text-[#9CA3AF] font-mono hidden sm:block">
-              Market Status: <span className="text-[#22C55E] font-bold">REGULAR LIVE</span> &bull; Session ET
+              Data Status:{' '}
+              <span className={AppConfig.marketDataMode === 'end_of_day' ? 'text-purple-300 font-bold' : 'text-[#22C55E] font-bold'}>
+                {AppConfig.marketDataMode === 'end_of_day' ? 'END-OF-DAY' : 'REGULAR LIVE'}
+              </span>{' '}
+              &bull; Session ET
             </div>
           </div>
         </div>

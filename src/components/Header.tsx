@@ -187,25 +187,31 @@ export const Header: React.FC<HeaderProps> = ({
 
           {/* Real-time Data Source Selector */}
           <div className="flex items-center bg-[#101010] border border-[#242424] hover:border-[rgba(212,175,55,0.4)] rounded-lg px-2.5 py-1 text-xs transition">
-            <Radio className="w-3 h-3 text-[#22C55E] mr-1.5 animate-pulse" />
-            <select
-              value={dataSource}
-              onChange={(e) => onChangeDataSource(e.target.value as LiveMarketDataSource)}
-              className="bg-transparent text-[#E5E5E5] font-mono text-[11px] font-semibold focus:outline-none cursor-pointer"
-            >
-              <option value="Massive WebSocket (Real-Time Live Feed)" className="bg-[#101010] text-[#E5E5E5]">
-                ⚡ Massive WebSocket (Live Stream)
-              </option>
-              <option value="Yahoo Finance (Real-Time)" className="bg-[#101010] text-[#E5E5E5]">
-                📈 Yahoo Finance (Real-Time)
-              </option>
-              <option value="Google Finance Feed" className="bg-[#101010] text-[#E5E5E5]">
-                🌐 Google Finance Gateway
-              </option>
-              <option value="Robinhood Multi-Feed" className="bg-[#101010] text-[#E5E5E5]">
-                📱 Multi-Exchange Stream
-              </option>
-            </select>
+            <Radio className={`w-3 h-3 mr-1.5 ${AppConfig.marketDataMode === 'end_of_day' ? 'text-purple-400' : 'text-[#22C55E] animate-pulse'}`} />
+            {AppConfig.marketDataMode === 'end_of_day' ? (
+              <span className="text-purple-300 font-mono text-[11px] font-semibold">
+                Massive End-of-Day (Free)
+              </span>
+            ) : (
+              <select
+                value={dataSource}
+                onChange={(e) => onChangeDataSource(e.target.value as LiveMarketDataSource)}
+                className="bg-transparent text-[#E5E5E5] font-mono text-[11px] font-semibold focus:outline-none cursor-pointer"
+              >
+                <option value="Massive WebSocket (Real-Time Live Feed)" className="bg-[#101010] text-[#E5E5E5]">
+                  ⚡ Massive WebSocket (Live Stream)
+                </option>
+                <option value="Yahoo Finance (Real-Time)" className="bg-[#101010] text-[#E5E5E5]">
+                  📈 Yahoo Finance (Real-Time)
+                </option>
+                <option value="Google Finance Feed" className="bg-[#101010] text-[#E5E5E5]">
+                  🌐 Google Finance Gateway
+                </option>
+                <option value="Robinhood Multi-Feed" className="bg-[#101010] text-[#E5E5E5]">
+                  📱 Multi-Exchange Stream
+                </option>
+              </select>
+            )}
           </div>
 
           {/* Refresh Rate Selector */}
@@ -365,7 +371,7 @@ export const Header: React.FC<HeaderProps> = ({
                   {quote.name}
                 </span>
                 <span className="text-[10px] text-[#9CA3AF] font-mono">
-                  {quote.exchange || 'US Market'} • <span className="text-[#D4AF37]">{quote.dataSource || 'Live Feed'}</span>
+                  {quote.exchange || 'US Market'} • <span className="text-[#D4AF37]">{quote.dataSource || (AppConfig.marketDataMode === 'end_of_day' ? 'End-of-Day Data' : 'Live Feed')}</span>
                 </span>
               </div>
             </div>
@@ -537,5 +543,4 @@ export const Header: React.FC<HeaderProps> = ({
     </header>
   );
 };
-
 

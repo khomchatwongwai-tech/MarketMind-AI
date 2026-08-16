@@ -6,8 +6,6 @@ import {
   Sparkles,
   Shield,
   Crown,
-  Building2,
-  CreditCard,
   CheckCircle2,
   ArrowRight,
   Receipt,
@@ -16,10 +14,11 @@ import {
   Loader2,
   Clock,
 } from 'lucide-react';
-import { SubscriptionPlanTier, UserProfile } from '../types/user';
+import { UserProfile } from '../types/user';
 import { SubscriptionPlanId } from '../types/subscription';
 import { UserService } from '../services/userService';
 import { BillingService } from '../services/billingService';
+import { SUBSCRIPTION_PLANS } from '../config/plans';
 
 interface SubscriptionModalProps {
   isOpen: boolean;
@@ -34,7 +33,7 @@ export const SubscriptionModal: React.FC<SubscriptionModalProps> = ({
   currentUser,
   onPlanUpdated,
 }) => {
-  const [billingCycle, setBillingCycle] = useState<'monthly' | 'annual'>('annual');
+  const [billingCycle, setBillingCycle] = useState<'monthly' | 'annual'>('monthly');
   const [isCheckingOut, setIsCheckingOut] = useState(false);
   const [isPortalLoading, setIsPortalLoading] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
@@ -43,90 +42,39 @@ export const SubscriptionModal: React.FC<SubscriptionModalProps> = ({
 
   if (!isOpen) return null;
 
+  const planIcons: Record<SubscriptionPlanId, React.ElementType> = {
+    free: Shield,
+    basic: Sparkles,
+    pro: Zap,
+    premium: Crown,
+  };
+
   const plans: {
-    id: SubscriptionPlanTier;
+    id: SubscriptionPlanId;
     name: string;
     badge?: string;
     icon: React.ElementType;
     priceMonthly: number;
     priceAnnualMonthly: number;
+    annualBilledTotal: number;
     description: string;
     features: string[];
     highlight?: boolean;
-  }[] = [
-    {
-      id: 'free',
-      name: 'Free Explorer',
-      icon: Shield,
-      priceMonthly: 0,
-      priceAnnualMonthly: 0,
-      description: 'Essential market data & basic indicators for retail traders.',
-      features: [
-        '15-minute delayed market quotes',
-        'Standard Candlestick charts',
-        '5 Gemini AI questions per day',
-        '3 Active price alerts',
-        '1 Watchlist (up to 5 tickers)',
-        'Community access',
-      ],
-    },
-    {
-      id: 'pro',
-      name: 'Pro Trader',
-      badge: 'MOST POPULAR',
-      icon: Zap,
-      priceMonthly: 49,
-      priceAnnualMonthly: 39,
-      description: 'Real-time WebSocket feeds, unlimited AI analysis & quantitative indicator engines.',
-      highlight: true,
-      features: [
-        'Real-time tick-by-tick WebSocket stream',
-        'Unlimited Gemini Market AI Analysis',
-        'Full Technical Engine (EMAs, VWAP, RSI, MACD)',
-        'Support & Resistance dynamic pivots',
-        'Real-time Options Flow & Put/Call ratios',
-        'Unlimited saved alerts with webhooks',
-        'Morning & EOD Intelligence Reports',
-        '5 Custom Watchlists with live sparklines',
-      ],
-    },
-    {
-      id: 'institutional',
-      name: 'Institutional Alpha',
-      badge: 'FULL QUANT SUITE',
-      icon: Crown,
-      priceMonthly: 199,
-      priceAnnualMonthly: 159,
-      description: 'Prop desk quantitative models, dark pool liquidity radar & programmatic API access.',
-      features: [
-        'Everything in Pro Trader',
-        'Dark Pool print radar & Gamma exposure maps',
-        'Direct Market Data REST & WebSocket API',
-        'Historical backtesting & probability engine',
-        'Predictive AI machine learning signal store',
-        'Custom Webhook signals directly to bots',
-        'Priority low-latency server cluster',
-        'Dedicated quant strategist Slack channel',
-      ],
-    },
-    {
-      id: 'enterprise',
-      name: 'Enterprise / Fund',
-      icon: Building2,
-      priceMonthly: 499,
-      priceAnnualMonthly: 399,
-      description: 'Multi-seat trading floor integration, custom model weights & dedicated SLA.',
-      features: [
-        'Everything in Institutional Alpha',
-        'Unlimited team seats & role management',
-        'Custom model fine-tuning on proprietary data',
-        'Direct Chicago / New York cross-connects',
-        'SOC2 Type II & regulatory export logs',
-        'Dedicated 24/7 technical account manager',
-        'Custom billing & invoice terms',
-      ],
-    },
-  ];
+  }[] = (['free', 'basic', 'pro', 'premium'] as SubscriptionPlanId[]).map((id) => {
+    const plan = SUBSCRIPTION_PLANS[id];
+    return {
+      id,
+      name: plan.name,
+      badge: plan.badge,
+      icon: planIcons[id],
+      priceMonthly: plan.monthlyPrice,
+      priceAnnualMonthly: plan.annualMonthlyPrice,
+      annualBilledTotal: plan.annualBilledTotal,
+      description: plan.description,
+      features: plan.features.slice(0, 8),
+      highlight: plan.isPopular,
+    };
+  });
 
   const handleStartTrial = async (tier: SubscriptionPlanId) => {
     setIsCheckingOut(true);
@@ -174,7 +122,7 @@ export const SubscriptionModal: React.FC<SubscriptionModalProps> = ({
     }
   };
 
-  const handleUpgrade = async (tier: SubscriptionPlanTier) => {
+  const handleUpgrade = async (tier: SubscriptionPlanId) => {
     setIsCheckingOut(true);
     setErrorMessage(null);
     setStatusMessage(null);
@@ -319,7 +267,7 @@ export const SubscriptionModal: React.FC<SubscriptionModalProps> = ({
               Annual Billing
             </span>
             <span className="text-[9px] px-1.5 py-0.5 bg-[#151515] text-[#F2D675] border border-[#D4AF37]/40 rounded font-bold font-mono uppercase">
-              Save 20%
+              Annual savings
             </span>
           </div>
         </div>
@@ -376,7 +324,7 @@ export const SubscriptionModal: React.FC<SubscriptionModalProps> = ({
                     </div>
                     {billingCycle === 'annual' && plan.priceMonthly > 0 && (
                       <span className="text-[10px] text-[#F2D675] font-mono">
-                        Billed annually (${price * 12}/yr)
+                        Billed annually (${plan.annualBilledTotal.toFixed(2)}/yr)
                       </span>
                     )}
                   </div>

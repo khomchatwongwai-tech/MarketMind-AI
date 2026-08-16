@@ -166,12 +166,11 @@ export const Header: React.FC<HeaderProps> = ({
         {/* Left: Minimal Luxury Brand Wordmark */}
         <div className="flex items-center gap-3">
           <div className="flex items-center gap-2">
-            {/* Geometric Gold Logo Emblem */}
-            <div className="w-7 h-7 rounded-lg bg-gradient-to-br from-[#8C6B18] via-[#D4AF37] to-[#FFE08A] p-[1px] shadow-sm flex items-center justify-center">
-              <div className="w-full h-full bg-[#0A0A0A] rounded-[7px] flex items-center justify-center">
-                <span className="gold-gradient-text font-black text-xs tracking-tighter">M</span>
-              </div>
-            </div>
+            <img
+              src="/marketmind-icon.png"
+              alt="MarketMind AI"
+              className="w-9 h-9 object-contain drop-shadow-[0_0_8px_rgba(212,175,55,0.28)]"
+            />
             <div className="flex flex-col">
               <div className="flex items-center gap-1.5 leading-none">
                 <span className="text-sm font-black text-white tracking-wider">MARKETMIND</span>
@@ -543,4 +542,3 @@ export const Header: React.FC<HeaderProps> = ({
     </header>
   );
 };
-

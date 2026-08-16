@@ -7,7 +7,6 @@ import {
   Check,
   TrendingUp,
   ShieldCheck,
-  Crown,
   Bell,
   Layers,
   Flame,
@@ -158,9 +157,11 @@ export const FastOnboardingModal: React.FC<FastOnboardingModalProps> = ({
         <div className="px-6 pt-6 pb-4 border-b border-[#202026] bg-[#141418]">
           <div className="flex items-center justify-between mb-4">
             <div className="flex items-center gap-2.5">
-              <div className="p-1.5 bg-[#1C1C24] border border-[#D4AF37]/40 rounded-lg text-[#D4AF37]">
-                <Sparkles className="w-4 h-4" />
-              </div>
+              <img
+                src="/marketmind-icon.png"
+                alt="MarketMind AI"
+                className="w-10 h-10 rounded-xl object-cover shadow-[0_0_14px_rgba(212,175,55,0.2)]"
+              />
               <h2 className="text-sm font-bold text-white font-mono tracking-tight">
                 WELCOME TO MARKETMIND AI
               </h2>

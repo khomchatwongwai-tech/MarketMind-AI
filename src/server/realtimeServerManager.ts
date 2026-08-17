@@ -292,7 +292,11 @@ export class RealtimeServerManager {
 
     try {
       status.wsStatus = 'CONNECTING';
-      this.massiveWs = new WebSocket('wss://socket.polygon.io/stocks');
+      const massiveWsUrl =
+        process.env.MASSIVE_WS_URL?.trim() ||
+        'wss://socket.massive.com/stocks';
+
+      this.massiveWs = new WebSocket(massiveWsUrl);
 
       this.massiveWs.on('open', () => {
         // Authenticate

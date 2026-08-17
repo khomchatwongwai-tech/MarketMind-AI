@@ -214,7 +214,12 @@ export class MassiveWebSocketManager {
 
     // Polygon / Massive Stocks WebSocket endpoint
     const isDelayedEndpoint = process.env.MASSIVE_WS_DELAYED === 'true';
-    const wsUrl = isDelayedEndpoint ? 'wss://delayed.polygon.io/stocks' : 'wss://socket.polygon.io/stocks';
+    const configuredWsUrl = process.env.MASSIVE_WS_URL?.trim();
+    const wsUrl =
+      configuredWsUrl ||
+      (isDelayedEndpoint
+        ? 'wss://delayed.massive.com/stocks'
+        : 'wss://socket.massive.com/stocks');
     this.state.isDelayed = isDelayedEndpoint;
 
     try {
@@ -287,7 +292,15 @@ export class MassiveWebSocketManager {
   private handleMassiveMessage(msg: any) {
     // 1. Authentication response
     if (msg.ev === 'status') {
-      if (msg.status === 'auth_success' || msg.message === 'authenticated') {
+      const normalizedStatus = String(msg.status || '').toLowerCase();
+      const normalizedMessage = String(msg.message || '').toLowerCase();
+
+      if (
+        normalizedStatus === 'auth_success' ||
+        normalizedStatus === 'authenticated' ||
+        normalizedMessage === 'authenticated' ||
+        normalizedMessage.includes('authentication successful')
+      ) {
         console.log(`[MassiveWS] Authentication Successful. Subscribing exclusively to ${this.activeTicker}...`);
         this.isAuthenticating = false;
         this.reconnectAttempts = 0;

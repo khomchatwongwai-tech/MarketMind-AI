@@ -52,67 +52,43 @@ export class MassiveWebSocketManager {
   private reconnectTimeout: NodeJS.Timeout | null = null;
   private reconnectAttempts: number = 0;
   private maxReconnectAttempts: number = 5;
-  private simulationInterval: NodeJS.Timeout | null = null;
   private aiAnalysisInterval: NodeJS.Timeout | null = null;
   private isAuthenticating: boolean = false;
   private isSubscribed: boolean = false;
-  private isUsingSimulatedStream: boolean = false;
   private state: MassiveStreamState;
   private getAI: () => GoogleGenAI | null;
   private aiCooldownUntil: number = 0;
 
   constructor(getAI: () => GoogleGenAI | null) {
     this.getAI = getAI;
-    const basePrice = 512.48;
-    this.state = {
-      ticker: 'SPY',
-      status: 'CONNECTING',
-      isDelayed: false,
-      price: basePrice,
-      open: basePrice * 0.998,
-      high: basePrice * 1.004,
-      low: basePrice * 0.995,
-      close: basePrice,
-      volume: 125000,
-      cumulativeVolume: 4500000,
-      cumulativePV: 4500000 * (basePrice * 1.001),
-      vwap: Number((basePrice * 1.001).toFixed(2)),
-      ema9: Number((basePrice * 0.999).toFixed(2)),
-      ema20: Number((basePrice * 0.996).toFixed(2)),
-      ema50: Number((basePrice * 0.991).toFixed(2)),
-      ema200: Number((basePrice * 0.975).toFixed(2)),
-      rsi: 54.2,
-      relativeVolume: 1.15,
-      support: Number((basePrice * 0.994).toFixed(2)),
-      resistance: Number((basePrice * 1.006).toFixed(2)),
-      candles: this.initializeHistoricalCandles(basePrice),
-    };
+    this.state = this.createBaselineTickerState('SPY', 'CONNECTING');
   }
 
-  private initializeHistoricalCandles(basePrice: number): CandleState[] {
-    const candles: CandleState[] = [];
-    const now = Math.floor(Date.now() / 1000);
-    let p = basePrice * 0.995;
-    let cumV = 0;
-    let cumPV = 0;
-
-    for (let i = 60; i >= 0; i--) {
-      const time = now - i * 300; // 5-minute intervals default
-      const o = p;
-      const change = (Math.sin(i / 5) + (Math.random() - 0.48)) * 0.4;
-      const c = Number((o + change).toFixed(2));
-      const h = Number((Math.max(o, c) + Math.random() * 0.3).toFixed(2));
-      const l = Number((Math.min(o, c) - Math.random() * 0.3).toFixed(2));
-      const v = Math.floor(20000 + Math.random() * 50000);
-      const typical = (h + l + c) / 3;
-      cumV += v;
-      cumPV += typical * v;
-      const vwap = Number((cumPV / cumV).toFixed(2));
-
-      candles.push({ time, open: o, high: h, low: l, close: c, volume: v, vwap });
-      p = c;
-    }
-    return candles;
+  private createBaselineTickerState(ticker: string, initialStatus: MassiveWsStatus = 'DISCONNECTED'): MassiveStreamState {
+    const cleanTicker = (ticker || 'SPY').toUpperCase().trim();
+    return {
+      ticker: cleanTicker,
+      status: initialStatus,
+      isDelayed: false,
+      price: 0,
+      open: 0,
+      high: 0,
+      low: 0,
+      close: 0,
+      volume: 0,
+      cumulativeVolume: 0,
+      cumulativePV: 0,
+      vwap: 0,
+      ema9: 0,
+      ema20: 0,
+      ema50: 0,
+      ema200: 0,
+      rsi: 0,
+      relativeVolume: 0,
+      support: 0,
+      resistance: 0,
+      candles: [],
+    };
   }
 
   public init(server: HttpServer) {
@@ -131,12 +107,9 @@ export class MassiveWebSocketManager {
         })
       );
 
-      ws.send(
-        JSON.stringify({
-          type: 'SIGNALS',
-          signals: this.getCalculatedSignals(),
-        })
-      );
+      if (this.hasVerifiedMarketData()) {
+        ws.send(JSON.stringify({ type: 'SIGNALS', signals: this.getCalculatedSignals() }));
+      }
 
       if (this.state.lastAiInsight) {
         ws.send(
@@ -164,10 +137,6 @@ export class MassiveWebSocketManager {
     // Start connection to Massive / Polygon
     this.connectMassive();
 
-    // Trigger initial quantitative interpretation
-    setTimeout(() => {
-      this.triggerGeminiSignalFeed(false);
-    }, 1000);
   }
 
   public setTicker(newTicker: string) {
@@ -177,17 +146,23 @@ export class MassiveWebSocketManager {
     console.log(`[MassiveWS] Switching active ticker subscription from ${this.activeTicker} to ${cleanTicker}`);
     const oldTicker = this.activeTicker;
     this.activeTicker = cleanTicker;
-    this.state.ticker = cleanTicker;
+
+    // Never carry a previous symbol's values into a new subscription.
+    this.state = {
+      ...this.createBaselineTickerState(cleanTicker, this.state.status),
+      status: this.state.status,
+      isDelayed: this.state.isDelayed,
+    };
 
     // Resubscribe if connected to real Massive WebSocket (avoid duplicate subscriptions)
-    if (this.massiveWs && this.massiveWs.readyState === WebSocket.OPEN && !this.isUsingSimulatedStream) {
+    if (this.massiveWs && this.massiveWs.readyState === WebSocket.OPEN) {
       // Unsubscribe old ticker
       this.massiveWs.send(JSON.stringify({ action: 'unsubscribe', params: `T.${oldTicker},AM.${oldTicker},A.${oldTicker}` }));
       // Subscribe to only the active new ticker
       this.massiveWs.send(JSON.stringify({ action: 'subscribe', params: `T.${cleanTicker},AM.${cleanTicker},A.${cleanTicker}` }));
     }
 
-    // Broadcast status
+    // Broadcast status and updated baseline signals
     this.broadcast({
       type: 'STATUS',
       status: this.state.status,
@@ -195,10 +170,6 @@ export class MassiveWebSocketManager {
       isDelayed: this.state.isDelayed,
     });
 
-    // Run AI analysis for new ticker
-    setTimeout(() => {
-      this.triggerGeminiSignalFeed(true);
-    }, 1500);
   }
 
   private isPlaceholderKey(key: string | undefined): boolean {
@@ -209,18 +180,32 @@ export class MassiveWebSocketManager {
     return (
       lower.startsWith('my_') ||
       lower.startsWith('your_') ||
+      lower.startsWith('placeholder') ||
+      lower.startsWith('example') ||
+      lower.startsWith('api_key') ||
+      lower.startsWith('dummy') ||
+      lower.startsWith('test_') ||
       lower.includes('placeholder') ||
       lower.includes('example') ||
-      lower.includes('api_key')
+      lower.includes('api_key') ||
+      lower === 'undefined' ||
+      lower === 'null'
     );
   }
 
   private connectMassive() {
     const rawApiKey = process.env.MASSIVE_API_KEY || process.env.POLYGON_API_KEY;
 
+    if ((process.env.MARKET_DATA_MODE || 'end_of_day') === 'end_of_day') {
+      this.state.isDelayed = true;
+      this.updateStatus('DELAYED DATA');
+      console.log('[MassiveWS] End-of-day mode enabled; real-time WebSocket connection is disabled.');
+      return;
+    }
+
     if (!rawApiKey || this.isPlaceholderKey(rawApiKey)) {
-      console.log('[MassiveWS] Note: MASSIVE_API_KEY environment secret is pending configuration. Running live resilient stream.');
-      this.startSimulatedRealTimeFeed();
+      console.log('[MassiveWS] Provider credentials are not configured. Verified streaming data is unavailable.');
+      this.updateStatus('DISCONNECTED');
       return;
     }
 
@@ -228,15 +213,12 @@ export class MassiveWebSocketManager {
     this.updateStatus('CONNECTING');
 
     // Polygon / Massive Stocks WebSocket endpoint
-    // Standard real-time endpoint: wss://socket.polygon.io/stocks
-    // Delayed fallback endpoint: wss://delayed.polygon.io/stocks
     const isDelayedEndpoint = process.env.MASSIVE_WS_DELAYED === 'true';
     const wsUrl = isDelayedEndpoint ? 'wss://delayed.polygon.io/stocks' : 'wss://socket.polygon.io/stocks';
     this.state.isDelayed = isDelayedEndpoint;
 
     try {
-      const maskedKey = apiKey.length > 4 ? `****${apiKey.slice(-4)}` : '****';
-      console.log(`[MassiveWS] Connecting to Massive WebSocket at ${wsUrl} (Key: ${maskedKey})...`);
+      console.log(`[MassiveWS] Connecting to Massive WebSocket at ${wsUrl} with configured credentials...`);
       this.massiveWs = new WebSocket(wsUrl);
 
       this.massiveWs.on('open', () => {
@@ -271,7 +253,7 @@ export class MassiveWebSocketManager {
 
       this.massiveWs.on('close', (code, reason) => {
         if (!this.isAuthenticating) {
-          console.warn(`[MassiveWS] Stream disconnected (${code}): ${reason.toString()}`);
+          console.log(`[MassiveWS] Stream disconnected (${code}): ${reason.toString()}`);
         }
         this.handleConnectionDrop();
       });
@@ -282,25 +264,23 @@ export class MassiveWebSocketManager {
   }
 
   private handleConnectionDrop() {
-    // If auth failed, don't keep hammering the invalid key
     if (this.state.status === 'DISCONNECTED') {
-      this.startSimulatedRealTimeFeed();
       return;
     }
 
     this.reconnectAttempts++;
     if (this.reconnectAttempts <= this.maxReconnectAttempts) {
       this.updateStatus('RECONNECTING');
-      console.log(`[MassiveWS] Connection lost. Attempting reconnection ${this.reconnectAttempts}/${this.maxReconnectAttempts}...`);
+      const backoffMs = Math.min(1000 * Math.pow(2, this.reconnectAttempts), 30000);
+      console.log(`[MassiveWS] Connection lost. Attempting reconnection ${this.reconnectAttempts}/${this.maxReconnectAttempts} in ${backoffMs}ms...`);
       
       if (this.reconnectTimeout) clearTimeout(this.reconnectTimeout);
       this.reconnectTimeout = setTimeout(() => {
         this.connectMassive();
-      }, 5000);
+      }, backoffMs);
     } else {
-      console.warn('[MassiveWS] Max reconnection attempts reached. Switching to live resilient stream.');
+      console.log('[MassiveWS] Upstream connection stopped. Verified streaming data is unavailable.');
       this.updateStatus('DISCONNECTED');
-      this.startSimulatedRealTimeFeed();
     }
   }
 
@@ -319,12 +299,11 @@ export class MassiveWebSocketManager {
         const finalStatus = this.state.isDelayed ? 'DELAYED DATA' : 'LIVE';
         this.updateStatus(finalStatus);
       } else if (msg.status === 'auth_failed') {
-        console.log('[MassiveWS] Upstream WebSocket authentication pending valid key. Running live resilient stream.');
+        console.log('[MassiveWS] Upstream WebSocket authentication failed. Verified streaming data is unavailable.');
         this.isAuthenticating = false;
         this.reconnectAttempts = this.maxReconnectAttempts + 1; // Prevent retry loop
         if (this.reconnectTimeout) clearTimeout(this.reconnectTimeout);
         this.updateStatus('DISCONNECTED');
-        this.startSimulatedRealTimeFeed();
         try {
           this.massiveWs?.close();
         } catch {
@@ -335,7 +314,6 @@ export class MassiveWebSocketManager {
         this.isSubscribed = true;
         const finalStatus = this.state.isDelayed ? 'DELAYED DATA' : 'LIVE';
         this.updateStatus(finalStatus);
-        this.stopSimulatedFeed();
       } else if (msg.message?.toLowerCase().includes('delayed')) {
         this.state.isDelayed = true;
         this.updateStatus('DELAYED DATA');
@@ -355,11 +333,14 @@ export class MassiveWebSocketManager {
 
   // Receive live trades
   private processLiveTrade(price: number, size: number, timestamp: number) {
-    if (!price || isNaN(price)) return;
+    if (!Number.isFinite(price) || price <= 0 || !Number.isFinite(size) || size < 0) return;
+
+    const isFirstVerifiedPrice = !this.hasVerifiedMarketData();
 
     this.state.price = Number(price.toFixed(2));
-    this.state.high = Math.max(this.state.high, this.state.price);
-    this.state.low = Math.min(this.state.low, this.state.price);
+    this.state.open = isFirstVerifiedPrice ? this.state.price : this.state.open;
+    this.state.high = isFirstVerifiedPrice ? this.state.price : Math.max(this.state.high, this.state.price);
+    this.state.low = isFirstVerifiedPrice ? this.state.price : Math.min(this.state.low, this.state.price);
     this.state.close = this.state.price;
     this.state.cumulativeVolume += size;
     this.state.cumulativePV += price * size;
@@ -392,16 +373,36 @@ export class MassiveWebSocketManager {
 
   // Receive live aggregates & Update Chart without replacing full dataset
   private processLiveAggregate(agg: any) {
-    const time = Math.floor((agg.s || Date.now()) / 1000);
-    const o = agg.o ?? this.state.price;
-    const h = agg.h ?? this.state.price;
-    const l = agg.l ?? this.state.price;
-    const c = agg.c ?? this.state.price;
-    const v = agg.v ?? 1000;
+    const rawTime = Number(agg.s);
+    const o = Number(agg.o);
+    const h = Number(agg.h);
+    const l = Number(agg.l);
+    const c = Number(agg.c);
+    const v = Number(agg.v ?? 0);
+    if (
+      !Number.isFinite(rawTime) ||
+      !Number.isFinite(o) ||
+      !Number.isFinite(h) ||
+      !Number.isFinite(l) ||
+      !Number.isFinite(c) ||
+      !Number.isFinite(v) ||
+      o <= 0 || h <= 0 || l <= 0 || c <= 0 || v < 0 ||
+      h < Math.max(o, c) || l > Math.min(o, c)
+    ) {
+      return;
+    }
+    const time = Math.floor(rawTime / 1000);
 
+    const hadVerifiedData = this.hasVerifiedMarketData();
     this.state.price = c;
-    this.state.high = Math.max(this.state.high, h);
-    this.state.low = Math.min(this.state.low, l);
+    this.state.open = hadVerifiedData ? this.state.open : o;
+    this.state.high = hadVerifiedData ? Math.max(this.state.high, h) : h;
+    this.state.low = hadVerifiedData ? Math.min(this.state.low, l) : l;
+    this.state.close = c;
+    this.state.volume += v;
+    this.state.cumulativeVolume += v;
+    this.state.cumulativePV += ((h + l + c) / 3) * v;
+    this.state.lastTradeTime = rawTime;
 
     // Merge into latest candle
     const lastIndex = this.state.candles.length - 1;
@@ -448,6 +449,7 @@ export class MassiveWebSocketManager {
   // Calculate VWAP / EMA / RSI / Volume / Support / Resistance
   private recalculateIndicators() {
     const p = this.state.price;
+    if (!Number.isFinite(p) || p <= 0) return;
 
     // 1. VWAP (Cumulative Price * Volume / Cumulative Volume)
     if (this.state.cumulativeVolume > 0) {
@@ -462,23 +464,34 @@ export class MassiveWebSocketManager {
     const k50 = 2 / (50 + 1);
     const k200 = 2 / (200 + 1);
 
-    this.state.ema9 = Number((p * k9 + this.state.ema9 * (1 - k9)).toFixed(2));
-    this.state.ema20 = Number((p * k20 + this.state.ema20 * (1 - k20)).toFixed(2));
-    this.state.ema50 = Number((p * k50 + this.state.ema50 * (1 - k50)).toFixed(2));
-    this.state.ema200 = Number((p * k200 + this.state.ema200 * (1 - k200)).toFixed(2));
+    this.state.ema9 = this.state.ema9 > 0 ? Number((p * k9 + this.state.ema9 * (1 - k9)).toFixed(2)) : p;
+    this.state.ema20 = this.state.ema20 > 0 ? Number((p * k20 + this.state.ema20 * (1 - k20)).toFixed(2)) : p;
+    this.state.ema50 = this.state.ema50 > 0 ? Number((p * k50 + this.state.ema50 * (1 - k50)).toFixed(2)) : p;
+    this.state.ema200 = this.state.ema200 > 0 ? Number((p * k200 + this.state.ema200 * (1 - k200)).toFixed(2)) : p;
 
-    // 3. RSI approx
-    const delta = p - this.state.open;
-    const rsiChange = delta * 1.5;
-    this.state.rsi = Number(Math.min(88, Math.max(15, this.state.rsi + rsiChange * 0.05)).toFixed(1));
+    // 3. RSI from verified aggregate closes only
+    const closes = this.state.candles.map((candle) => candle.close).filter((close) => close > 0);
+    if (closes.length >= 15) {
+      const changes = closes.slice(-15).slice(1).map((close, index) => close - closes.slice(-15)[index]);
+      const averageGain = changes.reduce((sum, change) => sum + Math.max(change, 0), 0) / 14;
+      const averageLoss = changes.reduce((sum, change) => sum + Math.max(-change, 0), 0) / 14;
+      this.state.rsi = averageLoss === 0
+        ? (averageGain > 0 ? 100 : 50)
+        : Number((100 - 100 / (1 + averageGain / averageLoss)).toFixed(1));
+    } else {
+      this.state.rsi = 0;
+    }
 
-    // 4. Relative Volume
-    const avgVol = 35000;
-    this.state.relativeVolume = Number((Math.max(0.6, this.state.volume / avgVol)).toFixed(2));
+    // Relative volume requires a verified historical baseline, which this stream does not provide.
+    this.state.relativeVolume = 0;
 
     // 5. Dynamic Support & Resistance
-    this.state.support = Number((Math.min(this.state.low, p * 0.995)).toFixed(2));
-    this.state.resistance = Number((Math.max(this.state.high, p * 1.005)).toFixed(2));
+    this.state.support = Number(this.state.low.toFixed(2));
+    this.state.resistance = Number(this.state.high.toFixed(2));
+  }
+
+  public hasVerifiedMarketData(): boolean {
+    return Number.isFinite(this.state.price) && this.state.price > 0 && Boolean(this.state.lastTradeTime);
   }
 
   public getCalculatedSignals(): CalculatedMarketSignals {
@@ -527,9 +540,7 @@ export class MassiveWebSocketManager {
       emaStack,
       momentum,
       lastUpdated: new Date().toLocaleTimeString('en-US', { timeZone: 'America/New_York' }) + ' ET',
-      source: this.isUsingSimulatedStream
-        ? 'Massive Resilient Stream'
-        : this.state.isDelayed
+      source: this.state.isDelayed
         ? 'Massive Delayed Feed'
         : 'Massive Real-Time WebSocket',
       isDelayed: this.state.isDelayed,
@@ -538,6 +549,14 @@ export class MassiveWebSocketManager {
 
   // Feed calculated signals to Gemini AI (strictly interpreting market data, never guessing prices)
   public async triggerGeminiSignalFeed(force: boolean = false) {
+    if (!this.hasVerifiedMarketData()) {
+      this.broadcast({
+        type: 'ERROR',
+        ticker: this.activeTicker,
+        error: 'AI market interpretation is unavailable until verified provider data is received.',
+      });
+      return;
+    }
     const now = Date.now();
     // Enforce rate limit cooldown if previously hit 429
     if (now < this.aiCooldownUntil && !force) {
@@ -605,7 +624,7 @@ Return a strictly valid JSON object matching this schema:
 }`;
 
       const response = await ai.models.generateContent({
-        model: 'gemini-3.7-flash',
+        model: process.env.GEMINI_MODEL || 'gemini-2.5-flash',
         contents: prompt,
         config: {
           responseMimeType: 'application/json',
@@ -709,42 +728,6 @@ Return a strictly valid JSON object matching this schema:
     });
   }
 
-  // Fallback high-frequency simulator when outside market hours or when waiting for connection
-  private startSimulatedRealTimeFeed() {
-    if (this.isUsingSimulatedStream && this.simulationInterval) return;
-    this.isUsingSimulatedStream = true;
-
-    if (this.simulationInterval) clearInterval(this.simulationInterval);
-    this.simulationInterval = setInterval(() => {
-      const jitter = (Math.random() - 0.48) * 0.16;
-      const size = Math.floor(100 + Math.random() * 500);
-      const newPrice = Number((this.state.price + jitter).toFixed(2));
-      const now = Date.now();
-
-      this.processLiveTrade(newPrice, size, now);
-
-      // Every 3 seconds emit aggregate bar
-      if (Math.random() < 0.35) {
-        this.processLiveAggregate({
-          s: now,
-          o: this.state.price - jitter,
-          h: Math.max(this.state.price, this.state.price + Math.random() * 0.1),
-          l: Math.min(this.state.price, this.state.price - Math.random() * 0.1),
-          c: newPrice,
-          v: size * 4,
-        });
-      }
-    }, 1200);
-  }
-
-  private stopSimulatedFeed() {
-    this.isUsingSimulatedStream = false;
-    if (this.simulationInterval) {
-      clearInterval(this.simulationInterval);
-      this.simulationInterval = null;
-    }
-  }
-
   private updateStatus(status: MassiveStreamState['status']) {
     this.state.status = status;
     this.broadcast({
@@ -765,4 +748,3 @@ Return a strictly valid JSON object matching this schema:
     }
   }
 }
-

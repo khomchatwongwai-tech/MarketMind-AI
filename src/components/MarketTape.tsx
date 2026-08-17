@@ -1,7 +1,8 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useMemo } from 'react';
 import { fetchLiveTape } from '../services/marketDataService';
 import { TrendingUp, TrendingDown, Radio, Zap } from 'lucide-react';
 import { TickerSymbol } from '../types/market';
+import { useRealTimeWatchlist } from '../hooks/useRealTimeMarket';
 
 interface MarketTapeProps {
   selectedTicker: TickerSymbol;
@@ -18,26 +19,41 @@ interface TapeQuote {
   volume?: number;
 }
 
+const DEFAULT_SYMBOLS = [
+  'SPY',
+  'QQQ',
+  'DIA',
+  'IWM',
+  'NVDA',
+  'AAPL',
+  'MSFT',
+  'TSLA',
+  'AMZN',
+  'META',
+  'AMD',
+  'PLTR',
+  'COIN',
+  'BTC-USD',
+  'ETH-USD',
+];
+
 export const MarketTape: React.FC<MarketTapeProps> = ({
   selectedTicker,
   onSelectTicker,
   isLive,
 }) => {
-  const [tapeQuotes, setTapeQuotes] = useState<TapeQuote[]>([
-    { symbol: 'SPY', name: 'S&P 500 ETF', price: 512.48, change: 4.2, changePercent: 0.82 },
-    { symbol: 'QQQ', name: 'Nasdaq 100 ETF', price: 442.35, change: 4.25, changePercent: 0.97 },
-    { symbol: 'DIA', name: 'Dow Jones ETF', price: 391.2, change: 1.8, changePercent: 0.46 },
-    { symbol: 'IWM', name: 'Russell 2000', price: 214.8, change: 2.7, changePercent: 1.27 },
-    { symbol: 'NVDA', name: 'NVIDIA Corp', price: 128.6, change: 3.7, changePercent: 2.96 },
-    { symbol: 'AAPL', name: 'Apple Inc.', price: 224.2, change: 2.7, changePercent: 1.22 },
-    { symbol: 'MSFT', name: 'Microsoft Corp', price: 428.9, change: 3.8, changePercent: 0.89 },
-    { symbol: 'TSLA', name: 'Tesla Inc.', price: 218.4, change: 5.6, changePercent: 2.63 },
-    { symbol: 'AMZN', name: 'Amazon.com', price: 186.75, change: 2.55, changePercent: 1.38 },
-    { symbol: 'META', name: 'Meta Platforms', price: 514.3, change: 7.5, changePercent: 1.48 },
-    { symbol: 'AMD', name: 'Advanced Micro Devices', price: 154.2, change: 3.4, changePercent: 2.25 },
-    { symbol: 'PLTR', name: 'Palantir Tech', price: 31.8, change: 0.9, changePercent: 2.91 },
-    { symbol: 'COIN', name: 'Coinbase Global', price: 215.3, change: 5.8, changePercent: 2.77 },
-  ]);
+  const [tapeQuotes, setTapeQuotes] = useState<TapeQuote[]>(() =>
+    DEFAULT_SYMBOLS.map((sym) => ({
+      symbol: sym,
+      name: `${sym} Asset`,
+      price: 0,
+      change: 0,
+      changePercent: 0,
+    }))
+  );
+
+  const symbolsList = useMemo(() => DEFAULT_SYMBOLS, []);
+  const { quotes: rtQuotes, flashes: rtFlashes } = useRealTimeWatchlist(symbolsList, 'tape');
 
   const [lastSync, setLastSync] = useState<string>(new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' }));
 
@@ -54,7 +70,7 @@ export const MarketTape: React.FC<MarketTapeProps> = ({
     loadTape();
     if (!isLive) return;
 
-    const interval = setInterval(loadTape, 5000);
+    const interval = setInterval(loadTape, 6000);
     return () => {
       mounted = false;
       clearInterval(interval);
@@ -87,28 +103,42 @@ export const MarketTape: React.FC<MarketTapeProps> = ({
       <div className="flex items-center gap-2 overflow-x-auto no-scrollbar py-0.5 px-2 flex-1 scroll-smooth">
         {tapeQuotes.map((item) => {
           const isSelected = selectedTicker.toUpperCase() === item.symbol.toUpperCase();
-          const isPos = item.change >= 0;
+          const rtQuote = rtQuotes[item.symbol.toUpperCase()];
+          const flash = rtFlashes[item.symbol.toUpperCase()];
+
+          const currentPrice = rtQuote && rtQuote.price > 0 ? rtQuote.price : item.price;
+          const currentChange = rtQuote && rtQuote.change !== undefined ? rtQuote.change : item.change;
+          const currentChangePct = rtQuote && rtQuote.changePercent !== undefined ? rtQuote.changePercent : item.changePercent;
+          const isPos = currentChange >= 0;
+          const hasValidPrice = currentPrice > 0;
+
           return (
             <button
               key={item.symbol}
               onClick={() => onSelectTicker(item.symbol as TickerSymbol)}
-              className={`flex items-center gap-1.5 px-2.5 py-1 rounded-md text-[11px] font-mono shrink-0 transition ${
-                isSelected
+              className={`flex items-center gap-1.5 px-2.5 py-1 rounded-md text-[11px] font-mono shrink-0 transition-all duration-300 ${
+                flash === 'UP'
+                  ? 'bg-emerald-900/60 border-emerald-400 text-emerald-200 ring-1 ring-emerald-500'
+                  : flash === 'DOWN'
+                  ? 'bg-rose-900/60 border-rose-400 text-rose-200 ring-1 ring-rose-500'
+                  : isSelected
                   ? 'bg-gradient-to-r from-[rgba(212,175,55,0.2)] to-[rgba(20,20,20,0.9)] text-white border border-[#D4AF37] font-black shadow-[0_0_8px_rgba(212,175,55,0.2)]'
                   : 'bg-[#0A0A0A] hover:bg-[#101010] text-[#9CA3AF] hover:text-[#E5E5E5] border border-[#1C1C1C]'
               }`}
               title={`Click to load live ${item.name} analysis`}
             >
               <span className="font-bold text-white">{item.symbol}</span>
-              <span className="text-[#E5E5E5]">${item.price.toFixed(2)}</span>
-              <span
-                className={`flex items-center text-[10px] font-bold ${
-                  isPos ? 'text-[#22C55E]' : 'text-[#EF4444]'
-                }`}
-              >
-                {isPos ? '+' : ''}
-                {item.changePercent.toFixed(2)}%
-              </span>
+              <span className="text-[#E5E5E5]">{hasValidPrice ? `$${currentPrice.toFixed(2)}` : '--'}</span>
+              {hasValidPrice && (
+                <span
+                  className={`flex items-center text-[10px] font-bold ${
+                    isPos ? 'text-[#22C55E]' : 'text-[#EF4444]'
+                  }`}
+                >
+                  {isPos ? '+' : ''}
+                  {currentChangePct.toFixed(2)}%
+                </span>
+              )}
             </button>
           );
         })}

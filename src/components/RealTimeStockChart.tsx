@@ -36,7 +36,12 @@ import {
   evaluateMarketStructure,
   checkRealTimeBreakouts,
 } from '../services/technicalIndicators';
-import { useMassiveWebSocket } from '../hooks/useMassiveWebSocket';
+import { useRealTimeQuote } from '../hooks/useRealTimeMarket';
+import { TradingViewDatafeedAdapter, TradingViewBar } from '../services/realtime/TradingViewDatafeedAdapter';
+import { TradingViewChart } from './TradingViewChart';
+import { DataDetailsModal } from './markets/DataDetailsModal';
+import { useTheme } from '../context/ThemeContext';
+import { AppConfig } from '../config/environment';
 import {
   Sparkles,
   TrendingUp,
@@ -63,7 +68,6 @@ import {
 
 interface RealTimeStockChartProps {
   ticker: TickerSymbol;
-  isLiveSimulation?: boolean;
 }
 
 const TIMEFRAMES: Array<{ label: string; value: ChartTimeframe }> = [
@@ -80,8 +84,8 @@ const TIMEFRAMES: Array<{ label: string; value: ChartTimeframe }> = [
 
 export const RealTimeStockChart: React.FC<RealTimeStockChartProps> = ({
   ticker,
-  isLiveSimulation = true,
 }) => {
+  const { resolvedTheme, isDark, colors } = useTheme();
   const chartContainerRef = useRef<HTMLDivElement>(null);
   const chartRef = useRef<IChartApi | null>(null);
 
@@ -105,19 +109,22 @@ export const RealTimeStockChart: React.FC<RealTimeStockChartProps> = ({
   const currentPriceLineRef = useRef<IPriceLine | null>(null);
 
   // State
+  const [chartEngine, setChartEngine] = useState<'marketmind' | 'tradingview'>('marketmind');
   const [timeframe, setTimeframe] = useState<ChartTimeframe>('5m');
   const [extendedHours, setExtendedHours] = useState<boolean>(true);
   const [candles, setCandles] = useState<ChartCandle[]>([]);
   const [levels, setLevels] = useState<ChartLevels>({});
-  const [marketStatus, setMarketStatus] = useState<'LIVE' | 'DELAYED' | 'DISCONNECTED' | 'UNAVAILABLE'>('LIVE');
+  const [marketStatus, setMarketStatus] = useState<'LIVE' | 'DELAYED' | 'DISCONNECTED' | 'UNAVAILABLE'>('UNAVAILABLE');
   const [lastUpdateStr, setLastUpdateStr] = useState<string>('');
   const [isLoading, setIsLoading] = useState<boolean>(true);
   const [connectionMessage, setConnectionMessage] = useState<string | null>(null);
+  const [isExpanded, setIsExpanded] = useState<boolean>(false);
+  const [priceFlash, setPriceFlash] = useState<'UP' | 'DOWN' | null>(null);
 
   // Current quote display
-  const [livePrice, setLivePrice] = useState<number>(512.48);
-  const [liveChange, setLiveChange] = useState<number>(4.2);
-  const [liveChangePercent, setLiveChangePercent] = useState<number>(0.82);
+  const [livePrice, setLivePrice] = useState<number | null>(null);
+  const [liveChange, setLiveChange] = useState<number | null>(null);
+  const [liveChangePercent, setLiveChangePercent] = useState<number | null>(null);
 
   // Hover Crosshair Tooltip
   const [hoverData, setHoverData] = useState<{
@@ -149,9 +156,13 @@ export const RealTimeStockChart: React.FC<RealTimeStockChartProps> = ({
   });
   const [showIndicatorMenu, setShowIndicatorMenu] = useState<boolean>(false);
 
+  // Real-time Market Manager hook & Details Modal
+  const { quote: rtQuote, flash: rtFlash, mode: rtMode } = useRealTimeQuote(ticker, 'chart');
+  const [isDetailsOpen, setIsDetailsOpen] = useState<boolean>(false);
+
   // Real-time Breakout Alerts
   const [breakoutAlert, setBreakoutAlert] = useState<BreakoutAlert | null>(null);
-  const prevPriceRef = useRef<number>(512.48);
+  const prevPriceRef = useRef<number>(0);
 
   // AI Chart Analysis modal state
   const [isAiModalOpen, setIsAiModalOpen] = useState<boolean>(false);
@@ -185,38 +196,38 @@ export const RealTimeStockChart: React.FC<RealTimeStockChartProps> = ({
       width: container.clientWidth || 800,
       height: 480,
       layout: {
-        background: { type: ColorType.Solid, color: '#131518' },
-        textColor: '#94a3b8',
+        background: { type: ColorType.Solid, color: colors.chart.background },
+        textColor: colors.chart.textColor,
         fontSize: 11,
       },
       grid: {
-        vertLines: { color: 'rgba(45, 49, 57, 0.4)', style: 1 },
-        horzLines: { color: 'rgba(45, 49, 57, 0.4)', style: 1 },
+        vertLines: { color: colors.chart.gridColor, style: 1 },
+        horzLines: { color: colors.chart.gridColor, style: 1 },
       },
       crosshair: {
         mode: CrosshairMode.Normal,
         vertLine: {
-          color: '#6366f1',
+          color: colors.chart.crosshairColor,
           width: 1,
           style: 3,
-          labelBackgroundColor: '#4f46e5',
+          labelBackgroundColor: colors.chart.crosshairLabelBg,
         },
         horzLine: {
-          color: '#6366f1',
+          color: colors.chart.crosshairColor,
           width: 1,
           style: 3,
-          labelBackgroundColor: '#4f46e5',
+          labelBackgroundColor: colors.chart.crosshairLabelBg,
         },
       },
       rightPriceScale: {
-        borderColor: '#2d3139',
+        borderColor: colors.chart.borderColor,
         scaleMargins: {
           top: 0.08,
           bottom: 0.22, // leave bottom space for volume bars
         },
       },
       timeScale: {
-        borderColor: '#2d3139',
+        borderColor: colors.chart.borderColor,
         timeVisible: true,
         secondsVisible: false,
         rightOffset: 6,
@@ -239,11 +250,11 @@ export const RealTimeStockChart: React.FC<RealTimeStockChartProps> = ({
 
     // Add Candlestick Series
     const candleSeries = chart.addSeries(CandlestickSeries, {
-      upColor: '#10b981',
-      downColor: '#f43f5e',
+      upColor: colors.chart.upColor,
+      downColor: colors.chart.downColor,
       borderVisible: false,
-      wickUpColor: '#10b981',
-      wickDownColor: '#f43f5e',
+      wickUpColor: colors.chart.upColor,
+      wickDownColor: colors.chart.downColor,
     });
     candleSeriesRef.current = candleSeries as any;
 
@@ -386,6 +397,46 @@ export const RealTimeStockChart: React.FC<RealTimeStockChartProps> = ({
       }
     };
   }, []);
+
+  // Dynamically update chart options on theme change without re-creating series data
+  useEffect(() => {
+    if (!chartRef.current) return;
+    chartRef.current.applyOptions({
+      layout: {
+        background: { type: ColorType.Solid, color: colors.chart.background },
+        textColor: colors.chart.textColor,
+      },
+      grid: {
+        vertLines: { color: colors.chart.gridColor },
+        horzLines: { color: colors.chart.gridColor },
+      },
+      rightPriceScale: {
+        borderColor: colors.chart.borderColor,
+      },
+      timeScale: {
+        borderColor: colors.chart.borderColor,
+      },
+      crosshair: {
+        vertLine: {
+          color: colors.chart.crosshairColor,
+          labelBackgroundColor: colors.chart.crosshairLabelBg,
+        },
+        horzLine: {
+          color: colors.chart.crosshairColor,
+          labelBackgroundColor: colors.chart.crosshairLabelBg,
+        },
+      },
+    });
+
+    if (candleSeriesRef.current) {
+      candleSeriesRef.current.applyOptions({
+        upColor: colors.chart.upColor,
+        downColor: colors.chart.downColor,
+        wickUpColor: colors.chart.upColor,
+        wickDownColor: colors.chart.downColor,
+      });
+    }
+  }, [resolvedTheme, colors]);
 
   // 2. Fetch Candles for selected ticker and timeframe
   const loadCandleData = useCallback(async () => {
@@ -665,7 +716,7 @@ export const RealTimeStockChart: React.FC<RealTimeStockChartProps> = ({
     if (currentPriceLineRef.current && candleSeriesRef.current) {
       candleSeriesRef.current.removePriceLine(currentPriceLineRef.current);
     }
-    if (candleSeriesRef.current && livePrice > 0) {
+    if (candleSeriesRef.current && livePrice !== null && livePrice > 0) {
       currentPriceLineRef.current = candleSeriesRef.current.createPriceLine({
         price: livePrice,
         color: '#6366f1',
@@ -677,161 +728,96 @@ export const RealTimeStockChart: React.FC<RealTimeStockChartProps> = ({
     }
   }, [candles, indicators, levels, livePrice, ticker]);
 
-  // Hook into Massive WebSocket Streaming Engine
-  const {
-    status: massiveWsStatus,
-    isDelayed: massiveIsDelayed,
-    signals: massiveSignals,
-    liveTrade: massiveLiveTrade,
-    liveAggregate: massiveLiveAggregate,
-  } = useMassiveWebSocket(ticker);
-
-  // Derive explicit display status according to user specification
+  // Derive explicit display status from authoritative RealTimeMarketManager stream
   const currentStreamStatus: 'LIVE' | 'DELAYED DATA' | 'RECONNECTING' | 'DISCONNECTED' | 'LIVE DATA UNAVAILABLE' =
-    massiveIsDelayed || massiveWsStatus === 'DELAYED DATA'
+    AppConfig.marketDataMode === 'end_of_day'
       ? 'DELAYED DATA'
-      : massiveWsStatus === 'LIVE'
+      : rtMode === 'REAL_TIME'
       ? 'LIVE'
-      : massiveWsStatus === 'RECONNECTING' || massiveWsStatus === 'CONNECTING' || massiveWsStatus === 'AUTHENTICATING'
-      ? 'RECONNECTING'
-      : massiveWsStatus === 'DISCONNECTED'
+      : rtMode === 'DELAYED'
+      ? 'DELAYED DATA'
+      : rtMode === 'CLOSED'
       ? 'DISCONNECTED'
       : marketStatus === 'LIVE'
       ? 'LIVE'
       : 'LIVE DATA UNAVAILABLE';
 
-  // Sync incoming Massive WebSocket live trades/aggregates directly to chart
+  // Synchronize TradingView Datafeed Adapter real-time candle stream
   useEffect(() => {
-    if (massiveSignals && massiveSignals.price) {
-      const p = massiveSignals.price;
-      setLivePrice(p);
-      const openRef = candles.length > 0 ? candles[0].open : p;
-      const chg = p - openRef;
-      setLiveChange(Number(chg.toFixed(2)));
-      setLiveChangePercent(Number(((chg / openRef) * 100).toFixed(2)));
-      setLastUpdateStr(massiveSignals.lastUpdated);
-      setMarketStatus('LIVE');
+    const subscriberUID = `chart_${ticker}_${timeframe}`;
+    const adapter = TradingViewDatafeedAdapter.getInstance();
 
-      setCandles((prevCandles) => {
-        if (prevCandles.length === 0) return prevCandles;
-        const last = { ...prevCandles[prevCandles.length - 1] };
-        last.high = Math.max(last.high, p);
-        last.low = Math.min(last.low, p);
-        last.close = p;
-        if (massiveLiveTrade) {
-          last.volume += massiveLiveTrade.size;
+    adapter.subscribeBars(
+      ticker,
+      timeframe,
+      (bar: TradingViewBar) => {
+        const p = bar.close;
+        const prevP = prevPriceRef.current || p;
+
+        // Trigger subtle real-time price tick flash
+        if (p > prevP) {
+          setPriceFlash('UP');
+        } else if (p < prevP) {
+          setPriceFlash('DOWN');
         }
+        setTimeout(() => setPriceFlash(null), 400);
 
-        const updated = [...prevCandles.slice(0, -1), last];
+        setLivePrice(p);
+        const openRef = candles.length > 0 ? candles[0].open : p;
+        const chg = p - openRef;
+        setLiveChange(Number(chg.toFixed(2)));
+        setLiveChangePercent(Number(((chg / openRef) * 100).toFixed(2)));
+        setLastUpdateStr(
+          new Date().toLocaleTimeString('en-US', {
+            hour: '2-digit',
+            minute: '2-digit',
+            second: '2-digit',
+            timeZone: 'America/New_York',
+          }) + ' ET'
+        );
+        setMarketStatus('LIVE');
 
+        // Update Lightweight Charts Candlestick series surgically
         if (candleSeriesRef.current) {
           candleSeriesRef.current.update({
-            time: last.time as Time,
-            open: last.open,
-            high: last.high,
-            low: last.low,
-            close: last.close,
+            time: bar.time as Time,
+            open: bar.open,
+            high: bar.high,
+            low: bar.low,
+            close: bar.close,
           });
         }
+
+        // Update Volume Histogram Series
         if (volumeSeriesRef.current && indicators.volume) {
           volumeSeriesRef.current.update({
-            time: last.time as Time,
-            value: last.volume,
-            color: last.close >= last.open ? 'rgba(16, 185, 129, 0.4)' : 'rgba(244, 63, 94, 0.4)',
-          });
-        }
-        return updated;
-      });
-
-      // Check breakout alerts
-      const vwapLine = calculateVWAP(candles);
-      const vwap = vwapLine.length > 0 ? vwapLine[vwapLine.length - 1].value : p;
-      const alert = checkRealTimeBreakouts(
-        ticker,
-        p,
-        prevPriceRef.current,
-        levels,
-        vwap,
-        marketStructure.relativeVolume
-      );
-      if (alert) setBreakoutAlert(alert);
-      prevPriceRef.current = p;
-    }
-  }, [massiveLiveTrade, massiveLiveAggregate, massiveSignals]);
-
-  // 4. Real-time Live Price Streaming & Candle Aggregation (Fallback Interval)
-  useEffect(() => {
-    if (!isLiveSimulation || massiveWsStatus === 'LIVE') return;
-
-    const interval = setInterval(async () => {
-      // Gentle tick movement
-      const jitter = (Math.random() - 0.48) * 0.18;
-      const newPrice = Number((livePrice + jitter).toFixed(2));
-      const newChange = Number((liveChange + jitter).toFixed(2));
-      const newChangePct = Number(((newChange / (livePrice - newChange)) * 100).toFixed(2));
-
-      setLivePrice(newPrice);
-      setLiveChange(newChange);
-      setLiveChangePercent(newChangePct);
-      setLastUpdateStr(new Date().toLocaleTimeString('en-US', {
-        hour: '2-digit',
-        minute: '2-digit',
-        second: '2-digit',
-        timeZone: 'America/New_York',
-      }) + ' ET');
-
-      // Update latest candle surgically in series
-      setCandles((prevCandles) => {
-        if (prevCandles.length === 0) return prevCandles;
-        const last = { ...prevCandles[prevCandles.length - 1] };
-        last.high = Math.max(last.high, newPrice);
-        last.low = Math.min(last.low, newPrice);
-        last.close = newPrice;
-        last.volume += Math.floor(100 + Math.random() * 400);
-
-        const updated = [...prevCandles.slice(0, -1), last];
-
-        // Update Lightweight Charts series surgically without full redraw
-        if (candleSeriesRef.current) {
-          candleSeriesRef.current.update({
-            time: last.time as Time,
-            open: last.open,
-            high: last.high,
-            low: last.low,
-            close: last.close,
-          });
-        }
-        if (volumeSeriesRef.current && indicators.volume) {
-          volumeSeriesRef.current.update({
-            time: last.time as Time,
-            value: last.volume,
-            color: last.close >= last.open ? 'rgba(16, 185, 129, 0.4)' : 'rgba(244, 63, 94, 0.4)',
+            time: bar.time as Time,
+            value: bar.volume,
+            color: bar.close >= bar.open ? 'rgba(16, 185, 129, 0.4)' : 'rgba(244, 63, 94, 0.4)',
           });
         }
 
-        return updated;
-      });
+        // Re-evaluate breakout alerts against live tick
+        const vwapLine = calculateVWAP(candles);
+        const vwap = vwapLine.length > 0 ? vwapLine[vwapLine.length - 1].value : p;
+        const alert = checkRealTimeBreakouts(
+          ticker,
+          p,
+          prevPriceRef.current,
+          levels,
+          vwap,
+          marketStructure.relativeVolume
+        );
+        if (alert) setBreakoutAlert(alert);
+        prevPriceRef.current = p;
+      },
+      subscriberUID
+    );
 
-      // Check for real-time breakout alerts
-      const vwapLine = calculateVWAP(candles);
-      const vwap = vwapLine.length > 0 ? vwapLine[vwapLine.length - 1].value : newPrice;
-      const alert = checkRealTimeBreakouts(
-        ticker,
-        newPrice,
-        prevPriceRef.current,
-        levels,
-        vwap,
-        marketStructure.relativeVolume
-      );
-
-      if (alert) {
-        setBreakoutAlert(alert);
-      }
-      prevPriceRef.current = newPrice;
-    }, 2000);
-
-    return () => clearInterval(interval);
-  }, [isLiveSimulation, massiveWsStatus, livePrice, liveChange, ticker, levels, marketStructure.relativeVolume, indicators.volume, candles]);
+    return () => {
+      adapter.unsubscribeBars(subscriberUID);
+    };
+  }, [ticker, timeframe, candles, levels, marketStructure.relativeVolume, indicators.volume]);
 
   // Chart Navigation Handlers
   const handleZoomIn = () => {
@@ -884,16 +870,16 @@ export const RealTimeStockChart: React.FC<RealTimeStockChartProps> = ({
     setIsAiLoading(true);
     try {
       const vwapLine = calculateVWAP(candles);
-      const vwapVal = vwapLine.length > 0 ? vwapLine[vwapLine.length - 1].value : livePrice;
-      const ema9Val = calculateEMA(candles, 9).pop()?.value || livePrice;
-      const ema20Val = calculateEMA(candles, 20).pop()?.value || livePrice;
-      const ema50Val = calculateEMA(candles, 50).pop()?.value || livePrice;
-      const ema200Val = calculateEMA(candles, 200).pop()?.value || livePrice;
+      const vwapVal = vwapLine.length > 0 ? vwapLine[vwapLine.length - 1].value : (livePrice ?? 0);
+      const ema9Val = calculateEMA(candles, 9).pop()?.value || (livePrice ?? 0);
+      const ema20Val = calculateEMA(candles, 20).pop()?.value || (livePrice ?? 0);
+      const ema50Val = calculateEMA(candles, 50).pop()?.value || (livePrice ?? 0);
+      const ema200Val = calculateEMA(candles, 200).pop()?.value || (livePrice ?? 0);
 
       const payload = {
         ticker,
         timeframe: timeframe.toUpperCase(),
-        currentPrice: livePrice,
+        currentPrice: livePrice ?? 0,
         vwap: vwapVal,
         ema9: ema9Val,
         ema20: ema20Val,
@@ -903,8 +889,14 @@ export const RealTimeStockChart: React.FC<RealTimeStockChartProps> = ({
         macd: currentMacd,
         volume: candles.length > 0 ? candles[candles.length - 1].volume : 0,
         relativeVolume: marketStructure.relativeVolume,
-        supportLevels: [levels.s1 ? `$${levels.s1.toFixed(2)}` : '$508.50', levels.s2 ? `$${levels.s2.toFixed(2)}` : '$506.10'],
-        resistanceLevels: [levels.r1 ? `$${levels.r1.toFixed(2)}` : '$513.40', levels.r2 ? `$${levels.r2.toFixed(2)}` : '$515.80'],
+        supportLevels: [
+          levels.s1 ? `$${levels.s1.toFixed(2)}` : livePrice !== null && livePrice > 0 ? `$${(livePrice * 0.995).toFixed(2)}` : '$0.00',
+          levels.s2 ? `$${levels.s2.toFixed(2)}` : livePrice !== null && livePrice > 0 ? `$${(livePrice * 0.99).toFixed(2)}` : '$0.00',
+        ],
+        resistanceLevels: [
+          levels.r1 ? `$${levels.r1.toFixed(2)}` : livePrice !== null && livePrice > 0 ? `$${(livePrice * 1.005).toFixed(2)}` : '$0.00',
+          levels.r2 ? `$${levels.r2.toFixed(2)}` : livePrice !== null && livePrice > 0 ? `$${(livePrice * 1.01).toFixed(2)}` : '$0.00',
+        ],
         trend: marketStructure.trend,
         marketStructure: marketStructure.structure,
         candles,
@@ -919,7 +911,7 @@ export const RealTimeStockChart: React.FC<RealTimeStockChartProps> = ({
     }
   };
 
-  const isPos = liveChange >= 0;
+  const isPos = (liveChange ?? 0) >= 0;
 
   return (
     <div className="bg-[#15171a] border border-[#2d3139] rounded-lg p-3 flex flex-col gap-2.5 text-[#e2e8f0] shadow-sm mb-3">
@@ -931,50 +923,66 @@ export const RealTimeStockChart: React.FC<RealTimeStockChartProps> = ({
             <span className="text-xl md:text-2xl font-black font-mono text-white tracking-tight">
               {ticker}
             </span>
-            <span
-              className={`text-base md:text-lg font-black font-mono ${
-                isPos ? 'text-emerald-400' : 'text-rose-400'
-              }`}
-            >
-              ${livePrice.toFixed(2)}
-            </span>
-            <span
-              className={`text-xs font-bold font-mono ${
-                isPos ? 'text-emerald-400' : 'text-rose-400'
-              }`}
-            >
-              {isPos ? '+' : ''}
-              {liveChange.toFixed(2)} ({isPos ? '+' : ''}
-              {liveChangePercent.toFixed(2)}%)
-            </span>
+            {livePrice !== null ? (
+              <>
+                <span
+                  className={`text-base md:text-lg font-black font-mono transition-colors duration-200 px-1.5 py-0.5 rounded ${
+                    priceFlash === 'UP'
+                      ? 'bg-emerald-500/25 text-emerald-300 ring-1 ring-emerald-500'
+                      : priceFlash === 'DOWN'
+                      ? 'bg-rose-500/25 text-rose-300 ring-1 ring-rose-500'
+                      : isPos
+                      ? 'text-emerald-400'
+                      : 'text-rose-400'
+                  }`}
+                >
+                  ${livePrice.toFixed(2)}
+                </span>
+                {liveChange !== null && liveChangePercent !== null && (
+                  <span
+                    className={`text-xs font-bold font-mono ${
+                      isPos ? 'text-emerald-400' : 'text-rose-400'
+                    }`}
+                  >
+                    {isPos ? '+' : ''}
+                    {liveChange.toFixed(2)} ({isPos ? '+' : ''}
+                    {liveChangePercent.toFixed(2)}%)
+                  </span>
+                )}
+              </>
+            ) : (
+              <span className="text-base font-mono text-[#6B7280]">--</span>
+            )}
           </div>
 
           <div className="h-5 w-[1px] bg-[#2d3139] hidden sm:block" />
 
-          {/* Live Status Badge */}
+          {/* Live Status Badge & Data Details Trigger */}
           <div className="flex items-center gap-2">
-            {currentStreamStatus === 'LIVE' ? (
-              <span className="flex items-center gap-1.5 px-2 py-0.5 bg-emerald-500/10 border border-emerald-500/30 text-emerald-400 text-[10px] font-bold font-mono rounded">
-                <span className="h-1.5 w-1.5 rounded-full bg-emerald-400 animate-pulse"></span>
-                🟢 LIVE
-              </span>
-            ) : currentStreamStatus === 'DELAYED DATA' ? (
-              <span className="flex items-center gap-1.5 px-2 py-0.5 bg-purple-500/10 border border-purple-500/30 text-purple-300 text-[10px] font-bold font-mono rounded" title="Massive plan provides delayed rather than real-time data">
-                🟣 DELAYED DATA
-              </span>
-            ) : currentStreamStatus === 'RECONNECTING' ? (
-              <span className="flex items-center gap-1.5 px-2 py-0.5 bg-amber-500/10 border border-amber-500/30 text-amber-400 text-[10px] font-bold font-mono rounded animate-pulse">
-                🟡 RECONNECTING
-              </span>
-            ) : currentStreamStatus === 'DISCONNECTED' ? (
-              <span className="flex items-center gap-1.5 px-2 py-0.5 bg-rose-500/10 border border-rose-500/30 text-rose-400 text-[10px] font-bold font-mono rounded">
-                🔴 DISCONNECTED
-              </span>
-            ) : (
-              <span className="flex items-center gap-1.5 px-2 py-0.5 bg-rose-500/10 border border-rose-500/30 text-rose-400 text-[10px] font-bold font-mono rounded">
-                🔴 LIVE DATA UNAVAILABLE
-              </span>
-            )}
+            <button
+              onClick={() => setIsDetailsOpen(true)}
+              className="hover:opacity-80 transition-opacity focus:outline-none"
+              title="Click to inspect real-time connection telemetry, provenance & session state"
+            >
+              {currentStreamStatus === 'LIVE' ? (
+                <span className="flex items-center gap-1.5 px-2 py-0.5 bg-emerald-500/10 border border-emerald-500/30 text-emerald-400 text-[10px] font-bold font-mono rounded cursor-pointer">
+                  <span className="h-1.5 w-1.5 rounded-full bg-emerald-400 animate-pulse"></span>
+                  🟢 LIVE FEED
+                </span>
+              ) : currentStreamStatus === 'DELAYED DATA' ? (
+                <span className="flex items-center gap-1.5 px-2 py-0.5 bg-purple-500/10 border border-purple-500/30 text-purple-300 text-[10px] font-bold font-mono rounded cursor-pointer" title="Delayed data feed">
+                  {AppConfig.marketDataMode === 'end_of_day' ? '🟣 END-OF-DAY DATA' : '🟣 DELAYED DATA'}
+                </span>
+              ) : currentStreamStatus === 'DISCONNECTED' ? (
+                <span className="flex items-center gap-1.5 px-2 py-0.5 bg-rose-500/10 border border-rose-500/30 text-rose-400 text-[10px] font-bold font-mono rounded cursor-pointer">
+                  🔴 SESSION CLOSED
+                </span>
+              ) : (
+                <span className="flex items-center gap-1.5 px-2 py-0.5 bg-rose-500/10 border border-rose-500/30 text-rose-400 text-[10px] font-bold font-mono rounded cursor-pointer">
+                  🔴 DATA UNAVAILABLE
+                </span>
+              )}
+            </button>
 
             <span className="text-[10px] text-slate-400 font-mono hidden md:inline">
               Last update: {lastUpdateStr || 'Connecting...'}
@@ -986,8 +994,32 @@ export const RealTimeStockChart: React.FC<RealTimeStockChartProps> = ({
           </div>
         </div>
 
-        {/* Right: Timeframe Buttons, Indicators, EXT Hours & AI Analyze Button */}
+        {/* Right: Engine Switcher, Timeframe Buttons, Indicators, EXT Hours & AI Analyze Button */}
         <div className="flex flex-wrap items-center gap-1.5">
+          {/* Chart Engine Switcher */}
+          <div className="flex items-center bg-[#1c1f24] border border-[#2d3139] rounded p-0.5" title="Switch between MarketMind Quant Engine and TradingView Advanced Chart">
+            <button
+              onClick={() => setChartEngine('marketmind')}
+              className={`px-2 py-1 text-[10px] font-mono font-bold rounded transition ${
+                chartEngine === 'marketmind'
+                  ? 'bg-[#6366f1] text-white shadow-sm'
+                  : 'text-slate-400 hover:text-white hover:bg-[#252830]'
+              }`}
+            >
+              Quant Engine
+            </button>
+            <button
+              onClick={() => setChartEngine('tradingview')}
+              className={`px-2 py-1 text-[10px] font-mono font-bold rounded transition flex items-center gap-1 ${
+                chartEngine === 'tradingview'
+                  ? 'bg-[#10b981] text-white shadow-sm'
+                  : 'text-slate-400 hover:text-white hover:bg-[#252830]'
+              }`}
+            >
+              <span>TradingView</span>
+            </button>
+          </div>
+
           {/* Timeframe Buttons */}
           <div className="flex items-center bg-[#1c1f24] border border-[#2d3139] rounded p-0.5">
             {TIMEFRAMES.map((tf) => (
@@ -1348,19 +1380,36 @@ export const RealTimeStockChart: React.FC<RealTimeStockChartProps> = ({
         </div>
       </div>
 
-      {/* 5. MAIN TRADINGVIEW CANDLESTICK CHART CONTAINER */}
-      <div className="relative w-full overflow-hidden rounded border border-[#2d3139] bg-[#131518]">
-        {isLoading && (
-          <div className="absolute inset-0 bg-[#131518]/70 backdrop-blur-xs flex flex-col items-center justify-center z-20">
-            <div className="w-7 h-7 border-2 border-[#6366f1] border-t-transparent rounded-full animate-spin mb-2" />
-            <span className="text-xs font-mono font-bold text-slate-300">
-              Loading {ticker} {timeframe.toUpperCase()} Candles...
-            </span>
-          </div>
-        )}
+      {/* 5. MAIN CANDLESTICK CHART CONTAINER (MARKETMIND QUANT & TRADINGVIEW ENGINES) */}
+      <div className="relative w-full overflow-hidden rounded-xl border border-[#242424] bg-[#0A0A0A]">
+        {chartEngine === 'tradingview' ? (
+          <TradingViewChart
+            symbol={ticker}
+            interval={timeframe}
+            theme={isDark ? 'dark' : 'light'}
+            allowSymbolChange={true}
+            hideSideToolbar={false}
+            hideTopToolbar={false}
+            hideLegend={false}
+            hideVolume={false}
+            saveImage={true}
+            className="border-0 rounded-none"
+          />
+        ) : (
+          <>
+            {isLoading && (
+              <div className="absolute inset-0 bg-[#131518]/70 backdrop-blur-xs flex flex-col items-center justify-center z-20">
+                <div className="w-7 h-7 border-2 border-[#6366f1] border-t-transparent rounded-full animate-spin mb-2" />
+                <span className="text-xs font-mono font-bold text-slate-300">
+                  Loading {ticker} {timeframe.toUpperCase()} Candles...
+                </span>
+              </div>
+            )}
 
-        {/* Chart canvas mounted here */}
-        <div ref={chartContainerRef} className="w-full" style={{ height: '480px' }} />
+            {/* Chart canvas mounted here */}
+            <div ref={chartContainerRef} className="w-full min-h-[450px] md:min-h-[600px] h-[520px] md:h-[620px]" />
+          </>
+        )}
       </div>
 
       {/* 6. SUB-INDICATORS STRIP: RSI (14) & MACD Quick Gauge */}
@@ -1531,6 +1580,15 @@ export const RealTimeStockChart: React.FC<RealTimeStockChartProps> = ({
           </div>
         </div>
       )}
+
+      {/* Real-time Data Details Modal */}
+      <DataDetailsModal
+        isOpen={isDetailsOpen}
+        onClose={() => setIsDetailsOpen(false)}
+        symbol={ticker}
+        quote={rtQuote}
+        status={currentStreamStatus === 'LIVE' ? 'CONNECTED' : 'DISCONNECTED'}
+      />
     </div>
   );
 };

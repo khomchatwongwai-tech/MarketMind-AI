@@ -10,13 +10,30 @@ import {
   AdminSubscriptionMetrics,
 } from '../types/subscription';
 
+async function getAuthHeaders(): Promise<Record<string, string>> {
+  const headers: Record<string, string> = {
+    'Content-Type': 'application/json',
+  };
+  try {
+    const { auth } = await import('../config/firebase');
+    if (auth.currentUser) {
+      const token = await auth.currentUser.getIdToken();
+      headers['Authorization'] = `Bearer ${token}`;
+      return headers;
+    }
+  } catch {}
+
+  return headers;
+}
+
 export class BillingService {
   /**
    * Fetch all plans & configuration
    */
   static async getPlans(): Promise<{ trialDurationDays: number; plans: Record<SubscriptionPlanId, PlanFeatureConfig> }> {
     try {
-      const res = await fetch('/api/billing/plans');
+      const headers = await getAuthHeaders();
+      const res = await fetch('/api/billing/plans', { headers });
       if (!res.ok) throw new Error('Failed to load subscription plans');
       return await res.json();
     } catch (e) {
@@ -30,9 +47,10 @@ export class BillingService {
    * Start 15-Day Free Trial
    */
   static async startTrial(email: string, planId: SubscriptionPlanId = 'pro'): Promise<{ message: string; user: UserProfile }> {
+    const headers = await getAuthHeaders();
     const res = await fetch('/api/billing/start-trial', {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers,
       body: JSON.stringify({ email, planId }),
     });
     const data = await res.json();
@@ -55,9 +73,10 @@ export class BillingService {
     disclaimer?: string;
     simulatedPlan?: PlanFeatureConfig;
   }> {
+    const headers = await getAuthHeaders();
     const res = await fetch('/api/billing/create-checkout-session', {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers,
       body: JSON.stringify({ email, planId, billingCycle }),
     });
     return await res.json();
@@ -71,9 +90,10 @@ export class BillingService {
     portalUrl?: string;
     message?: string;
   }> {
+    const headers = await getAuthHeaders();
     const res = await fetch('/api/billing/create-portal-session', {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers,
       body: JSON.stringify({ email }),
     });
     return await res.json();
@@ -87,9 +107,10 @@ export class BillingService {
     planId: SubscriptionPlanId,
     billingCycle: 'monthly' | 'annual' = 'monthly'
   ): Promise<{ message: string; user: UserProfile }> {
+    const headers = await getAuthHeaders();
     const res = await fetch('/api/billing/change-plan', {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers,
       body: JSON.stringify({ email, planId, billingCycle }),
     });
     const data = await res.json();
@@ -105,9 +126,10 @@ export class BillingService {
     user: UserProfile;
     accessUntil: string;
   }> {
+    const headers = await getAuthHeaders();
     const res = await fetch('/api/billing/cancel-subscription', {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers,
       body: JSON.stringify({ email }),
     });
     const data = await res.json();
@@ -120,7 +142,8 @@ export class BillingService {
    */
   static async getBillingHistory(email: string): Promise<BillingInvoice[]> {
     try {
-      const res = await fetch(`/api/billing/history?email=${encodeURIComponent(email)}`);
+      const headers = await getAuthHeaders();
+      const res = await fetch(`/api/billing/history?email=${encodeURIComponent(email)}`, { headers });
       const data = await res.json();
       return data.invoices || [];
     } catch {
@@ -133,7 +156,8 @@ export class BillingService {
    */
   static async getAdminMetrics(): Promise<AdminSubscriptionMetrics> {
     try {
-      const res = await fetch('/api/billing/admin-metrics');
+      const headers = await getAuthHeaders();
+      const res = await fetch('/api/billing/admin-metrics', { headers });
       return await res.json();
     } catch {
       return {

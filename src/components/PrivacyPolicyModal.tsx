@@ -66,10 +66,10 @@ export const PrivacyPolicyModal: React.FC<PrivacyPolicyModalProps> = ({
 
           <section className="space-y-1.5">
             <h3 className="text-sm font-bold text-white uppercase tracking-wider">
-              3. Data Security &amp; Encryption
+              3. Data Security &amp; Transport Encryption
             </h3>
             <p>
-              All transit traffic is strictly encrypted using TLS 1.3 with AES-256-GCM cipher suites. Programmatic API secrets are hashed with salted Argon2id algorithms and are never stored in plaintext.
+              MarketMind uses managed authentication services and industry-standard HTTPS/TLS encrypted connections for data in transit. Authentication credentials are handled by the configured identity provider rather than a separate MarketMind password-hashing system.
             </p>
           </section>
 

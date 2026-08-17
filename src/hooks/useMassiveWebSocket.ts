@@ -5,6 +5,7 @@ import {
   CalculatedMarketSignals,
   MassiveAiInsight,
 } from '../types/massiveWs';
+import { AppConfig } from '../config/environment';
 
 export interface UseMassiveWebSocketReturn {
   status: MassiveWsStatus;
@@ -35,10 +36,11 @@ export interface UseMassiveWebSocketReturn {
 }
 
 export function useMassiveWebSocket(initialTicker: string = 'SPY'): UseMassiveWebSocketReturn {
-  const [status, setStatus] = useState<MassiveWsStatus>('CONNECTING');
-  const [isDelayed, setIsDelayed] = useState<boolean>(false);
+  const endOfDayMode = AppConfig.marketDataMode === 'end_of_day';
+  const [status, setStatus] = useState<MassiveWsStatus>(endOfDayMode ? 'DELAYED DATA' : 'CONNECTING');
+  const [isDelayed, setIsDelayed] = useState<boolean>(endOfDayMode);
   const [ticker, setTicker] = useState<string>(initialTicker);
-  const [livePrice, setLivePrice] = useState<number>(512.48);
+  const [livePrice, setLivePrice] = useState<number>(0);
   const [liveTrade, setLiveTrade] = useState<UseMassiveWebSocketReturn['liveTrade']>(null);
   const [liveAggregate, setLiveAggregate] = useState<UseMassiveWebSocketReturn['liveAggregate']>(null);
   const [signals, setSignals] = useState<CalculatedMarketSignals | null>(null);
@@ -49,6 +51,12 @@ export function useMassiveWebSocket(initialTicker: string = 'SPY'): UseMassiveWe
   const reconnectTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
   const connect = useCallback(() => {
+    if (endOfDayMode) {
+      setStatus('DELAYED DATA');
+      setIsDelayed(true);
+      setIsConnected(false);
+      return;
+    }
     try {
       if (wsRef.current && (wsRef.current.readyState === WebSocket.OPEN || wsRef.current.readyState === WebSocket.CONNECTING)) {
         return;
@@ -62,7 +70,7 @@ export function useMassiveWebSocket(initialTicker: string = 'SPY'): UseMassiveWe
 
       ws.onopen = () => {
         setIsConnected(true);
-        setStatus('LIVE');
+        setStatus('CONNECTING');
         // Subscribe only to active ticker (default SPY)
         ws.send(JSON.stringify({ action: 'SUBSCRIBE', ticker }));
       };
@@ -97,12 +105,16 @@ export function useMassiveWebSocket(initialTicker: string = 'SPY'): UseMassiveWe
 
           if (msg.type === 'SIGNALS' && msg.signals) {
             setSignals(msg.signals);
-            setLivePrice(msg.signals.price);
+            if (msg.signals.price > 0) setLivePrice(msg.signals.price);
             if (msg.signals.isDelayed !== undefined) setIsDelayed(msg.signals.isDelayed);
           }
 
           if (msg.type === 'AI_INSIGHT' && msg.aiInsight) {
             setAiInsight(msg.aiInsight);
+          }
+
+          if (msg.type === 'ERROR') {
+            setStatus('ERROR');
           }
         } catch (e) {
           console.warn('[useMassiveWebSocket] Error parsing server message:', e);
@@ -126,7 +138,7 @@ export function useMassiveWebSocket(initialTicker: string = 'SPY'): UseMassiveWe
     } catch (err) {
       console.error('[useMassiveWebSocket] Connection exception:', err);
     }
-  }, [ticker]);
+  }, [ticker, endOfDayMode]);
 
   useEffect(() => {
     connect();
@@ -174,4 +186,3 @@ export function useMassiveWebSocket(initialTicker: string = 'SPY'): UseMassiveWe
     reconnect,
   };
 }
-

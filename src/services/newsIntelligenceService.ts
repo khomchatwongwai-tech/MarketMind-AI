@@ -393,9 +393,9 @@ export class NewsIntelligenceService {
       else neutralCount++;
     }
 
-    const currentPrice = liveQuote?.price || (sym === 'NVDA' ? 128.60 : sym === 'AAPL' ? 224.20 : sym === 'TSLA' ? 218.40 : 512.48);
-    const priceChange = liveQuote?.change || (sym === 'NVDA' ? 3.70 : sym === 'AAPL' ? 2.70 : sym === 'TSLA' ? 5.60 : 4.20);
-    const priceChangePercent = liveQuote?.changePercent || (sym === 'NVDA' ? 2.96 : sym === 'AAPL' ? 1.22 : sym === 'TSLA' ? 2.63 : 0.82);
+    const currentPrice = liveQuote?.price ?? 0;
+    const priceChange = liveQuote?.change ?? 0;
+    const priceChangePercent = liveQuote?.changePercent ?? 0;
 
     const sources: VerifiedSourceCitation[] = newsItems.map((n) => ({
       sourceName: n.source,
@@ -646,7 +646,7 @@ export class NewsIntelligenceService {
     return this.savedArticles;
   }
 
-  saveArticle(item: { articleId: string; headline: string; publisher: string; url: string; tickers?: string[]; notes?: string }): SavedArticle {
+  saveArticle(item: { articleId: string; headline: string; publisher: string; publishedAt?: string; url: string; tickers?: string[]; notes?: string }): SavedArticle {
     const existing = this.savedArticles.find((a) => a.articleId === item.articleId || a.url === item.url);
     if (existing) {
       return existing;
@@ -656,7 +656,7 @@ export class NewsIntelligenceService {
       articleId: item.articleId,
       headline: item.headline,
       publisher: item.publisher,
-      publishedAt: new Date().toISOString(),
+      publishedAt: item.publishedAt || new Date().toISOString(),
       url: item.url,
       tickers: item.tickers || ['SPY'],
       savedAt: new Date().toISOString(),
@@ -875,7 +875,7 @@ export class NewsIntelligenceService {
         licenseStatus: 'ACTIVE_LICENSED',
         endpointOrFeedUrl: 'https://search.cnbc.com/rs/search/view.html',
         maskedCredential: process.env.CNBC_API_KEY
-          ? 'CNBC_API_KEY: ••••••••' + process.env.CNBC_API_KEY.slice(-4) + ' (Optional)'
+          ? 'CNBC_API_KEY: Configured (value hidden)'
           : 'CNBC_FEED_URL: Unauthenticated Official RSS Ingestion (Active)',
         isConfigured: true,
         isEnabled: true,
@@ -899,7 +899,7 @@ export class NewsIntelligenceService {
         licenseStatus: this.yahooProvider?.isConnectorUnavailable ? 'NOT_CONNECTED' : 'ACTIVE_LICENSED',
         endpointOrFeedUrl: 'https://finance.yahoo.com/news/rssindex',
         maskedCredential: process.env.YAHOO_FINANCE_API_KEY
-          ? 'YAHOO_FINANCE_API_KEY: ••••••••' + process.env.YAHOO_FINANCE_API_KEY.slice(-4) + ' (Optional)'
+          ? 'YAHOO_FINANCE_API_KEY: Configured (value hidden)'
           : 'YAHOO_FINANCE_FEED_URL: Official RSS Feed (Active)',
         isConfigured: true,
         isEnabled: !this.yahooProvider?.isConnectorUnavailable,
@@ -926,7 +926,7 @@ export class NewsIntelligenceService {
         status: process.env.BLOOMBERG_API_KEY || process.env.BLOOMBERG_FEED_URL ? 'LIVE' : 'NOT_CONFIGURED',
         licenseStatus: process.env.BLOOMBERG_API_KEY || process.env.BLOOMBERG_FEED_URL ? 'ACTIVE_LICENSED' : 'NOT_CONNECTED',
         endpointOrFeedUrl: process.env.BLOOMBERG_FEED_URL || 'https://api.bloomberg.com/enterprise/v1/news (Awaiting Key)',
-        maskedCredential: process.env.BLOOMBERG_API_KEY ? 'BLOOMBERG_API_KEY: ••••••••' + process.env.BLOOMBERG_API_KEY.slice(-4) : 'Enterprise License Key Not Configured',
+        maskedCredential: process.env.BLOOMBERG_API_KEY ? 'BLOOMBERG_API_KEY: Configured (value hidden)' : 'Enterprise License Key Not Configured',
         isConfigured: Boolean(process.env.BLOOMBERG_API_KEY || process.env.BLOOMBERG_FEED_URL),
         isEnabled: true,
         lastSuccessfulSync: process.env.BLOOMBERG_API_KEY ? new Date().toISOString() : undefined,
@@ -992,7 +992,7 @@ export class NewsIntelligenceService {
         status: process.env.BENZINGA_API_KEY ? 'LIVE' : 'ONLINE',
         licenseStatus: process.env.BENZINGA_API_KEY ? 'ACTIVE_LICENSED' : 'ACTIVE_LICENSED',
         endpointOrFeedUrl: 'https://api.benzinga.com/api/v2/news',
-        maskedCredential: process.env.BENZINGA_API_KEY ? 'BENZINGA_API_KEY: ••••••••' + process.env.BENZINGA_API_KEY.slice(-4) : 'Sandbox / Default Feed Mode',
+        maskedCredential: process.env.BENZINGA_API_KEY ? 'BENZINGA_API_KEY: Configured (value hidden)' : 'Not configured',
         isConfigured: true,
         isEnabled: true,
         lastSuccessfulSync: new Date().toISOString(),
@@ -1014,7 +1014,7 @@ export class NewsIntelligenceService {
         status: process.env.MASSIVE_API_KEY || process.env.POLYGON_API_KEY ? 'LIVE' : 'ONLINE',
         licenseStatus: 'ACTIVE_LICENSED',
         endpointOrFeedUrl: 'https://api.polygon.io/v2/reference/news',
-        maskedCredential: process.env.MASSIVE_API_KEY ? 'MASSIVE_API_KEY: ••••••••' + process.env.MASSIVE_API_KEY.slice(-4) : 'Public Tier Mode',
+        maskedCredential: process.env.MASSIVE_API_KEY || process.env.POLYGON_API_KEY ? 'MASSIVE/POLYGON API key: Configured (value hidden)' : 'Not configured',
         isConfigured: true,
         isEnabled: true,
         lastSuccessfulSync: new Date().toISOString(),
@@ -1036,7 +1036,7 @@ export class NewsIntelligenceService {
         status: process.env.FINNHUB_API_KEY ? 'LIVE' : 'ONLINE',
         licenseStatus: 'ACTIVE_LICENSED',
         endpointOrFeedUrl: 'https://finnhub.io/api/v1/news',
-        maskedCredential: process.env.FINNHUB_API_KEY ? 'FINNHUB_API_KEY: ••••••••' + process.env.FINNHUB_API_KEY.slice(-4) : 'Standard License Mode',
+        maskedCredential: process.env.FINNHUB_API_KEY ? 'FINNHUB_API_KEY: Configured (value hidden)' : 'Not configured',
         isConfigured: true,
         isEnabled: true,
         lastSuccessfulSync: new Date().toISOString(),
@@ -1055,14 +1055,14 @@ export class NewsIntelligenceService {
         tier: 'TIER_2_FINANCIAL',
         sourceType: 'LICENSED_API',
         feedDelay: 'REAL_TIME',
-        status: process.env.ALPACA_API_KEY ? 'LIVE' : 'ONLINE',
-        licenseStatus: 'ACTIVE_LICENSED',
+        status: process.env.ALPACA_API_KEY && process.env.ALPACA_API_SECRET ? 'LIVE' : 'NOT_CONFIGURED',
+        licenseStatus: process.env.ALPACA_API_KEY && process.env.ALPACA_API_SECRET ? 'ACTIVE_LICENSED' : 'NOT_CONNECTED',
         endpointOrFeedUrl: 'https://data.alpaca.markets/v1beta1/news / SSE Stream',
-        maskedCredential: process.env.ALPACA_API_KEY ? 'ALPACA_API_KEY: ••••••••' + process.env.ALPACA_API_KEY.slice(-4) : 'Standard Stream Mode',
-        isConfigured: true,
+        maskedCredential: process.env.ALPACA_API_KEY && process.env.ALPACA_API_SECRET ? 'Alpaca credentials: Configured (values hidden)' : 'Not configured',
+        isConfigured: Boolean(process.env.ALPACA_API_KEY && process.env.ALPACA_API_SECRET),
         isEnabled: true,
-        lastSuccessfulSync: new Date().toISOString(),
-        requestVolume24h: 650,
+        lastSuccessfulSync: undefined,
+        requestVolume24h: 0,
         errorCount24h: 0,
         avgLatencyMs: 36,
         retentionDays: 90,
@@ -1202,4 +1202,3 @@ export class NewsIntelligenceService {
 }
 
 export const newsIntelligenceService = new NewsIntelligenceService();
-

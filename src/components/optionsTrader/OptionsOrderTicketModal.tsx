@@ -155,9 +155,22 @@ export const OptionsOrderTicketModal: React.FC<OptionsOrderTicketModalProps> = (
         result = optionsPaperTradingService.submitPaperOrder(orderRequest);
       } else {
         // Send to live broker endpoint with explicit confirmation
+        let authHeader = '';
+        try {
+          const { auth } = await import('../../config/firebase');
+          if (auth.currentUser) {
+            const token = await auth.currentUser.getIdToken();
+            authHeader = `Bearer ${token}`;
+          }
+        } catch {}
+        if (!authHeader) throw new Error('Please sign in before submitting an order.');
+
+        const headers: Record<string, string> = { 'Content-Type': 'application/json' };
+        if (authHeader) headers['Authorization'] = authHeader;
+
         const response = await fetch('/api/options/order/submit', {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
+          headers,
           body: JSON.stringify({ request: orderRequest }),
         });
 

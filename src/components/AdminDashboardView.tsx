@@ -26,6 +26,8 @@ import { SupportTicket, UserProfile } from '../types/user';
 import { UserService } from '../services/userService';
 import { CommunityService } from '../services/community/communityService';
 import { CommunityReport, CommunityModerationAction } from '../types/community';
+import { RealTimeDiagnosticsPanel } from './markets/RealTimeDiagnosticsPanel';
+import { Zap } from 'lucide-react';
 
 interface AdminDashboardViewProps {
   currentUser: UserProfile;
@@ -34,7 +36,21 @@ interface AdminDashboardViewProps {
 export const AdminDashboardView: React.FC<AdminDashboardViewProps> = ({
   currentUser,
 }) => {
-  const [activeTab, setActiveTab] = useState<'overview' | 'users' | 'tickets' | 'broadcast' | 'moderation'>('overview');
+  const isAdmin = currentUser?.role === 'admin' || currentUser?.role === 'super_admin';
+
+  if (!isAdmin) {
+    return (
+      <div className="flex flex-col items-center justify-center p-12 bg-[#15171a] border border-[#2d3139] rounded-xl text-center my-6">
+        <ShieldAlert className="w-12 h-12 text-[#EF4444] mb-3 animate-pulse" />
+        <h2 className="text-xl font-bold text-[#F8FAFC]">Administrative Authorization Required</h2>
+        <p className="text-sm text-[#94A3B8] mt-1 max-w-md">
+          Your current account does not have verified administrative privileges to access the MarketMind AI Control Center.
+        </p>
+      </div>
+    );
+  }
+
+  const [activeTab, setActiveTab] = useState<'overview' | 'realtime' | 'users' | 'tickets' | 'broadcast' | 'moderation'>('realtime');
   const [tickets, setTickets] = useState<SupportTicket[]>(UserService.getSupportTickets());
   const [selectedTicket, setSelectedTicket] = useState<SupportTicket | null>(null);
   const [replyText, setReplyText] = useState('');
@@ -50,7 +66,7 @@ export const AdminDashboardView: React.FC<AdminDashboardViewProps> = ({
 
   // Mock user roster for admin
   const [usersList, setUsersList] = useState<Array<{ id: string; name: string; email: string; plan: string; joined: string; apiCalls: number; status: string }>>([
-    { id: 'usr_admin', name: 'Master Administrator', email: 'khomchatwongwai@gmail.com', plan: 'Enterprise', joined: '2025-01-15', apiCalls: 84290, status: 'Active' },
+    { id: 'usr_admin', name: 'System Administrator', email: 'admin@marketmind.ai', plan: 'Enterprise', joined: '2025-01-15', apiCalls: 84290, status: 'Active' },
     { id: 'usr_hedge_1', name: 'Citadel Quant Desk', email: 'trading@citadel-mock.com', plan: 'Enterprise', joined: '2025-03-10', apiCalls: 541200, status: 'Active' },
     { id: 'usr_prop_2', name: 'Apex Prop Traders', email: 'desk@apexprop-mock.com', plan: 'Institutional', joined: '2025-04-02', apiCalls: 189400, status: 'Active' },
     { id: 'usr_pro_3', name: 'Marcus Sterling', email: 'm.sterling@capital.io', plan: 'Pro', joined: '2025-06-18', apiCalls: 24500, status: 'Active' },
@@ -93,10 +109,19 @@ export const AdminDashboardView: React.FC<AdminDashboardViewProps> = ({
         </div>
 
         {/* Tab Buttons */}
-        <div className="flex items-center bg-[#1c1f24] p-1 rounded-lg border border-[#2d3139] text-xs font-bold">
+        <div className="flex flex-wrap items-center bg-[#1c1f24] p-1 rounded-lg border border-[#2d3139] text-xs font-bold gap-1">
+          <button
+            onClick={() => setActiveTab('realtime')}
+            className={`px-3 py-1.5 rounded transition flex items-center gap-1.5 ${
+              activeTab === 'realtime' ? 'bg-emerald-600 text-white font-bold' : 'text-emerald-400 hover:text-white'
+            }`}
+          >
+            <Zap className="w-3.5 h-3.5" />
+            <span>Real-Time Market Diagnostics</span>
+          </button>
           <button
             onClick={() => setActiveTab('overview')}
-            className={`px-3 py-1 rounded transition ${
+            className={`px-3 py-1.5 rounded transition ${
               activeTab === 'overview' ? 'bg-[#6366f1] text-white' : 'text-slate-400 hover:text-white'
             }`}
           >
@@ -104,7 +129,7 @@ export const AdminDashboardView: React.FC<AdminDashboardViewProps> = ({
           </button>
           <button
             onClick={() => setActiveTab('users')}
-            className={`px-3 py-1 rounded transition ${
+            className={`px-3 py-1.5 rounded transition ${
               activeTab === 'users' ? 'bg-[#6366f1] text-white' : 'text-slate-400 hover:text-white'
             }`}
           >
@@ -112,7 +137,7 @@ export const AdminDashboardView: React.FC<AdminDashboardViewProps> = ({
           </button>
           <button
             onClick={() => setActiveTab('tickets')}
-            className={`px-3 py-1 rounded transition ${
+            className={`px-3 py-1.5 rounded transition ${
               activeTab === 'tickets' ? 'bg-[#6366f1] text-white' : 'text-slate-400 hover:text-white'
             }`}
           >
@@ -120,7 +145,7 @@ export const AdminDashboardView: React.FC<AdminDashboardViewProps> = ({
           </button>
           <button
             onClick={() => setActiveTab('broadcast')}
-            className={`px-3 py-1 rounded transition ${
+            className={`px-3 py-1.5 rounded transition ${
               activeTab === 'broadcast' ? 'bg-[#6366f1] text-white' : 'text-slate-400 hover:text-white'
             }`}
           >
@@ -128,7 +153,7 @@ export const AdminDashboardView: React.FC<AdminDashboardViewProps> = ({
           </button>
           <button
             onClick={() => setActiveTab('moderation')}
-            className={`px-3 py-1 rounded transition flex items-center gap-1.5 ${
+            className={`px-3 py-1.5 rounded transition flex items-center gap-1.5 ${
               activeTab === 'moderation' ? 'bg-[#D4AF37] text-black font-bold' : 'text-[#F2D675] hover:text-white'
             }`}
           >
@@ -137,6 +162,11 @@ export const AdminDashboardView: React.FC<AdminDashboardViewProps> = ({
           </button>
         </div>
       </div>
+
+      {/* REAL-TIME DIAGNOSTICS TAB */}
+      {activeTab === 'realtime' && (
+        <RealTimeDiagnosticsPanel />
+      )}
 
       {/* OVERVIEW TAB */}
       {activeTab === 'overview' && (

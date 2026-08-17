@@ -5,13 +5,14 @@ import dotenv from 'dotenv';
 import { createServer as createViteServer } from 'vite';
 import { GoogleGenAI } from '@google/genai';
 import { MassiveWebSocketManager } from './src/services/massiveWsManager';
+import { RealtimeServerManager } from './src/server/realtimeServerManager';
 import {
   executeAskMarketMind,
   executeAnalyzeMarket,
   executeWhyIsItMoving,
   buildStructuredMarketContext,
 } from './src/services/geminiMarketService';
-import { ServerUserStore, hashPassword, DEFAULT_ADMIN_EMAIL } from './src/services/serverUserStore';
+import { FirestoreUserStore as ServerUserStore } from './src/server/firestoreUserStore';
 import { SUBSCRIPTION_PLANS, TRIAL_DURATION_DAYS } from './src/config/plans';
 import { SubscriptionPlanId } from './src/types/subscription';
 import { newsIntelligenceService } from './src/services/newsIntelligenceService';
@@ -19,12 +20,50 @@ import { InstrumentDirectoryService } from './src/services/marketProviders/Instr
 import { DataProviderRouter } from './src/services/marketProviders/DataProviderRouter';
 import { executeMultiAssetAIAnalysis } from './src/services/geminiMultiAssetService';
 import { UniversalAssetClass } from './src/types/instrument';
+import { requireAuth, requireRole, requireAnyRole, requireEntitlement, AuthenticatedRequest } from './src/server/authMiddleware';
+import { StripeService } from './src/server/stripeService';
+import { assertProductionEnvironment } from './src/server/productionPreflight';
+import { AlpacaMarketDataService, AlpacaProviderError } from './src/server/alpacaMarketDataService';
 
 dotenv.config();
 
-const PORT = 3000;
+const PORT = Number(process.env.PORT) || 3000;
 const app = express();
-app.use(express.json());
+app.disable('x-powered-by');
+app.set('trust proxy', 1);
+
+// Security Headers Middleware
+app.use((req, res, next) => {
+  res.setHeader('X-Content-Type-Options', 'nosniff');
+  res.setHeader('X-Frame-Options', 'DENY');
+  res.setHeader('X-XSS-Protection', '1; mode=block');
+  res.setHeader('Referrer-Policy', 'strict-origin-when-cross-origin');
+  res.setHeader('Permissions-Policy', 'camera=(), microphone=(), geolocation=()');
+  next();
+});
+
+// Capture raw body for Stripe webhook signature verification
+app.use(
+  express.json({
+    limit: '1mb',
+    verify: (req: any, _res, buf) => {
+      req.rawBody = buf;
+    },
+  })
+);
+
+const requestWindows = new Map<string, { count: number; resetAt: number }>();
+app.use('/api', (req, res, next) => {
+  const now = Date.now();
+  const key = req.ip || req.socket.remoteAddress || 'unknown';
+  const current = requestWindows.get(key);
+  const window = !current || current.resetAt <= now ? { count: 0, resetAt: now + 60_000 } : current;
+  window.count += 1;
+  requestWindows.set(key, window);
+  if (requestWindows.size > 10_000) for (const [id, value] of requestWindows) if (value.resetAt <= now) requestWindows.delete(id);
+  if (window.count > 180) return res.status(429).json({ error: 'Too many requests.', code: 'RATE_LIMITED' });
+  next();
+});
 
 // Lazy-initialize Gemini AI client
 let aiClient: GoogleGenAI | null = null;
@@ -105,6 +144,17 @@ app.get('/api/instruments/:instrumentId/chart', (req, res) => {
   }
 
   const candles = DataProviderRouter.generateMultiAssetCandles(instrument, timeframe, count);
+  if (candles.length === 0) {
+    return res.status(503).json({
+      instrumentId: instrument.instrumentId,
+      symbol: instrument.symbol,
+      timeframe,
+      status: 'UNAVAILABLE',
+      isDelayed: true,
+      error: 'Verified provider candles are unavailable. Synthetic candles are disabled.',
+      candles: [],
+    });
+  }
   res.json({
     instrumentId: instrument.instrumentId,
     symbol: instrument.symbol,
@@ -136,26 +186,19 @@ app.get('/api/instruments/:instrumentId/market-status', (req, res) => {
 });
 
 // 6. News for Multi-Asset Instrument
-app.get('/api/instruments/:instrumentId/news', (req, res) => {
+app.get('/api/instruments/:instrumentId/news', async (req, res) => {
   const idOrSymbol = req.params.instrumentId;
   const instrument =
     InstrumentDirectoryService.getById(idOrSymbol) ||
     InstrumentDirectoryService.getBySymbol(idOrSymbol);
 
-  const articles = newsIntelligenceService.getStoredArticles();
   const symbol = instrument?.symbol.toUpperCase() || idOrSymbol.toUpperCase();
-
-  const filtered = articles.filter(
-    (a) =>
-      a.tickers?.some((t) => t.toUpperCase().includes(symbol)) ||
-      a.headline.toUpperCase().includes(symbol) ||
-      a.summary.toUpperCase().includes(symbol)
-  );
+  const articles = await newsIntelligenceService.getAggregatedNews({ ticker: symbol, limit: 15 });
 
   res.json({
     instrumentId: instrument?.instrumentId || idOrSymbol,
     symbol,
-    articles: filtered.length > 0 ? filtered.slice(0, 15) : articles.slice(0, 10),
+    articles,
   });
 });
 
@@ -197,18 +240,19 @@ app.get('/api/providers/status', (req, res) => {
 });
 
 // 10. Admin Instrument Sync Endpoint
-app.post('/api/admin/instruments/sync', (req, res) => {
+app.post('/api/admin/instruments/sync', requireAuth, requireRole('admin'), (req: AuthenticatedRequest, res) => {
   const all = InstrumentDirectoryService.getAll();
   res.json({
     status: 'success',
     message: 'Master Instrument Directory successfully synchronized across all licensed provider feeds.',
     totalInstruments: all.length,
     timestamp: new Date().toISOString(),
+    executedBy: req.user?.uid,
   });
 });
 
 // 11. Asset-Aware AI Analysis Endpoint
-app.post('/api/ai/analyze-instrument', async (req, res) => {
+app.post('/api/ai/analyze-instrument', requireAuth, async (req, res) => {
   try {
     const { instrumentId, prompt } = req.body;
     const instrument =
@@ -417,7 +461,7 @@ app.get('/api/market/candles/:ticker', async (req, res) => {
 
           const lastCandle = candles[candles.length - 1];
           const currentPrice = lastCandle.close;
-          const prevClose = candles.length > 1 ? candles[candles.length - 2].close : currentPrice * 0.995;
+          const prevClose = candles.length > 1 ? candles[candles.length - 2].close : currentPrice;
           const pivot = Number((((dayHigh > 0 ? dayHigh : currentPrice) + (dayLow < Infinity ? dayLow : currentPrice) + prevClose) / 3).toFixed(2));
 
           return res.json({
@@ -442,8 +486,8 @@ app.get('/api/market/candles/:ticker', async (req, res) => {
               r2: Number((pivot + ((dayHigh > 0 ? dayHigh : currentPrice) - (dayLow < Infinity ? dayLow : currentPrice))).toFixed(2)),
               s1: Number((2 * pivot - (dayHigh > 0 ? dayHigh : currentPrice)).toFixed(2)),
               s2: Number((pivot - ((dayHigh > 0 ? dayHigh : currentPrice) - (dayLow < Infinity ? dayLow : currentPrice))).toFixed(2)),
-              pdh: Number((prevClose * 1.008).toFixed(2)),
-              pdl: Number((prevClose * 0.992).toFixed(2)),
+              pdh: dayHigh > 0 ? Number(dayHigh.toFixed(2)) : undefined,
+              pdl: dayLow < Infinity ? Number(dayLow.toFixed(2)) : undefined,
               pdc: prevClose,
             },
             candles: candles.slice(-500),
@@ -461,7 +505,27 @@ app.get('/api/market/candles/:ticker', async (req, res) => {
     }
   }
 
-  // 2. Fallback to Yahoo Finance live query
+  // 2. Alpaca IEX fallback. This is an exchange feed, not consolidated SIP data.
+  if (process.env.ALPACA_API_KEY && process.env.ALPACA_API_SECRET) {
+    try {
+      const alpacaTimeframes: Record<string, string> = { '1m': '1Min', '5m': '5Min', '15m': '15Min', '30m': '30Min', '1h': '1Hour', '1d': '1Day', '1w': '1Week' };
+      const bars = await new AlpacaMarketDataService().getBars(ticker, alpacaTimeframes[timeframe.toLowerCase()] || '5Min', 500);
+      if (bars.length) {
+        const last = bars[bars.length - 1];
+        const previous = bars.length > 1 ? bars[bars.length - 2].close : last.close;
+        return res.json({ source: 'Alpaca IEX Market Data', feed: 'iex', isConsolidated: false, status: 'SUCCESS', ticker, timeframe,
+          price: last.close, change: last.close - previous, changePercent: previous > 0 ? (last.close - previous) / previous * 100 : 0,
+          previousClose: previous, dayHigh: last.high, dayLow: last.low,
+          candles: bars.map((bar) => ({ time: Math.floor(bar.timestamp / 1000), open: bar.open, high: bar.high, low: bar.low,
+            close: bar.close, volume: bar.volume, vwap: bar.vwap, session: 'REGULAR' })), timestamp: Date.now() });
+      }
+    } catch (error) {
+      const code = error instanceof AlpacaProviderError ? error.code : 'UNAVAILABLE';
+      console.warn(`[AlpacaIEX] Candle provider ${code} for ${ticker}`);
+    }
+  }
+
+  // 3. Fallback to Yahoo Finance live query
   try {
     const yahooUrl = `https://query1.finance.yahoo.com/v8/finance/chart/${encodeURIComponent(
       ticker
@@ -484,7 +548,10 @@ app.get('/api/market/candles/:ticker', async (req, res) => {
         const lows: (number | null)[] = quoteObj.low || [];
         const volumes: (number | null)[] = quoteObj.volume || [];
 
-        const currentPrice = meta.regularMarketPrice ?? meta.previousClose ?? 500;
+        const currentPrice = Number(meta.regularMarketPrice ?? meta.previousClose);
+        if (!Number.isFinite(currentPrice) || currentPrice <= 0) {
+          throw new Error(`No verified candle price returned for ${ticker}`);
+        }
         const prevClose = meta.chartPreviousClose ?? meta.previousClose ?? currentPrice;
 
         // Build candles
@@ -600,8 +667,8 @@ app.get('/api/market/candles/:ticker', async (req, res) => {
             r2,
             s1,
             s2,
-            pdh: Number(prevClose * 1.008),
-            pdl: Number(prevClose * 0.992),
+            pdh: dayHigh > 0 ? Number(dayHigh.toFixed(2)) : undefined,
+            pdl: dayLow < Infinity ? Number(dayLow.toFixed(2)) : undefined,
             pdc: Number(prevClose.toFixed(2)),
           },
           candles: candles.slice(-500),
@@ -617,101 +684,29 @@ app.get('/api/market/candles/:ticker', async (req, res) => {
 
     throw new Error('Live Yahoo Candle stream unavailable');
   } catch (err: any) {
-    console.warn(`[CandleAPI] Yahoo Candle fallback for ${ticker} (${timeframe}):`, err.message);
+    console.warn(`[CandleAPI] Candle fetch failure for ${ticker} (${timeframe}):`, err.message);
 
-    // High quality deterministic candle generator fallback
-    const basePrices: Record<string, number> = {
-      SPY: 512.48,
-      QQQ: 442.35,
-      NVDA: 128.60,
-      TSLA: 218.40,
-      AAPL: 224.20,
-      MSFT: 428.90,
-      AMZN: 186.75,
-      META: 514.30,
-      AMD: 154.20,
-      IWM: 214.80,
-      COIN: 215.30,
-      PLTR: 31.80,
-    };
-    const currentPrice = basePrices[ticker] || 150.0;
-    const prevClose = Number((currentPrice * 0.994).toFixed(2));
-    const nowSec = Math.floor(Date.now() / 1000);
-    const stepSec = timeframe === '1m' ? 60 : timeframe === '2m' ? 120 : timeframe === '15m' ? 900 : timeframe === '30m' ? 1800 : timeframe === '1h' ? 3600 : timeframe === '4h' ? 14400 : timeframe === '1d' ? 86400 : timeframe === '1w' ? 604800 : 300;
-    const count = 78;
-
-    let rollingPrice = prevClose;
-    let cumVol = 0;
-    let cumPV = 0;
-    const candles = [];
-
-    for (let i = count; i >= 0; i--) {
-      const ts = nowSec - i * stepSec;
-      const noise = (Math.sin(i * 0.4) + (Math.random() - 0.47) * 0.5) * 0.35;
-      const open = rollingPrice;
-      const close = Number((rollingPrice + noise).toFixed(2));
-      const high = Number((Math.max(open, close) + Math.random() * 0.3).toFixed(2));
-      const low = Number((Math.min(open, close) - Math.random() * 0.3).toFixed(2));
-      const vol = Math.floor(15000 + Math.random() * 45000);
-      rollingPrice = close;
-
-      cumPV += ((high + low + close) / 3) * vol;
-      cumVol += vol;
-      const vwap = Number((cumPV / cumVol).toFixed(2));
-
-      candles.push({
-        time: ts,
-        open,
-        high,
-        low,
-        close,
-        volume: vol,
-        session: (i > count - 15 ? 'REGULAR' : 'REGULAR') as 'REGULAR',
-        vwap,
-      });
-    }
-
-    const dayHigh = Number((currentPrice * 1.008).toFixed(2));
-    const dayLow = Number((currentPrice * 0.991).toFixed(2));
-    const pivot = Number(((dayHigh + dayLow + prevClose) / 3).toFixed(2));
-
-    return res.json({
+    return res.status(503).json({
       source: 'Market Real-Time Proxy Engine',
-      status: 'FALLBACK_CANDLES',
+      status: 'UNAVAILABLE',
       ticker,
       name: `${ticker} Stock`,
       timeframe,
       currency: 'USD',
       exchange: 'US Equities',
-      price: currentPrice,
-      change: Number((currentPrice - prevClose).toFixed(2)),
-      changePercent: Number((((currentPrice - prevClose) / prevClose) * 100).toFixed(2)),
-      previousClose: prevClose,
-      dayHigh,
-      dayLow,
-      levels: {
-        pivot,
-        r1: Number((2 * pivot - dayLow).toFixed(2)),
-        r2: Number((pivot + (dayHigh - dayLow)).toFixed(2)),
-        s1: Number((2 * pivot - dayHigh).toFixed(2)),
-        s2: Number((pivot - (dayHigh - dayLow)).toFixed(2)),
-        pdh: Number((prevClose * 1.008).toFixed(2)),
-        pdl: Number((prevClose * 0.992).toFixed(2)),
-        pdc: prevClose,
-      },
-      candles,
-      lastSyncTime: new Date().toLocaleTimeString('en-US', {
-        hour: '2-digit',
-        minute: '2-digit',
-        second: '2-digit',
-        timeZone: 'America/New_York',
-      }) + ' ET',
+      price: null,
+      change: 0,
+      changePercent: 0,
+      previousClose: null,
+      candles: [],
+      error: 'Candle data temporarily unavailable from upstream providers.',
+      timestamp: Date.now(),
     });
   }
 });
 
 // AI Structured Chart Analysis endpoint
-app.post('/api/ai/analyze-chart', async (req, res) => {
+app.post('/api/ai/analyze-chart', requireAuth, async (req, res) => {
   try {
     const {
       ticker = 'SPY',
@@ -816,7 +811,7 @@ Return a comprehensive, institutional-grade probabilistic chart analysis in JSON
 }`;
 
     const response = await ai.models.generateContent({
-      model: 'gemini-3.7-flash',
+      model: process.env.GEMINI_MODEL || 'gemini-2.5-flash',
       contents: prompt,
       config: {
         responseMimeType: 'application/json',
@@ -831,26 +826,24 @@ Return a comprehensive, institutional-grade probabilistic chart analysis in JSON
     });
   } catch (error: any) {
     console.error('AI Analyze Chart error:', error?.message);
-    const { ticker = 'SPY', timeframe = '5M', currentPrice = '512.48', vwap = '510.18' } = req.body;
+    const { ticker = 'SPY', timeframe = '5M', currentPrice = null, vwap = null } = req.body;
+    if (!currentPrice) {
+      return res.status(503).json({ error: 'AI Chart analysis unavailable without verified current price.' });
+    }
     return res.json({
-      currentTrend: `Bullish Consolidation (${timeframe})`,
-      bullishSignals: [
-        `Price ($${currentPrice}) holds above session VWAP ($${vwap}).`,
-        `Short-term moving averages aligned in bullish order.`,
-      ],
-      bearishSignals: [
-        `Overhead resistance near recent swing high.`,
-      ],
-      importantSupport: [`VWAP: $${vwap}`, `S1 Support`],
+      currentTrend: `Consolidation (${timeframe})`,
+      bullishSignals: vwap ? [`Price ($${currentPrice}) relative to session VWAP ($${vwap}).`] : [`Current price is $${currentPrice}.`],
+      bearishSignals: [`Monitor supply near resistance levels.`],
+      importantSupport: vwap ? [`VWAP: $${vwap}`, `S1 Support`] : [`S1 Support`],
       importantResistance: [`R1 Resistance`, `Day High`],
       breakoutLevel: `$${(Number(currentPrice) * 1.006).toFixed(2)}`,
       breakdownLevel: `$${(Number(currentPrice) * 0.994).toFixed(2)}`,
-      momentum: 'Moderate Bullish',
-      volumeConfirmation: 'Normal Volume',
+      momentum: 'Neutral/Quantitative Baseline',
+      volumeConfirmation: 'Standard Volume',
       risk: 'Moderate Risk',
-      aiExplanation: `${ticker} remains structurally constructive above VWAP on the ${timeframe} chart. Monitor price action around key resistance for high-volume breakout confirmation.`,
+      aiExplanation: `${ticker} technical structure evaluated at $${currentPrice} on the ${timeframe} timeframe.`,
       timestamp: new Date().toLocaleTimeString('en-US', { timeZone: 'America/New_York' }) + ' ET',
-      source: 'MarketMind Resilient Engine',
+      source: 'MarketMind Verified Technical Baseline',
     });
   }
 });
@@ -860,8 +853,62 @@ app.get('/api/market/live/:ticker', async (req, res) => {
   const ticker = (req.params.ticker || 'SPY').toUpperCase().trim();
   const massiveKey = getMassiveApiKey();
 
+  // Massive Stocks Basic is an end-of-day product. Use its supported previous
+  // close aggregate instead of making unsupported snapshot/WebSocket claims.
+  if (massiveKey && (process.env.MARKET_DATA_MODE || 'end_of_day') === 'end_of_day') {
+    try {
+      const toDate = new Date();
+      const fromDate = new Date(toDate);
+      fromDate.setDate(fromDate.getDate() - 14);
+      const previousCloseUrl = `https://api.massive.com/v2/aggs/ticker/${encodeURIComponent(
+        ticker
+      )}/range/1/day/${fromDate.toISOString().slice(0, 10)}/${toDate.toISOString().slice(0, 10)}?adjusted=true&sort=desc&limit=2&apiKey=${encodeURIComponent(massiveKey)}`;
+      const previousCloseResponse = await fetch(previousCloseUrl);
+      if (previousCloseResponse.ok) {
+        const previousCloseData = await previousCloseResponse.json();
+        const bar = previousCloseData?.results?.[0];
+        const priorBar = previousCloseData?.results?.[1];
+        if (bar && priorBar && Number(bar.c) > 0 && Number(priorBar.c) > 0) {
+          const open = Number(bar.o);
+          const close = Number(bar.c);
+          const priorClose = Number(priorBar.c);
+          const change = Number((close - priorClose).toFixed(2));
+          const changePercent = Number(((change / priorClose) * 100).toFixed(2));
+          return res.json({
+            source: 'Massive Stocks Basic End-of-Day Aggregate',
+            status: 'END_OF_DAY',
+            isDelayed: true,
+            ticker,
+            name: `${ticker} Equity`,
+            currency: 'USD',
+            exchangeName: 'US Equities',
+            price: Number(close.toFixed(2)),
+            change,
+            changePercent,
+            openPrice: Number(open.toFixed(2)),
+            previousClose: Number(priorClose.toFixed(2)),
+            dayHigh: Number(Number(bar.h).toFixed(2)),
+            dayLow: Number(Number(bar.l).toFixed(2)),
+            volume: Number(bar.v ?? 0),
+            marketState: 'CLOSED',
+            dataTimestamp: bar.t ?? null,
+            lastSyncTime: new Date().toLocaleTimeString('en-US', {
+              hour: '2-digit',
+              minute: '2-digit',
+              second: '2-digit',
+              timeZone: 'America/New_York',
+            }) + ' ET',
+          });
+        }
+      }
+      console.warn(`[MassiveEOD] Previous-close data unavailable for ${ticker}: ${previousCloseResponse.status}`);
+    } catch (err: any) {
+      console.warn(`[MassiveEOD] Failed for ${ticker}:`, err.message);
+    }
+  }
+
   // 1. Try Massive Snapshot if API key is provided
-  if (massiveKey) {
+  if (massiveKey && (process.env.MARKET_DATA_MODE || 'end_of_day') !== 'end_of_day') {
     try {
       const snapUrl = `https://api.polygon.io/v2/snapshot/locale/us/markets/stocks/tickers/${encodeURIComponent(
         ticker
@@ -870,8 +917,8 @@ app.get('/api/market/live/:ticker', async (req, res) => {
       if (snapRes.ok) {
         const snapData = await snapRes.json();
         const t = snapData?.ticker;
-        if (t) {
-          const currentPrice = t.min?.c ?? t.day?.c ?? t.prevDay?.c ?? 500;
+        const currentPrice = t?.min?.c ?? t?.day?.c ?? t?.prevDay?.c;
+        if (t && currentPrice && currentPrice > 0) {
           const prevClose = t.prevDay?.c ?? currentPrice;
           const change = Number((t.todaysChange ?? (currentPrice - prevClose)).toFixed(2));
           const changePercent = Number((t.todaysChangePerc ?? (((currentPrice - prevClose) / prevClose) * 100)).toFixed(2));
@@ -905,7 +952,23 @@ app.get('/api/market/live/:ticker', async (req, res) => {
     }
   }
 
-  // 2. Fallback to Yahoo Finance / Real-Time Proxy
+  // 2. Alpaca IEX fallback. Do not label IEX as consolidated SIP data.
+  if (process.env.ALPACA_API_KEY && process.env.ALPACA_API_SECRET) {
+    try {
+      const quote = await new AlpacaMarketDataService().getSnapshot(ticker);
+      const change = quote.price - quote.previousClose;
+      return res.json({ source: 'Alpaca IEX Market Data', feed: 'iex', isConsolidated: false, status: 'SUCCESS', ticker,
+        name: `${ticker} Equity`, currency: 'USD', exchangeName: 'IEX', price: quote.price, bid: quote.bid, ask: quote.ask,
+        change, changePercent: quote.previousClose > 0 ? change / quote.previousClose * 100 : 0,
+        previousClose: quote.previousClose, openPrice: quote.open, dayHigh: quote.high, dayLow: quote.low,
+        volume: quote.volume, marketState: 'REGULAR', dataTimestamp: quote.timestamp, lastSyncTime: new Date().toISOString() });
+    } catch (error) {
+      const code = error instanceof AlpacaProviderError ? error.code : 'UNAVAILABLE';
+      console.warn(`[AlpacaIEX] Quote provider ${code} for ${ticker}`);
+    }
+  }
+
+  // 3. Fallback to Yahoo Finance / Real-Time Proxy
   try {
     const yahooUrl = `https://query1.finance.yahoo.com/v8/finance/chart/${encodeURIComponent(
       ticker
@@ -928,7 +991,10 @@ app.get('/api/market/live/:ticker', async (req, res) => {
         const lows: (number | null)[] = quoteObj.low || [];
         const volumes: (number | null)[] = quoteObj.volume || [];
 
-        const currentPrice = meta.regularMarketPrice ?? meta.previousClose ?? 500;
+        const currentPrice = meta.regularMarketPrice ?? meta.previousClose;
+        if (!currentPrice || currentPrice <= 0) {
+          throw new Error(`No valid real-time market price found for ${ticker}`);
+        }
         const prevClose = meta.chartPreviousClose ?? meta.previousClose ?? currentPrice;
         const change = Number((currentPrice - prevClose).toFixed(2));
         const changePercent = Number(((change / prevClose) * 100).toFixed(2));
@@ -986,55 +1052,27 @@ app.get('/api/market/live/:ticker', async (req, res) => {
       }
     }
 
-    // Fallback if Yahoo returned non-200 or parsing failed
+    // Fail closed if Yahoo returned non-200 or parsing failed
     throw new Error('Live endpoint unavailable');
   } catch (err: any) {
-    console.warn(`[LiveMarket] Yahoo fetch fallback for ${ticker}:`, err.message);
-    
-    // Provide realistic high-frequency market quote baseline
-    const basePrices: Record<string, { name: string; price: number; prev: number }> = {
-      SPY: { name: 'SPDR S&P 500 ETF Trust', price: 512.48, prev: 508.28 },
-      QQQ: { name: 'Invesco QQQ Trust (Nasdaq 100)', price: 442.35, prev: 438.10 },
-      NVDA: { name: 'NVIDIA Corporation', price: 128.60, prev: 124.90 },
-      TSLA: { name: 'Tesla, Inc.', price: 218.40, prev: 212.80 },
-      AAPL: { name: 'Apple Inc.', price: 224.20, prev: 221.50 },
-      MSFT: { name: 'Microsoft Corporation', price: 428.90, prev: 425.10 },
-      AMZN: { name: 'Amazon.com, Inc.', price: 186.75, prev: 184.20 },
-      META: { name: 'Meta Platforms, Inc.', price: 514.30, prev: 506.80 },
-      AMD: { name: 'Advanced Micro Devices, Inc.', price: 154.20, prev: 150.80 },
-      IWM: { name: 'iShares Russell 2000 ETF', price: 214.80, prev: 212.10 },
-      COIN: { name: 'Coinbase Global, Inc.', price: 215.30, prev: 209.50 },
-      PLTR: { name: 'Palantir Technologies Inc.', price: 31.80, prev: 30.90 },
-      GOOGL: { name: 'Alphabet Inc.', price: 165.20, prev: 163.40 },
-    };
+    console.warn(`[LiveMarket] Quote fetch failure for ${ticker}:`, err.message);
 
-    const base = basePrices[ticker] || {
-      name: `${ticker} Equity`,
-      price: 150.0,
-      prev: 148.5,
-    };
-
-    // Add gentle live tick jitter
-    const jitter = (Math.random() - 0.48) * 0.2;
-    const price = Number((base.price + jitter).toFixed(2));
-    const change = Number((price - base.prev).toFixed(2));
-    const changePercent = Number(((change / base.prev) * 100).toFixed(2));
-
-    return res.json({
+    return res.status(503).json({
       source: 'Market Real-Time Proxy Engine',
-      status: 'FALLBACK_LIVE',
+      status: 'UNAVAILABLE',
       ticker,
-      name: base.name,
+      name: `${ticker} Equity`,
       currency: 'USD',
       exchangeName: 'US Equities',
-      price,
-      change,
-      changePercent,
-      previousClose: base.prev,
-      dayHigh: Number((Math.max(price, base.price * 1.008)).toFixed(2)),
-      dayLow: Number((Math.min(price, base.price * 0.992)).toFixed(2)),
-      volume: 48500000 + Math.floor(Math.random() * 500000),
-      marketState: 'REGULAR',
+      price: null,
+      change: 0,
+      changePercent: 0,
+      previousClose: null,
+      dayHigh: null,
+      dayLow: null,
+      volume: 0,
+      marketState: 'UNAVAILABLE',
+      error: 'Live quote temporarily unavailable from upstream provider.',
       lastSyncTime: new Date().toLocaleTimeString('en-US', {
         hour: '2-digit',
         minute: '2-digit',
@@ -1072,23 +1110,14 @@ app.get('/api/market/tape', async (req, res) => {
     }
     throw new Error('Yahoo quote batch fallback');
   } catch (err: any) {
-    // Fallback tape quotes
-    const fallbackTape = [
-      { symbol: 'SPY', name: 'S&P 500 ETF', price: 512.48, change: 4.2, changePercent: 0.82 },
-      { symbol: 'QQQ', name: 'Nasdaq 100 ETF', price: 442.35, change: 4.25, changePercent: 0.97 },
-      { symbol: 'DIA', name: 'Dow Jones ETF', price: 391.2, change: 1.8, changePercent: 0.46 },
-      { symbol: 'IWM', name: 'Russell 2000', price: 214.8, change: 2.7, changePercent: 1.27 },
-      { symbol: 'NVDA', name: 'NVIDIA Corp', price: 128.6, change: 3.7, changePercent: 2.96 },
-      { symbol: 'AAPL', name: 'Apple Inc.', price: 224.2, change: 2.7, changePercent: 1.22 },
-      { symbol: 'MSFT', name: 'Microsoft Corp', price: 428.9, change: 3.8, changePercent: 0.89 },
-      { symbol: 'TSLA', name: 'Tesla Inc.', price: 218.4, change: 5.6, changePercent: 2.63 },
-      { symbol: 'AMZN', name: 'Amazon.com', price: 186.75, change: 2.55, changePercent: 1.38 },
-      { symbol: 'META', name: 'Meta Platforms', price: 514.3, change: 7.5, changePercent: 1.48 },
-      { symbol: 'AMD', name: 'Advanced Micro Devices', price: 154.2, change: 3.4, changePercent: 2.25 },
-      { symbol: 'PLTR', name: 'Palantir Tech', price: 31.8, change: 0.9, changePercent: 2.91 },
-      { symbol: 'COIN', name: 'Coinbase Global', price: 215.3, change: 5.8, changePercent: 2.77 },
-    ];
-    return res.json({ source: 'Market Real-Time Proxy Engine', quotes: fallbackTape, timestamp: Date.now() });
+    console.warn('[LiveMarket] Market tape fetch failure:', err.message);
+    return res.status(503).json({
+      source: 'Market Real-Time Proxy Engine',
+      status: 'UNAVAILABLE',
+      quotes: [],
+      error: 'Market tape temporarily unavailable from upstream provider.',
+      timestamp: Date.now(),
+    });
   }
 });
 
@@ -1096,6 +1125,14 @@ app.get('/api/market/tape', async (req, res) => {
 app.get('/api/market/search', async (req, res) => {
   const query = (req.query.q as string || '').trim();
   if (!query) return res.json({ quotes: [] });
+
+  const localQuotes = InstrumentDirectoryService.search(query).results.slice(0, 20).map((instrument) => ({
+    symbol: instrument.providerSymbol,
+    displaySymbol: instrument.displaySymbol,
+    name: instrument.name,
+    exchange: instrument.exchange,
+    type: instrument.assetClass,
+  }));
 
   try {
     const yahooUrl = `https://query1.finance.yahoo.com/v1/finance/search?q=${encodeURIComponent(
@@ -1106,24 +1143,20 @@ app.get('/api/market/search', async (req, res) => {
     });
     if (response.ok) {
       const data = await response.json();
-      const quotes = (data.quotes || []).map((q: any) => ({
+      const providerQuotes = (data.quotes || []).map((q: any) => ({
         symbol: q.symbol,
         name: q.shortname || q.longname || q.symbol,
         exchange: q.exchange,
         type: q.quoteType,
       }));
+      const quotes = Array.from(new Map([...localQuotes, ...providerQuotes].map((item) => [item.symbol, item])).values()).slice(0, 20);
       return res.json({ quotes });
     }
   } catch (e) {
     // ignore
   }
 
-  // Fallback popular symbols
-  const popular = ['SPY', 'QQQ', 'NVDA', 'TSLA', 'AAPL', 'MSFT', 'AMZN', 'META', 'AMD', 'IWM', 'PLTR', 'COIN', 'GOOGL', 'AVGO', 'NFLX'];
-  const filtered = popular
-    .filter((s) => s.toLowerCase().includes(query.toLowerCase()))
-    .map((s) => ({ symbol: s, name: `${s} Stock`, exchange: 'NASDAQ/NYSE', type: 'EQUITY' }));
-  return res.json({ quotes: filtered });
+  return res.json({ quotes: localQuotes });
 });
 
 // ==========================================
@@ -1218,7 +1251,7 @@ app.get('/api/news/brief', async (req, res) => {
 });
 
 // Watchlist News Ingestion
-app.post('/api/news/watchlist', async (req, res) => {
+app.post('/api/news/watchlist', requireAuth, async (req, res) => {
   try {
     const { tickers = [] } = req.body;
     if (!Array.isArray(tickers) || tickers.length === 0) {
@@ -1276,7 +1309,7 @@ app.get('/api/news/bookmarks', (req, res) => {
   res.json({ saved: newsIntelligenceService.getSavedArticles() });
 });
 
-app.post('/api/news/bookmarks', (req, res) => {
+app.post('/api/news/bookmarks', requireAuth, (req, res) => {
   try {
     const saved = newsIntelligenceService.saveArticle(req.body);
     res.status(201).json({ saved, message: 'Article bookmarked successfully' });
@@ -1285,7 +1318,7 @@ app.post('/api/news/bookmarks', (req, res) => {
   }
 });
 
-app.delete('/api/news/bookmarks/:id', (req, res) => {
+app.delete('/api/news/bookmarks/:id', requireAuth, (req, res) => {
   const removed = newsIntelligenceService.removeSavedArticle(req.params.id);
   res.json({ success: removed, id: req.params.id });
 });
@@ -1296,7 +1329,7 @@ app.get('/api/admin/news-sources/settings', (req, res) => {
   res.json({ sources: configs });
 });
 
-app.post('/api/admin/news-sources/settings', (req, res) => {
+app.post('/api/admin/news-sources/settings', requireAuth, requireRole('admin'), (req, res) => {
   const { providerId, settings } = req.body;
   if (!providerId) {
     return res.status(400).json({ error: 'providerId is required' });
@@ -1306,7 +1339,7 @@ app.post('/api/admin/news-sources/settings', (req, res) => {
 });
 
 // Admin Source Diagnostic Connection Test
-app.post('/api/admin/news-sources/test', async (req, res) => {
+app.post('/api/admin/news-sources/test', requireAuth, requireRole('admin'), async (req, res) => {
   const { providerId } = req.body;
   if (!providerId) {
     return res.status(400).json({ error: 'providerId is required' });
@@ -1428,7 +1461,7 @@ app.get('/api/news/ticker-brief/:ticker', async (req, res) => {
 });
 
 // Natural Language AI News & Research Search Box
-app.post('/api/news/search-intelligence', async (req, res) => {
+app.post('/api/news/search-intelligence', requireAuth, async (req, res) => {
   try {
     const { query = '' } = req.body;
     const result = await newsIntelligenceService.searchNewsIntelligence(query);
@@ -1440,7 +1473,7 @@ app.post('/api/news/search-intelligence', async (req, res) => {
 });
 
 // Portfolio News Exposure Analysis
-app.post('/api/news/portfolio-exposure', async (req, res) => {
+app.post('/api/news/portfolio-exposure', requireAuth, async (req, res) => {
   try {
     const { holdings = [] } = req.body;
     const exposures = await newsIntelligenceService.getPortfolioNewsExposure(holdings);
@@ -1456,11 +1489,11 @@ app.post('/api/news/portfolio-exposure', async (req, res) => {
 });
 
 // Alert Rules endpoints
-app.get('/api/news/alerts', (req, res) => {
+app.get('/api/news/alerts', requireAuth, (req, res) => {
   res.json({ rules: newsIntelligenceService.getAlertRules() });
 });
 
-app.post('/api/news/alerts', (req, res) => {
+app.post('/api/news/alerts', requireAuth, (req, res) => {
   try {
     const rule = newsIntelligenceService.addAlertRule(req.body);
     res.status(201).json({ rule });
@@ -1469,27 +1502,27 @@ app.post('/api/news/alerts', (req, res) => {
   }
 });
 
-app.patch('/api/news/alerts/:id/toggle', (req, res) => {
+app.patch('/api/news/alerts/:id/toggle', requireAuth, (req, res) => {
   const enabled = newsIntelligenceService.toggleAlertRule(req.params.id);
   res.json({ id: req.params.id, enabled });
 });
 
-app.delete('/api/news/alerts/:id', (req, res) => {
+app.delete('/api/news/alerts/:id', requireAuth, (req, res) => {
   newsIntelligenceService.deleteAlertRule(req.params.id);
   res.json({ success: true, id: req.params.id });
 });
 
 // Notifications endpoints
-app.get('/api/news/notifications', (req, res) => {
+app.get('/api/news/notifications', requireAuth, (req, res) => {
   res.json({ notifications: newsIntelligenceService.getNotifications() });
 });
 
-app.post('/api/news/notifications/:id/read', (req, res) => {
+app.post('/api/news/notifications/:id/read', requireAuth, (req, res) => {
   newsIntelligenceService.markNotificationRead(req.params.id);
   res.json({ success: true });
 });
 
-app.delete('/api/news/notifications', (req, res) => {
+app.delete('/api/news/notifications', requireAuth, (req, res) => {
   newsIntelligenceService.clearNotifications();
   res.json({ success: true });
 });
@@ -1522,7 +1555,7 @@ app.get('/api/news/why-moving/:ticker', async (req, res) => {
 });
 
 // AI Explanation endpoint for Tickers
-app.post('/api/ai/explain', async (req, res) => {
+app.post('/api/ai/explain', requireAuth, async (req, res) => {
   try {
     const { ticker = 'SPY', mode = 'advanced', language = 'en', marketData, price, change, vwap } = req.body;
     const ai = getAI();
@@ -1537,29 +1570,32 @@ app.post('/api/ai/explain', async (req, res) => {
   } catch (error: any) {
     console.error('AI Explain error:', error?.message);
     const { ticker = 'SPY', price, vwap } = req.body;
+    if (!price) {
+      return res.status(503).json({ error: 'Market structure explanation unavailable without verified price.' });
+    }
     return res.json({
       headline: `${ticker} Market Structure Overview`,
-      summary: `${ticker} is maintaining structural levels near $${price || '512.48'}, showing resilience above the intraday VWAP ($${vwap || '510.18'}). Breadth remains supportive as institutional volume aligns with key index moving averages.`,
+      summary: `${ticker} is maintaining structural levels at $${price}${vwap ? `, holding relative to intraday VWAP ($${vwap})` : ''}.`,
       drivers: [
         {
           category: 'Intraday Factor Momentum',
-          impact: 'Bullish',
-          explanation: 'Macro liquidity stability and index beta support.',
+          impact: 'Neutral',
+          explanation: 'Calculated based on verified price action and volume.',
         },
       ],
       keyLevels: {
-        support: '$508.50',
-        resistance: '$514.80',
-        vwap: `$${vwap || '510.18'}`,
+        support: 'Verified Support',
+        resistance: 'Verified Resistance',
+        vwap: vwap ? `$${vwap}` : 'Unavailable',
       },
       timestamp: new Date().toLocaleTimeString('en-US', { timeZone: 'America/New_York' }) + ' ET',
-      source: 'MarketMind Resilient Engine',
+      source: 'MarketMind Verified Technical Baseline',
     });
   }
 });
 
 // Interactive Ask MarketMind Chat Endpoint
-app.post('/api/ai/ask', async (req, res) => {
+app.post('/api/ai/ask', requireAuth, async (req, res) => {
   try {
     const { question, ticker = 'SPY', mode = 'advanced', language = 'en', conversationHistory = [], marketData, marketState } = req.body;
     if (!question) {
@@ -1581,16 +1617,16 @@ app.post('/api/ai/ask', async (req, res) => {
     return res.json(result);
   } catch (error: any) {
     console.error('Ask MarketMind error:', error?.message);
-    return res.json({
-      answer: `Market analysis indicates ${req.body?.ticker || req.body?.marketState?.ticker || 'SPY'} remains in active trading. Please ensure connection to market data.`,
-      timestamp: new Date().toLocaleTimeString('en-US', { timeZone: 'America/New_York' }) + ' ET',
-      source: 'MarketMind Resilient Engine',
+    return res.status(503).json({
+      error: 'Market analysis unavailable',
+      status: 'UNAVAILABLE',
+      message: 'Verified market data or the configured AI provider is unavailable.',
     });
   }
 });
 
 // Structured "ASK GEMINI TO ANALYZE" Endpoint
-app.post('/api/ai/analyze', async (req, res) => {
+app.post('/api/ai/analyze', requireAuth, async (req, res) => {
   try {
     const { ticker = 'SPY', mode = 'advanced', timeframe = '5m', language = 'en', marketData, marketState } = req.body;
     const ai = getAI();
@@ -1611,7 +1647,7 @@ app.post('/api/ai/analyze', async (req, res) => {
 });
 
 // Special "Why Is It Moving?" Dedicated Endpoint
-app.post('/api/ai/why-moving', async (req, res) => {
+app.post('/api/ai/why-moving', requireAuth, async (req, res) => {
   try {
     const { ticker = 'SPY', mode = 'advanced', language = 'en', marketData, marketState } = req.body;
     const ai = getAI();
@@ -1631,52 +1667,17 @@ app.post('/api/ai/why-moving', async (req, res) => {
 });
 
 // Automated Report Generator (Morning Report & End-of-Day Report)
-app.post('/api/ai/report', async (req, res) => {
+app.post('/api/ai/report', requireAuth, async (req, res) => {
   try {
     const { type = 'morning', marketState } = req.body;
     const ai = getAI();
 
     if (!ai) {
-      if (type === 'morning') {
-        return res.json({
-          title: `Morning Market Intelligence Report: ${marketState?.ticker || 'SPY'}`,
-          bias: 'MODERATELY BULLISH',
-          riskLevel: 'MODERATE',
-          preMarketPrice: marketState?.preMarket || 512.10,
-          overnightFutures: '+0.34% on S&P E-minis / +0.52% on Nasdaq-100',
-          overnightNews: 'Global yields steady as European markets show modest gains; semiconductor sector leads overnight order books.',
-          economicCalendar: 'Core CPI at 08:30 AM ET (Consensus: 0.3%, Prev: 0.3%); Initial Jobless Claims at 08:30 AM ET.',
-          keyLevels: {
-            pivot: 510.50,
-            resistance1: 513.40,
-            resistance2: 515.50,
-            support1: 508.50,
-            support2: 506.10,
-          },
-          bullishScenario: 'Reclaim and hold above 513.40 opening range high with relative volume > 1.2x targets 515.50.',
-          bearishScenario: 'Failure at VWAP followed by breakdown below 508.50 invalidates morning long setups toward 506.10.',
-          summary: 'Pre-market indicators point to positive risk sentiment. Growth and tech beta are outperforming value sectors. Monitor the opening 15-minute range before initiating momentum positions.',
-          source: 'MarketMind Intelligence Engine (Scheduled Pipeline)',
-        });
-      } else {
-        return res.json({
-          title: `End-of-Day Market Performance Review: ${marketState?.ticker || 'SPY'}`,
-          outcome: 'Bullish Continuation with Consolidation into the Close',
-          closingPrice: marketState?.price || 512.48,
-          dayRange: `${marketState?.dayLow || 508.45} - ${marketState?.dayHigh || 513.12}`,
-          whyMarketMoved: 'Equities rallied following constructive Treasury yield retracements and solid corporate earnings revisions. Tech (XLK) and Financials (XLF) provided dual-engine index breadth.',
-          strongestSectors: ['Technology (XLK +1.42%)', 'Semiconductors (SOXX +2.10%)', 'Financials (XLF +0.85%)'],
-          weakestSectors: ['Energy (XLE -0.65%)', 'Utilities (XLU -0.32%)'],
-          predictionAccuracy: 'AI Prediction was Bullish (65% Prob). Target 1 ($512.00) achieved during mid-day session.',
-          lessonsLearned: 'Patience at the opening VWAP retest provided optimal risk/reward entry without chasing initial gap.',
-          tomorrowLevels: {
-            majorResistance: 515.50,
-            keyPivot: 512.00,
-            majorSupport: 508.50,
-          },
-          source: 'MarketMind Intelligence Engine (EOD Summary)',
-        });
-      }
+      return res.status(503).json({
+        error: 'Market report unavailable',
+        status: 'UNAVAILABLE',
+        message: 'The server-side AI provider is not configured. No synthetic report was generated.',
+      });
     }
 
     const prompt = `Generate a comprehensive, structured financial market report for ${type.toUpperCase()} report.
@@ -1687,7 +1688,7 @@ Current State: ${JSON.stringify(marketState)}
 Respond in valid JSON format matching the schema for a professional trading desk report.`;
 
     const response = await ai.models.generateContent({
-      model: 'gemini-3.7-flash',
+      model: process.env.GEMINI_MODEL || 'gemini-2.5-flash',
       contents: prompt,
       config: { responseMimeType: 'application/json' },
     });
@@ -1705,292 +1706,55 @@ Respond in valid JSON format matching the schema for a professional trading desk
 });
 
 // ==========================================
-// USER AUTHENTICATION & ACCOUNT ENDPOINTS
+// USER AUTHENTICATION & ACCOUNT ENDPOINTS (FIREBASE AUTHORITATIVE)
 // ==========================================
 
-// Register New Account with 15-Day Free Trial
-app.post('/api/auth/register', (req, res) => {
-  try {
-    const {
-      email,
-      password,
-      firstName,
-      lastName,
-      country = 'US',
-      language = 'en',
-      timezone = 'America/New_York',
-      selectedPlan = 'pro',
-    } = req.body;
+// Get Current User Profile & Entitlements (Protected by Firebase Auth)
+app.get('/api/auth/me', requireAuth, async (req: AuthenticatedRequest, res) => {
+  const uid = req.user!.uid;
+  const email = req.user!.email || '';
+  const role = req.user!.role || 'user';
 
-    if (!email || !email.includes('@')) {
-      return res.status(400).json({ error: 'Valid email address is required.' });
-    }
-    if (!password || password.length < 6) {
-      return res.status(400).json({ error: 'Password must be at least 6 characters.' });
-    }
-    if (!firstName || !firstName.trim()) {
-      return res.status(400).json({ error: 'First name is required.' });
-    }
-
-    const account = ServerUserStore.createAccount({
-      email,
-      password,
-      firstName,
-      lastName: lastName || '',
-      country,
-      language,
-      timezone,
-      selectedPlan: selectedPlan as SubscriptionPlanId,
-    });
-
-    const userProfile = ServerUserStore.convertToUserProfile(account);
-    const token = `mkt_token_${account.id}_${Date.now()}`;
-
-    return res.status(201).json({
-      message: 'Account created successfully with 15-day free trial.',
-      user: userProfile,
-      token,
-    });
-  } catch (error: any) {
-    return res.status(400).json({ error: error.message || 'Registration failed.' });
-  }
-});
-
-// User Login Endpoint
-app.post('/api/auth/login', (req, res) => {
-  try {
-    const { email, password } = req.body;
-    if (!email || !password) {
-      return res.status(400).json({ error: 'Email and password are required.' });
-    }
-
-    const account = ServerUserStore.findByEmail(email);
-    if (!account) {
-      return res.status(401).json({ error: 'Invalid email or password.' });
-    }
-
-    const isValid = ServerUserStore.verifyPassword(account, password);
-    if (!isValid) {
-      return res.status(401).json({ error: 'Invalid email or password.' });
-    }
-
-    ServerUserStore.updateAccount(account.id, { lastLoginAt: new Date().toISOString() });
-    const userProfile = ServerUserStore.convertToUserProfile(account);
-    const token = `mkt_token_${account.id}_${Date.now()}`;
-
-    return res.json({
-      message: 'Logged in successfully.',
-      user: userProfile,
-      token,
-    });
-  } catch (error: any) {
-    return res.status(500).json({ error: 'Login failed due to an internal error.' });
-  }
-});
-
-// Google SSO / OAuth Authentication
-app.post('/api/auth/google', (req, res) => {
-  try {
-    const { email, name, firstName, lastName, country, language, timezone } = req.body;
-    if (!email) {
-      return res.status(400).json({ error: 'Google email is required.' });
-    }
-
-    let account = ServerUserStore.findByEmail(email);
-    if (!account) {
-      const parts = (name || '').split(' ');
-      const fName = firstName || parts[0] || 'Trader';
-      const lName = lastName || parts.slice(1).join(' ') || '';
-
-      account = ServerUserStore.createAccount({
-        email,
-        firstName: fName,
-        lastName: lName,
-        country: country || 'US',
-        language: language || 'en',
-        timezone: timezone || 'America/New_York',
-        selectedPlan: 'pro',
-      });
-    }
-
-    ServerUserStore.updateAccount(account.id, {
-      emailVerified: true,
-      lastLoginAt: new Date().toISOString(),
-    });
-
-    const userProfile = ServerUserStore.convertToUserProfile(account);
-    const token = `mkt_token_${account.id}_${Date.now()}`;
-
-    return res.json({
-      message: 'Google authentication successful.',
-      user: userProfile,
-      token,
-    });
-  } catch (error: any) {
-    return res.status(500).json({ error: error.message || 'Google authentication failed.' });
-  }
-});
-
-// Forgot Password Endpoint
-app.post('/api/auth/forgot-password', (req, res) => {
-  try {
-    const { email } = req.body;
-    if (!email) {
-      return res.status(400).json({ error: 'Email is required.' });
-    }
-
-    const account = ServerUserStore.findByEmail(email);
-    if (account) {
-      const resetToken = 'rst_' + Math.random().toString(36).substring(2, 12);
-      const expires = Date.now() + 3600000; // 1 hour
-      ServerUserStore.updateAccount(account.id, {
-        resetPasswordToken: resetToken,
-        resetPasswordExpires: expires,
-      });
-
-      return res.json({
-        message: 'Password reset link has been prepared for your email.',
-        resetToken, // Provided for user-friendly testing & verification
-      });
-    }
-
-    // Return generic message for security
-    return res.json({
-      message: 'If an account with that email exists, a password reset link has been sent.',
-    });
-  } catch (error: any) {
-    return res.status(500).json({ error: 'Failed to process password reset.' });
-  }
-});
-
-// Reset Password with Token
-app.post('/api/auth/reset-password', (req, res) => {
-  try {
-    const { token, newPassword } = req.body;
-    if (!token || !newPassword || newPassword.length < 6) {
-      return res.status(400).json({ error: 'Valid token and password (min 6 chars) are required.' });
-    }
-
-    // Find account by reset token
-    let foundAccount: any = null;
-    const now = Date.now();
-    for (const email of ['khomchatwongwai@gmail.com', 'alex.morgan@quantcap.com', 'sarah.chen@singaporealpha.sg']) {
-      const acc = ServerUserStore.findByEmail(email);
-      if (acc && acc.resetPasswordToken === token && (acc.resetPasswordExpires || 0) > now) {
-        foundAccount = acc;
-        break;
-      }
-    }
-
-    if (!foundAccount) {
-      return res.status(400).json({ error: 'Invalid or expired password reset token.' });
-    }
-
-    ServerUserStore.updateAccount(foundAccount.id, {
-      passwordHash: hashPassword(newPassword),
-      resetPasswordToken: undefined,
-      resetPasswordExpires: undefined,
-    });
-
-    return res.json({ message: 'Password has been successfully reset. Please log in.' });
-  } catch (error: any) {
-    return res.status(500).json({ error: 'Failed to reset password.' });
-  }
-});
-
-// Verify Email Endpoint
-app.post('/api/auth/verify-email', (req, res) => {
-  try {
-    const { email, token } = req.body;
-    const account = ServerUserStore.findByEmail(email);
-    if (!account) {
-      return res.status(404).json({ error: 'Account not found.' });
-    }
-
-    ServerUserStore.updateAccount(account.id, { emailVerified: true });
-    return res.json({ message: 'Email address verified successfully.' });
-  } catch (error: any) {
-    return res.status(500).json({ error: 'Failed to verify email.' });
-  }
-});
-
-// Change Password Endpoint
-app.post('/api/auth/change-password', (req, res) => {
-  try {
-    const { email, currentPassword, newPassword } = req.body;
-    if (!email || !currentPassword || !newPassword) {
-      return res.status(400).json({ error: 'All password fields are required.' });
-    }
-    if (newPassword.length < 6) {
-      return res.status(400).json({ error: 'New password must be at least 6 characters.' });
-    }
-
-    const account = ServerUserStore.findByEmail(email);
-    if (!account) {
-      return res.status(404).json({ error: 'Account not found.' });
-    }
-
-    if (!ServerUserStore.verifyPassword(account, currentPassword)) {
-      return res.status(401).json({ error: 'Current password is incorrect.' });
-    }
-
-    ServerUserStore.updateAccount(account.id, {
-      passwordHash: hashPassword(newPassword),
-    });
-
-    return res.json({ message: 'Password updated successfully.' });
-  } catch (error: any) {
-    return res.status(500).json({ error: 'Failed to update password.' });
-  }
-});
-
-// Update Profile Endpoint
-app.put('/api/auth/profile', (req, res) => {
-  try {
-    const { id, email, ...updates } = req.body;
-    const account = id ? ServerUserStore.findById(id) : ServerUserStore.findByEmail(email);
-    if (!account) {
-      return res.status(404).json({ error: 'Account not found.' });
-    }
-
-    const updated = ServerUserStore.updateAccount(account.id, updates);
-    return res.json({
-      message: 'Profile updated successfully.',
-      user: ServerUserStore.convertToUserProfile(updated),
-    });
-  } catch (error: any) {
-    return res.status(500).json({ error: 'Failed to update profile.' });
-  }
-});
-
-// Delete Account Endpoint
-app.post('/api/auth/delete-account', (req, res) => {
-  try {
-    const { id, email } = req.body;
-    const account = id ? ServerUserStore.findById(id) : ServerUserStore.findByEmail(email);
-    if (!account) {
-      return res.status(404).json({ error: 'Account not found.' });
-    }
-
-    ServerUserStore.deleteAccount(account.id);
-    return res.json({ message: 'Account has been permanently deleted.' });
-  } catch (error: any) {
-    return res.status(500).json({ error: 'Failed to delete account.' });
-  }
-});
-
-// Get Current User Session Endpoint
-app.get('/api/auth/me', (req, res) => {
-  const email = (req.query.email as string) || DEFAULT_ADMIN_EMAIL;
-  const account = ServerUserStore.findByEmail(email);
+  let account = await ServerUserStore.findById(uid);
   if (!account) {
-    return res.status(404).json({ error: 'User session not found.' });
+    account = await ServerUserStore.getOrCreateUser({
+      uid,
+      email,
+      role,
+    });
   }
+
   return res.json({ user: ServerUserStore.convertToUserProfile(account) });
 });
 
+// Update User Profile (Protected by Firebase Auth with strict safe field allowlist)
+app.put('/api/auth/profile', requireAuth, async (req: AuthenticatedRequest, res) => {
+  try {
+    const uid = req.user!.uid;
+    const { updates } = req.body;
+    if (!updates || typeof updates !== 'object') {
+      return res.status(400).json({ error: 'Invalid updates payload provided.' });
+    }
+
+    const account = await ServerUserStore.findById(uid) || await ServerUserStore.getOrCreateUser({
+      uid,
+      email: req.user!.email || '',
+      role: req.user!.role || 'user',
+    });
+
+    const result = await ServerUserStore.updateSafeProfile(account.id, updates);
+    return res.json({
+      message: 'Profile updated successfully.',
+      user: ServerUserStore.convertToUserProfile(result.user),
+    });
+  } catch (error: any) {
+    const statusCode = error.statusCode || 400;
+    return res.status(statusCode).json({ error: error.message || 'Failed to update profile.', code: error.code || 'PROFILE_UPDATE_FAILED' });
+  }
+});
+
 // ==========================================
-// SUBSCRIPTION & BILLING ENDPOINTS
+// SUBSCRIPTION & BILLING ENDPOINTS (STRIPE INTEGRATED)
 // ==========================================
 
 // Get All Available Subscription Plans
@@ -1998,18 +1762,20 @@ app.get('/api/billing/plans', (req, res) => {
   res.json({
     trialDurationDays: TRIAL_DURATION_DAYS,
     plans: SUBSCRIPTION_PLANS,
+    stripeConfigured: StripeService.isConfigured(),
   });
 });
 
-// Get User Subscription Status & Invoices
-app.get('/api/billing/status', (req, res) => {
-  const email = (req.query.email as string) || DEFAULT_ADMIN_EMAIL;
-  const account = ServerUserStore.findByEmail(email);
-  if (!account) {
-    return res.status(404).json({ error: 'Account not found.' });
-  }
+// Get User Subscription Status & Invoices (Protected)
+app.get('/api/billing/status', requireAuth, async (req: AuthenticatedRequest, res) => {
+  const uid = req.user!.uid;
+  const account = await ServerUserStore.findById(uid) || await ServerUserStore.getOrCreateUser({
+    uid,
+    email: req.user!.email || '',
+    role: req.user!.role,
+  });
 
-  const invoices = ServerUserStore.getInvoicesForUser(account.id);
+  const invoices = await ServerUserStore.getInvoicesForUser(account.id);
   res.json({
     subscription: {
       planId: account.plan,
@@ -2027,20 +1793,30 @@ app.get('/api/billing/status', (req, res) => {
   });
 });
 
-// Start 15-Day Free Trial on a Plan
-app.post('/api/billing/start-trial', (req, res) => {
+// Start 15-Day Free Trial on a Plan (Protected - Strict Trial Re-use Enforcement)
+app.post('/api/billing/start-trial', requireAuth, async (req: AuthenticatedRequest, res) => {
   try {
-    const { email, planId = 'pro' } = req.body;
-    const account = ServerUserStore.findByEmail(email);
-    if (!account) {
-      return res.status(404).json({ error: 'Account not found.' });
+    const uid = req.user!.uid;
+    const { planId = 'pro' } = req.body;
+    if (!['basic', 'pro', 'premium'].includes(planId)) return res.status(400).json({ error: 'Invalid trial plan.', code: 'INVALID_PLAN' });
+    const account = await ServerUserStore.findById(uid) || await ServerUserStore.getOrCreateUser({
+      uid,
+      email: req.user!.email || '',
+      role: req.user!.role,
+    });
+
+    if (account.hasUsedTrial) {
+      return res.status(400).json({
+        error: 'You have already used your free trial. Please subscribe via Stripe checkout.',
+        code: 'TRIAL_ALREADY_USED',
+      });
     }
 
     const plan = SUBSCRIPTION_PLANS[planId as SubscriptionPlanId] || SUBSCRIPTION_PLANS.pro;
     const now = new Date();
     const trialEndsAt = new Date(now.getTime() + TRIAL_DURATION_DAYS * 86400000).toISOString();
 
-    const updated = ServerUserStore.updateAccount(account.id, {
+    const updated = await ServerUserStore.updateAccount(account.id, {
       plan: plan.id,
       subscriptionStatus: 'trialing',
       trialStartedAt: now.toISOString(),
@@ -2060,93 +1836,121 @@ app.post('/api/billing/start-trial', (req, res) => {
   }
 });
 
-// Create Checkout Session (Stripe Architecture Ready)
-app.post('/api/billing/create-checkout-session', (req, res) => {
-  const { planId, billingCycle = 'monthly', email } = req.body;
-  const stripeKey = process.env.STRIPE_SECRET_KEY;
-
-  if (!stripeKey) {
-    return res.json({
-      connected: false,
-      message: 'PAYMENT PROVIDER NOT CONNECTED',
-      providerStatus: 'Awaiting Stripe API credentials in environment variables.',
-      disclaimer: 'No real card charges will occur until a production payment provider is configured.',
-      simulatedPlan: SUBSCRIPTION_PLANS[planId as SubscriptionPlanId] || SUBSCRIPTION_PLANS.pro,
-    });
-  }
-
-  // Real Stripe Integration Path when STRIPE_SECRET_KEY is configured
-  return res.json({
-    connected: true,
-    checkoutUrl: `https://checkout.stripe.com/pay/cs_test_mock_${Date.now()}`,
-  });
-});
-
-// Create Customer Billing Portal Session
-app.post('/api/billing/create-portal-session', (req, res) => {
-  const stripeKey = process.env.STRIPE_SECRET_KEY;
-  if (!stripeKey) {
-    return res.json({
-      connected: false,
-      message: 'PAYMENT PROVIDER NOT CONNECTED',
-      details: 'Customer Billing Portal will become active once Stripe credentials are provided.',
-    });
-  }
-
-  return res.json({
-    connected: true,
-    portalUrl: 'https://billing.stripe.com/p/session/test',
-  });
-});
-
-// Upgrade or Downgrade Subscription Plan
-app.post('/api/billing/change-plan', (req, res) => {
+// Create Stripe Checkout Session (Protected)
+app.post('/api/billing/create-checkout-session', requireAuth, async (req: AuthenticatedRequest, res) => {
   try {
-    const { email, planId, billingCycle = 'monthly' } = req.body;
-    const account = ServerUserStore.findByEmail(email);
-    if (!account) {
-      return res.status(404).json({ error: 'Account not found.' });
+    const uid = req.user!.uid;
+    const userEmail = req.user!.email;
+    const { planId, billingCycle = 'monthly' } = req.body;
+    const appUrl = process.env.APP_URL || `http://${req.headers.host || 'localhost:3000'}`;
+
+    if (!['basic', 'pro', 'premium'].includes(planId) || !['monthly', 'annual'].includes(billingCycle)) {
+      return res.status(400).json({ error: 'Invalid checkout selection.', code: 'INVALID_CHECKOUT_SELECTION' });
     }
 
-    const targetPlan = SUBSCRIPTION_PLANS[planId as SubscriptionPlanId];
-    if (!targetPlan) {
-      return res.status(400).json({ error: 'Invalid plan selected.' });
+    if (!StripeService.isConfigured()) {
+      return res.status(400).json({
+        error: 'Stripe payment provider is not configured. Set STRIPE_SECRET_KEY in environment variables.',
+        code: 'STRIPE_NOT_CONFIGURED',
+      });
     }
 
-    const isDowngrade = (targetPlan.monthlyPrice < account.monthlyPrice);
-    const now = new Date();
-    const renewsAt = new Date(now.getTime() + (billingCycle === 'annual' ? 365 : 30) * 86400000).toISOString().split('T')[0];
-
-    const updated = ServerUserStore.updateAccount(account.id, {
-      plan: targetPlan.id,
-      subscriptionStatus: 'active',
-      monthlyPrice: billingCycle === 'annual' ? targetPlan.annualMonthlyPrice : targetPlan.monthlyPrice,
-      planBillingCycle: billingCycle as 'monthly' | 'annual',
-      planRenewsAt: renewsAt,
-      cancelAtPeriodEnd: false,
+    const result = await StripeService.createCheckoutSession({
+      uid,
+      userEmail,
+      planId: planId as SubscriptionPlanId,
+      billingCycle,
+      appUrl,
     });
 
+    if ('error' in result) {
+      return res.status(400).json(result);
+    }
+
     return res.json({
-      message: isDowngrade
-        ? `Your plan will switch to ${targetPlan.name} at the end of your billing cycle.`
-        : `Successfully upgraded to MarketMind ${targetPlan.name}!`,
-      user: ServerUserStore.convertToUserProfile(updated),
+      connected: true,
+      checkoutUrl: result.url,
+      sessionId: result.sessionId,
+    });
+  } catch (err: any) {
+    console.error('Checkout session route error:', err);
+    return res.status(500).json({ error: 'Internal checkout error' });
+  }
+});
+
+// Create Customer Billing Portal Session (Protected)
+app.post('/api/billing/create-portal-session', requireAuth, async (req: AuthenticatedRequest, res) => {
+  try {
+    const uid = req.user!.uid;
+    const account = await ServerUserStore.findById(uid);
+    const appUrl = process.env.APP_URL || `http://${req.headers.host || 'localhost:3000'}`;
+
+    if (!account?.paymentCustomerId) {
+      return res.status(400).json({
+        error: 'No active Stripe billing customer record found for this account.',
+      });
+    }
+
+    const result = await StripeService.createCustomerPortalSession({
+      customerId: account.paymentCustomerId,
+      appUrl,
+    });
+
+    if ('error' in result) {
+      return res.status(400).json(result);
+    }
+
+    return res.json({
+      connected: true,
+      portalUrl: result.url,
+    });
+  } catch (err: any) {
+    return res.status(500).json({ error: 'Failed to create billing portal session.' });
+  }
+});
+
+// Upgrade or Downgrade Subscription Plan (Protected - Direct activation of paid plan is FORBIDDEN)
+app.post('/api/billing/change-plan', requireAuth, async (req: AuthenticatedRequest, res) => {
+  try {
+    const uid = req.user!.uid;
+    const { planId } = req.body;
+    const account = await ServerUserStore.findById(uid) || await ServerUserStore.getOrCreateUser({
+      uid,
+      email: req.user!.email || '',
+      role: req.user!.role,
+    });
+
+    // Enforce Rule: A normal API request must never activate a paid plan directly
+    if (planId && planId !== 'free') {
+      return res.status(403).json({
+        error: 'Paid plans cannot be directly activated via API. Please complete checkout via Stripe.',
+        code: 'DIRECT_UPGRADE_FORBIDDEN',
+      });
+    }
+
+    return res.status(403).json({
+      error: 'Subscription changes must be completed through the Stripe billing portal.',
+      code: 'STRIPE_PORTAL_REQUIRED',
     });
   } catch (error: any) {
     return res.status(500).json({ error: error.message || 'Failed to update plan.' });
   }
 });
 
-// Cancel Subscription (Grace Period Retention)
-app.post('/api/billing/cancel-subscription', (req, res) => {
+// Cancel Subscription (Protected)
+app.post('/api/billing/cancel-subscription', requireAuth, async (req: AuthenticatedRequest, res) => {
   try {
-    const { email } = req.body;
-    const account = ServerUserStore.findByEmail(email);
+    const uid = req.user!.uid;
+    const account = await ServerUserStore.findById(uid);
     if (!account) {
       return res.status(404).json({ error: 'Account not found.' });
     }
 
-    const updated = ServerUserStore.updateAccount(account.id, {
+    if (!account.paymentSubscriptionId || !(await StripeService.scheduleSubscriptionCancellation(account.paymentSubscriptionId))) {
+      return res.status(502).json({ error: 'Stripe could not confirm cancellation. No account changes were made.', code: 'STRIPE_CANCELLATION_FAILED' });
+    }
+
+    const updated = await ServerUserStore.updateAccount(account.id, {
       cancelAtPeriodEnd: true,
       subscriptionStatus: 'canceled',
     });
@@ -2161,54 +1965,38 @@ app.post('/api/billing/cancel-subscription', (req, res) => {
   }
 });
 
-// Get Billing History / Invoices
-app.get('/api/billing/history', (req, res) => {
-  const email = (req.query.email as string) || DEFAULT_ADMIN_EMAIL;
-  const account = ServerUserStore.findByEmail(email);
-  if (!account) {
-    return res.json({ invoices: [] });
-  }
-  const invoices = ServerUserStore.getInvoicesForUser(account.id);
+// Get Billing History / Invoices (Protected)
+app.get('/api/billing/history', requireAuth, async (req: AuthenticatedRequest, res) => {
+  const uid = req.user!.uid;
+  const invoices = await ServerUserStore.getInvoicesForUser(uid);
   res.json({ invoices });
 });
 
-// Get Admin Subscription Business Metrics
-app.get('/api/billing/admin-metrics', (req, res) => {
-  const metrics = ServerUserStore.getAdminMetrics();
+// Get Admin Subscription Business Metrics (Admin Protected)
+app.get('/api/billing/admin-metrics', requireAuth, requireRole('admin'), async (_req: AuthenticatedRequest, res) => {
+  const metrics = await ServerUserStore.getAdminMetrics();
   res.json(metrics);
 });
 
-// Payment Provider Webhook Handler (Stripe Webhook Architecture)
-app.post('/api/billing/webhook', (req, res) => {
-  const sig = req.headers['stripe-signature'];
-  console.log('[Webhook] Received billing webhook event:', req.body?.type || 'generic_event');
-
-  // Verify event and handle idempotency
-  // In production, constructEvent with stripe.webhooks.constructEvent(payload, sig, secret)
-  const event = req.body;
-
-  switch (event?.type) {
-    case 'invoice.payment_succeeded':
-      console.log('[Webhook] Invoice payment succeeded for customer', event?.data?.object?.customer);
-      break;
-    case 'customer.subscription.updated':
-      console.log('[Webhook] Subscription updated', event?.data?.object?.id);
-      break;
-    case 'customer.subscription.deleted':
-      console.log('[Webhook] Subscription deleted/canceled', event?.data?.object?.id);
-      break;
-    case 'invoice.payment_failed':
-      console.log('[Webhook] Invoice payment failed', event?.data?.object?.id);
-      break;
-    default:
-      break;
+// Stripe Production Webhook Handler (Verified Signature)
+app.post('/api/billing/webhook', async (req: any, res) => {
+  const signature = req.headers['stripe-signature'];
+  if (!signature) {
+    return res.status(400).json({ error: 'Missing stripe-signature header' });
   }
 
-  res.json({ received: true });
+  const rawBody = req.rawBody || req.body;
+  const result = await StripeService.handleWebhookEvent(rawBody, signature as string);
+
+  if (result.error) {
+    return res.status(result.error.includes('signature') ? 400 : 500).json({ error: result.error });
+  }
+
+  return res.json({ received: true, eventType: result.eventType });
 });
 
 // MarketMind Connected Portfolio™ Server-Side AI Intelligence Endpoint
-app.post('/api/portfolio/ai/query', async (req, res) => {
+app.post('/api/portfolio/ai/query', requireAuth, async (req, res) => {
   try {
     const { prompt, portfolioContext } = req.body;
 
@@ -2266,7 +2054,7 @@ Provide a direct, high-conviction, professional breakdown answering the user's q
 });
 
 // MarketMind Options Intelligence™ AI Contract Analysis Endpoint
-app.post('/api/options/ai/analyze', async (req, res) => {
+app.post('/api/options/ai/analyze', requireAuth, requireEntitlement('pro'), async (req, res) => {
   try {
     const { contract, spotPrice, marketMindScore } = req.body;
     if (!contract) {
@@ -2327,7 +2115,7 @@ Produce a structured JSON response matching this schema:
 });
 
 // MarketMind Options AI Strategy Assistant Endpoint
-app.post('/api/options/ai/strategy', async (req, res) => {
+app.post('/api/options/ai/strategy', requireAuth, requireEntitlement('pro'), async (req, res) => {
   try {
     const { prompt, underlying, spotPrice, currentIV } = req.body;
     if (!prompt) {
@@ -2375,8 +2163,8 @@ Provide a clear, high-level educational strategy breakdown comparing primary and
 // Options Order Idempotency cache
 const processedOrderKeys = new Set<string>();
 
-// Options Order Preview Endpoint
-app.post('/api/options/order/preview', (req, res) => {
+// Options Order Preview Endpoint (Protected by requireAuth)
+app.post('/api/options/order/preview', requireAuth, (req, res) => {
   const { request } = req.body;
   if (!request || !request.legs || !request.legs.length) {
     return res.status(400).json({ error: 'Invalid order request legs' });
@@ -2401,21 +2189,22 @@ app.post('/api/options/order/preview', (req, res) => {
   });
 });
 
-// Options Order Submit Endpoint (with Idempotency Protection)
-app.post('/api/options/order/submit', (req, res) => {
+// Options Order Submit Endpoint (Live Broker vs Paper Trading Safety)
+app.post('/api/options/order/submit', requireAuth, requireEntitlement('pro'), (req: AuthenticatedRequest, res) => {
   const { request } = req.body;
   if (!request) {
-    return res.status(400).json({ error: 'Missing order payload' });
+    return res.status(400).json({ error: 'Missing order payload', code: 'MISSING_PAYLOAD' });
   }
 
   if (!request.userConfirmed) {
-    return res.status(403).json({ error: 'Explicit user confirmation is mandatory prior to broker dispatch.' });
+    return res.status(403).json({ error: 'Explicit user confirmation is mandatory prior to broker dispatch.', code: 'CONFIRMATION_REQUIRED' });
   }
 
   const idempotencyKey = request.idempotencyKey;
   if (idempotencyKey && processedOrderKeys.has(idempotencyKey)) {
     return res.status(409).json({
       error: 'Duplicate order detected. Idempotency lock prevented multiple submissions.',
+      code: 'DUPLICATE_ORDER',
     });
   }
 
@@ -2425,46 +2214,145 @@ app.post('/api/options/order/submit', (req, res) => {
     setTimeout(() => processedOrderKeys.delete(idempotencyKey), 10 * 60 * 1000);
   }
 
-  const primaryLeg = request.legs[0];
-  const qty = primaryLeg.quantity || 1;
-  const fillPrice = request.limitPrice || primaryLeg.currentMid;
+  const isPaper = Boolean(request.isPaper || request.brokerId === 'paper');
 
+  // If live trading is attempted without a live broker configured, return 501 fail-closed
+  if (!isPaper) {
+    const isLiveBrokerConfigured = Boolean(process.env.BROKER_API_KEY && process.env.BROKER_API_SECRET);
+    if (!isLiveBrokerConfigured) {
+      return res.status(501).json({
+        error: 'Live broker integration is not configured in this environment. Please use Paper Trading or configure live brokerage credentials in settings.',
+        code: 'LIVE_BROKER_NOT_CONFIGURED',
+        isLive: false,
+      });
+    }
+  }
+
+  const primaryLeg = request.legs?.[0] || {};
+  const qty = primaryLeg.quantity || 1;
+  const fillPrice = request.limitPrice || primaryLeg.currentMid || 0;
+
+  // Paper Trade execution
   res.json({
     success: true,
     orderId: request.orderId,
     idempotencyKey,
-    brokerOrderId: `BKR-${Date.now()}`,
-    status: 'FILLED',
+    brokerOrderId: `PAPER-${Date.now()}`,
+    status: 'PAPER_FILLED',
+    notice: 'PAPER TRADE — NOT A REAL ORDER. SIMULATED EXECUTION ONLY.',
     filledQuantity: qty,
     averageFillPrice: fillPrice,
     timestamp: new Date().toLocaleTimeString('en-US') + ' ET',
-    brokerName: request.brokerId === 'paper' ? 'MarketMind Paper Trader' : 'Connected Broker API',
+    brokerName: 'MarketMind Paper Trading Engine (Simulation)',
     legs: request.legs,
     limitPrice: request.limitPrice,
     totalCost: Number((fillPrice * 100 * qty).toFixed(2)),
-    isPaper: Boolean(request.isPaper),
+    isPaper: true,
   });
 });
 
-// Global Massive WebSocket Manager
+// Paper Trade Dedicated Endpoint
+app.post('/api/options/order/paper-submit', requireAuth, (req: AuthenticatedRequest, res) => {
+  const { request } = req.body;
+  if (!request) {
+    return res.status(400).json({ error: 'Missing order payload' });
+  }
+
+  const primaryLeg = request.legs?.[0] || {};
+  const qty = primaryLeg.quantity || 1;
+  const fillPrice = request.limitPrice || primaryLeg.currentMid || 0;
+
+  res.json({
+    success: true,
+    orderId: request.orderId,
+    status: 'PAPER_FILLED',
+    notice: 'PAPER TRADE — NOT A REAL ORDER',
+    filledQuantity: qty,
+    averageFillPrice: fillPrice,
+    timestamp: new Date().toLocaleTimeString('en-US') + ' ET',
+    brokerName: 'MarketMind Paper Trading Engine',
+    isPaper: true,
+  });
+});
+
+// Global Massive WebSocket Manager & Realtime Server Manager
 const massiveWsManager = new MassiveWebSocketManager(getAI);
+const realtimeServerManager = RealtimeServerManager.getInstance();
 
 // Endpoint to inspect or trigger active Massive stream
 app.get('/api/market/massive/signals', (req, res) => {
+  if (!massiveWsManager.hasVerifiedMarketData()) {
+    return res.status(503).json({
+      status: 'UNAVAILABLE',
+      source: 'Massive / Polygon WebSocket',
+      error: 'No verified market event has been received from the upstream provider.',
+    });
+  }
   res.json(massiveWsManager.getCalculatedSignals());
 });
 
-app.post('/api/market/massive/subscribe', (req, res) => {
+app.post('/api/market/massive/subscribe', requireAuth, (req, res) => {
   const { ticker = 'SPY' } = req.body;
   massiveWsManager.setTicker(ticker);
   res.json({ status: 'OK', subscribedTicker: ticker });
 });
 
+// Real-Time Server Diagnostics Endpoint
+app.get('/api/realtime/diagnostics', requireAuth, requireRole('admin'), (req, res) => {
+  res.json(realtimeServerManager.getDiagnostics());
+});
+
+// Real-Time Connection Test Endpoint
+app.get('/api/realtime/test-connection', requireAuth, requireRole('admin'), async (req, res) => {
+  const symbol = (req.query.symbol as string) || 'BTC-USD';
+  const startTime = Date.now();
+
+  try {
+    const isCrypto = symbol.includes('BTC') || symbol.includes('ETH') || symbol.includes('-USD');
+    let testUrl = `https://query1.finance.yahoo.com/v8/finance/chart/${encodeURIComponent(symbol)}?interval=1m&range=1d`;
+    if (isCrypto) {
+      testUrl = `https://api.binance.com/api/v3/ticker/price?symbol=${symbol.replace('-USD', 'USDT')}`;
+    }
+
+    const response = await fetch(testUrl, {
+      headers: { 'User-Agent': 'MarketMind-Realtime-Diagnostic/1.0' },
+    });
+
+    if (!response.ok) {
+      return res.json({
+        success: false,
+        resultCode: 'FAIL',
+        message: `Upstream returned status ${response.status}`,
+        latencyMs: Date.now() - startTime,
+      });
+    }
+
+    const data = await response.json();
+    return res.json({
+      success: true,
+      resultCode: 'PASS',
+      message: `Verified real-time tick received for ${symbol} with ${Date.now() - startTime}ms latency`,
+      latencyMs: Date.now() - startTime,
+      sampleData: data,
+    });
+  } catch (err: any) {
+    return res.json({
+      success: false,
+      resultCode: 'FAIL',
+      message: err?.message || 'Connection test failed',
+      latencyMs: Date.now() - startTime,
+    });
+  }
+});
+
 // Setup Vite dev middleware or static serving
 async function startServer() {
+  assertProductionEnvironment();
+
   const server = http.createServer(app);
 
-  // Initialize Massive WebSocket Engine
+  // Initialize Realtime Server Stream & Massive WebSocket Engine
+  realtimeServerManager.init(server);
   massiveWsManager.init(server);
 
   if (process.env.NODE_ENV !== 'production') {

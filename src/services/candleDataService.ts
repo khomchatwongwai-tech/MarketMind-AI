@@ -82,25 +82,6 @@ export async function requestAIChartAnalysis(payload: {
     return await res.json();
   } catch (err) {
     console.error('requestAIChartAnalysis error:', err);
-    return {
-      currentTrend: `Bullish Trend (${payload.timeframe})`,
-      bullishSignals: [
-        `Price ($${payload.currentPrice}) holds firmly above VWAP ($${payload.vwap}).`,
-        `Short-term 9 EMA ($${payload.ema9}) leads above 20 EMA.`,
-      ],
-      bearishSignals: [
-        `Overhead resistance requires continuation volume (>1.25x).`,
-      ],
-      importantSupport: [`VWAP: $${payload.vwap}`, `S1: $${payload.supportLevels[0] || '508.50'}`],
-      importantResistance: [`R1: $${payload.resistanceLevels[0] || '513.40'}`, `Day High`],
-      breakoutLevel: payload.resistanceLevels[0] || `$${(payload.currentPrice * 1.006).toFixed(2)}`,
-      breakdownLevel: payload.supportLevels[0] || `$${(payload.currentPrice * 0.994).toFixed(2)}`,
-      momentum: 'Strong Bullish',
-      volumeConfirmation: `${payload.relativeVolume}x Volume`,
-      risk: 'Moderate Risk',
-      aiExplanation: `${payload.ticker} remains in a constructive trend above VWAP on the ${payload.timeframe} timeframe. Keep tight stops below VWAP.`,
-      timestamp: new Date().toLocaleTimeString('en-US', { timeZone: 'America/New_York' }) + ' ET',
-      source: 'MarketMind Resilient Engine',
-    };
+    throw new Error('AI chart analysis unavailable; no synthetic analysis was generated.');
   }
 }

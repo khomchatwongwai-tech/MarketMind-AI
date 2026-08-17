@@ -2,24 +2,29 @@
 // MarketMind AI - Universal Multi-Asset Instrument Model
 // ==========================================
 
+import { MarketDataMetadata } from './market';
+
 export type UniversalAssetClass =
   | 'STOCK'
   | 'ETF'
-  | 'FUND'
-  | 'ADR'
-  | 'WARRANT'
   | 'INDEX'
   | 'OPTION'
   | 'INDEX_OPTION'
-  | 'FOREX'
   | 'CRYPTO'
   | 'CRYPTO_PAIR'
+  | 'FOREX'
+  | 'FUTURE'
   | 'FUTURES'
   | 'FUTURES_OPTION'
+  | 'MUTUAL_FUND'
+  | 'FUND'
   | 'COMMODITY'
   | 'BOND'
   | 'TREASURY'
-  | 'ECONOMIC_INDICATOR';
+  | 'ECONOMIC_INDICATOR'
+  | 'ADR'
+  | 'WARRANT'
+  | 'OTHER';
 
 export type InstrumentActiveStatus = 'ACTIVE' | 'EXPIRED' | 'DELISTED' | 'HALTED' | 'PRE_MARKET' | 'SUSPENDED';
 
@@ -236,6 +241,7 @@ export interface MultiAssetQuoteResponse {
     feedDelayMinutes: number;
     latencyMs: number;
     currency: string;
+    metadata?: MarketDataMetadata;
   };
   assetSpecificData?: {
     greeks?: InstrumentGreeks;

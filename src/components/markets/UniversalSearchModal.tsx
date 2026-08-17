@@ -47,6 +47,7 @@ export const UniversalSearchModal: React.FC<UniversalSearchModalProps> = ({
     { id: 'COMMODITY', label: 'Commodities' },
     { id: 'INDEX', label: 'Indexes' },
     { id: 'TREASURY', label: 'Fixed Income' },
+    { id: 'BOND', label: 'Bonds' },
     { id: 'ECONOMIC_INDICATOR', label: 'Macro Series' },
   ];
 

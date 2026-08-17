@@ -16,6 +16,7 @@ import {
   Lock,
 } from 'lucide-react';
 import { CalculatedMarketSignals, MassiveWsStatus, MassiveAiInsight } from '../types/massiveWs';
+import { AppConfig } from '../config/environment';
 
 interface MassiveLiveFeedBarProps {
   status: MassiveWsStatus;
@@ -43,6 +44,7 @@ export const MassiveLiveFeedBar: React.FC<MassiveLiveFeedBarProps> = ({
 }) => {
   const isAboveVwap = signals?.priceVsVwap === 'ABOVE_VWAP';
   const isEmaBull = signals?.emaStack === 'BULLISH_STACK';
+  const endOfDayMode = AppConfig.marketDataMode === 'end_of_day';
 
   // Determine user status label based on connection
   const displayStatus: 'LIVE' | 'RECONNECTING' | 'DISCONNECTED' | 'DELAYED DATA' =
@@ -65,14 +67,16 @@ export const MassiveLiveFeedBar: React.FC<MassiveLiveFeedBarProps> = ({
           <div>
             <div className="flex items-center gap-2">
               <span className="text-sm font-black text-white font-mono tracking-tight">
-                MASSIVE REAL-TIME FEED & QUANT SIGNALS
+                {endOfDayMode ? 'MASSIVE END-OF-DAY DATA & QUANT SIGNALS' : 'MASSIVE REAL-TIME FEED & QUANT SIGNALS'}
               </span>
               <span className="px-2 py-0.5 bg-[#151515] text-[#F2D675] border border-[#D4AF37]/40 text-[10px] font-bold rounded-md font-mono">
-                {ticker} ACTIVE STREAM
+                {ticker} {endOfDayMode ? 'FREE PLAN' : 'ACTIVE STREAM'}
               </span>
             </div>
             <p className="text-[11px] text-[#9CA3AF] font-mono">
-              Direct WebSocket &bull; Real-Time Indicators &bull; MarketMind Quantitative Engine
+              {endOfDayMode
+                ? 'Historical / End-of-Day Data • No Real-Time Claims • MarketMind Quantitative Engine'
+                : 'Direct WebSocket • Real-Time Indicators • MarketMind Quantitative Engine'}
             </p>
           </div>
         </div>
@@ -101,7 +105,7 @@ export const MassiveLiveFeedBar: React.FC<MassiveLiveFeedBarProps> = ({
                   : 'bg-[#EF4444]'
               }`}
             />
-            {displayStatus}
+            {endOfDayMode ? (signals ? 'END-OF-DAY' : 'DATA UNAVAILABLE') : displayStatus}
           </div>
 
           <button
@@ -115,18 +119,24 @@ export const MassiveLiveFeedBar: React.FC<MassiveLiveFeedBarProps> = ({
         </div>
       </div>
 
+      {!signals && (
+        <div className="mt-3 rounded-lg border border-amber-500/30 bg-amber-500/10 px-3 py-2 text-[11px] font-mono text-amber-200">
+          Verified {endOfDayMode ? 'end-of-day' : 'streaming'} market data is currently unavailable. No simulated prices or candles are being generated.
+        </div>
+      )}
+
       {/* 2. Real-Time Signal Cards Grid */}
       <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-2.5 mt-3">
         {/* Live Ticker & Price */}
         <div className="bg-[#101010] border border-[#242424] hover:border-[rgba(212,175,55,0.4)] rounded-lg p-2.5 flex flex-col justify-between transition">
-          <span className="text-[10px] text-[#9CA3AF] font-mono uppercase">Live Trade ({ticker})</span>
+          <span className="text-[10px] text-[#9CA3AF] font-mono uppercase">{endOfDayMode ? 'Latest Close' : 'Live Trade'} ({ticker})</span>
           <div className="flex items-baseline gap-1 mt-1">
             <span className="text-lg font-black font-mono text-white">
-              ${signals ? signals.price.toFixed(2) : '512.48'}
+              {signals ? `$${signals.price.toFixed(2)}` : '--'}
             </span>
           </div>
           <span className="text-[10px] text-[#9CA3AF] font-mono">
-            Size: {liveTrade?.size || 250} shares
+            {endOfDayMode ? 'Free plan • End-of-day' : liveTrade?.size ? `Size: ${liveTrade.size} shares` : 'Awaiting ticks'}
           </span>
         </div>
 
@@ -134,19 +144,21 @@ export const MassiveLiveFeedBar: React.FC<MassiveLiveFeedBarProps> = ({
         <div className="bg-[#101010] border border-[#242424] hover:border-[rgba(212,175,55,0.4)] rounded-lg p-2.5 flex flex-col justify-between transition">
           <div className="flex justify-between items-center">
             <span className="text-[10px] text-[#9CA3AF] font-mono uppercase">Calculated VWAP</span>
-            <span
-              className={`text-[9px] font-bold px-1 rounded ${
-                isAboveVwap ? 'bg-[#22C55E]/20 text-[#22C55E]' : 'bg-[#EF4444]/20 text-[#EF4444]'
-              }`}
-            >
-              {isAboveVwap ? '+ Above' : '- Below'}
-            </span>
+            {signals && (
+              <span
+                className={`text-[9px] font-bold px-1 rounded ${
+                  isAboveVwap ? 'bg-[#22C55E]/20 text-[#22C55E]' : 'bg-[#EF4444]/20 text-[#EF4444]'
+                }`}
+              >
+                {isAboveVwap ? '+ Above' : '- Below'}
+              </span>
+            )}
           </div>
           <span className="text-lg font-black font-mono text-[#F2D675] mt-1">
-            ${signals ? signals.vwap.toFixed(2) : '512.10'}
+            {signals ? `$${signals.vwap.toFixed(2)}` : '--'}
           </span>
           <span className="text-[10px] text-[#9CA3AF] font-mono truncate">
-            CumVol: {signals ? (signals.cumulativeVolume / 1000000).toFixed(2) + 'M' : '4.5M'}
+            {signals ? `CumVol: ${(signals.cumulativeVolume / 1000000).toFixed(2)}M` : 'CumVol: --'}
           </span>
         </div>
 
@@ -154,21 +166,23 @@ export const MassiveLiveFeedBar: React.FC<MassiveLiveFeedBarProps> = ({
         <div className="bg-[#101010] border border-[#242424] hover:border-[rgba(212,175,55,0.4)] rounded-lg p-2.5 flex flex-col justify-between transition">
           <div className="flex justify-between items-center">
             <span className="text-[10px] text-[#9CA3AF] font-mono uppercase">EMA (9 / 20)</span>
-            <span
-              className={`text-[9px] font-bold px-1 rounded ${
-                isEmaBull ? 'bg-[#22C55E]/20 text-[#22C55E]' : 'bg-[#EF4444]/20 text-[#EF4444]'
-              }`}
-            >
-              {isEmaBull ? 'Bullish' : 'Bearish'}
-            </span>
+            {signals && (
+              <span
+                className={`text-[9px] font-bold px-1 rounded ${
+                  isEmaBull ? 'bg-[#22C55E]/20 text-[#22C55E]' : 'bg-[#EF4444]/20 text-[#EF4444]'
+                }`}
+              >
+                {isEmaBull ? 'Bullish' : 'Bearish'}
+              </span>
+            )}
           </div>
           <div className="flex items-baseline gap-1.5 mt-1 font-mono text-xs">
-            <span className="text-white font-bold">${signals?.ema9.toFixed(2) || '512.30'}</span>
+            <span className="text-white font-bold">{signals?.ema9 ? `$${signals.ema9.toFixed(2)}` : '--'}</span>
             <span className="text-[#6B7280]">/</span>
-            <span className="text-[#D4AF37] font-bold">${signals?.ema20.toFixed(2) || '511.95'}</span>
+            <span className="text-[#D4AF37] font-bold">{signals?.ema20 ? `$${signals.ema20.toFixed(2)}` : '--'}</span>
           </div>
           <span className="text-[10px] text-[#9CA3AF] font-mono">
-            50 EMA: ${signals?.ema50.toFixed(2) || '510.80'}
+            {signals?.ema50 ? `50 EMA: $${signals.ema50.toFixed(2)}` : '50 EMA: --'}
           </span>
         </div>
 
@@ -176,10 +190,10 @@ export const MassiveLiveFeedBar: React.FC<MassiveLiveFeedBarProps> = ({
         <div className="bg-[#101010] border border-[#242424] hover:border-[rgba(212,175,55,0.4)] rounded-lg p-2.5 flex flex-col justify-between transition">
           <span className="text-[10px] text-[#9CA3AF] font-mono uppercase">RSI(14)</span>
           <span className="text-lg font-black font-mono text-white mt-1">
-            {signals?.rsi.toFixed(1) || '54.2'}
+            {signals?.rsi ? signals.rsi.toFixed(1) : '--'}
           </span>
           <span className="text-[10px] text-[#9CA3AF] font-mono">
-            {signals && signals.rsi > 70 ? 'Overbought' : signals && signals.rsi < 30 ? 'Oversold' : 'Neutral Range'}
+            {signals ? (signals.rsi > 70 ? 'Overbought' : signals.rsi < 30 ? 'Oversold' : 'Neutral Range') : 'Awaiting data'}
           </span>
         </div>
 
@@ -187,7 +201,7 @@ export const MassiveLiveFeedBar: React.FC<MassiveLiveFeedBarProps> = ({
         <div className="bg-[#101010] border border-[#242424] hover:border-[rgba(212,175,55,0.4)] rounded-lg p-2.5 flex flex-col justify-between transition">
           <span className="text-[10px] text-[#9CA3AF] font-mono uppercase">Relative Volume</span>
           <span className="text-lg font-black font-mono text-[#22C55E] mt-1">
-            {signals?.relativeVolume.toFixed(2) || '1.15'}x
+            {signals?.relativeVolume !== undefined ? `${signals.relativeVolume.toFixed(2)}x` : '--'}
           </span>
           <span className="text-[10px] text-[#9CA3AF] font-mono">
             Institutional Flow

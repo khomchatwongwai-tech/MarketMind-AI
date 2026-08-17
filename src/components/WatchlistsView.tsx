@@ -22,24 +22,20 @@ interface WatchlistsViewProps {
   currentTicker: TickerSymbol;
 }
 
-// Mock live ticker summary dictionary for watchlists
+// Names only. Market values remain unavailable until verified provider data is wired here.
 const TICKER_DATA: Record<
   string,
   { name: string; price: number; change: number; changePercent: number; volume: string; rsi: number; bias: string }
-> = {
-  SPY: { name: 'SPDR S&P 500 ETF', price: 512.45, change: 4.25, changePercent: 0.84, volume: '48.2M', rsi: 58.4, bias: 'BULLISH' },
-  QQQ: { name: 'Invesco QQQ Trust', price: 446.8, change: 5.12, changePercent: 1.16, volume: '34.6M', rsi: 63.2, bias: 'BULLISH' },
-  NVDA: { name: 'NVIDIA Corporation', price: 129.6, change: 3.45, changePercent: 2.74, volume: '62.4M', rsi: 68.1, bias: 'BULLISH' },
-  TSLA: { name: 'Tesla, Inc.', price: 216.2, change: -2.8, changePercent: -1.28, volume: '41.8M', rsi: 44.5, bias: 'BEARISH' },
-  AAPL: { name: 'Apple Inc.', price: 224.75, change: 0.85, changePercent: 0.38, volume: '29.1M', rsi: 52.0, bias: 'NEUTRAL' },
-  MSFT: { name: 'Microsoft Corporation', price: 426.5, change: 3.2, changePercent: 0.76, volume: '18.4M', rsi: 59.8, bias: 'BULLISH' },
-  AMZN: { name: 'Amazon.com Inc.', price: 182.3, change: 1.6, changePercent: 0.89, volume: '22.0M', rsi: 56.4, bias: 'BULLISH' },
-  META: { name: 'Meta Platforms Inc.', price: 504.1, change: 6.8, changePercent: 1.37, volume: '14.5M', rsi: 64.9, bias: 'BULLISH' },
-  AMD: { name: 'Advanced Micro Devices', price: 148.9, change: 2.9, changePercent: 1.99, volume: '31.2M', rsi: 61.3, bias: 'BULLISH' },
-  IWM: { name: 'iShares Russell 2000', price: 205.8, change: -0.4, changePercent: -0.19, volume: '19.8M', rsi: 48.7, bias: 'NEUTRAL' },
-  COIN: { name: 'Coinbase Global', price: 218.4, change: 8.5, changePercent: 4.05, volume: '12.1M', rsi: 71.2, bias: 'BULLISH' },
-  PLTR: { name: 'Palantir Technologies', price: 31.8, change: 0.95, changePercent: 3.08, volume: '54.0M', rsi: 66.4, bias: 'BULLISH' },
-};
+> = Object.fromEntries(
+  Object.entries({
+    SPY: 'SPDR S&P 500 ETF', QQQ: 'Invesco QQQ Trust', NVDA: 'NVIDIA Corporation',
+    TSLA: 'Tesla, Inc.', AAPL: 'Apple Inc.', MSFT: 'Microsoft Corporation',
+    AMZN: 'Amazon.com Inc.', META: 'Meta Platforms Inc.', AMD: 'Advanced Micro Devices',
+    IWM: 'iShares Russell 2000', COIN: 'Coinbase Global', PLTR: 'Palantir Technologies',
+  }).map(([symbol, name]) => [symbol, {
+    name, price: 0, change: 0, changePercent: 0, volume: 'Unavailable', rsi: 0, bias: 'UNAVAILABLE',
+  }])
+);
 
 export const WatchlistsView: React.FC<WatchlistsViewProps> = ({
   onSelectTicker,
@@ -94,7 +90,7 @@ export const WatchlistsView: React.FC<WatchlistsViewProps> = ({
     const rows = [
       ['Ticker', 'Name', 'Price', 'Change', 'Change %', 'Volume', 'RSI', 'Bias'],
       ...currentList.tickers.map((t) => {
-        const d = TICKER_DATA[t] || { name: t, price: 100, change: 0, changePercent: 0, volume: '10M', rsi: 50, bias: 'NEUTRAL' };
+        const d = TICKER_DATA[t] || { name: t, price: 0, change: 0, changePercent: 0, volume: 'Unavailable', rsi: 0, bias: 'UNAVAILABLE' };
         return [t, d.name, d.price, d.change, `${d.changePercent}%`, d.volume, d.rsi, d.bias];
       }),
     ];
@@ -219,12 +215,12 @@ export const WatchlistsView: React.FC<WatchlistsViewProps> = ({
               {currentList?.tickers.map((sym) => {
                 const data = TICKER_DATA[sym] || {
                   name: `${sym} Asset`,
-                  price: 150.0,
-                  change: 1.25,
-                  changePercent: 0.85,
-                  volume: '15.4M',
-                  rsi: 55.0,
-                  bias: 'BULLISH',
+                  price: 0,
+                  change: 0,
+                  changePercent: 0,
+                  volume: 'Unavailable',
+                  rsi: 0,
+                  bias: 'UNAVAILABLE',
                 };
                 const isPos = data.change >= 0;
                 const isSelected = currentTicker === sym;
@@ -251,7 +247,7 @@ export const WatchlistsView: React.FC<WatchlistsViewProps> = ({
                     </td>
 
                     <td className="p-3 font-mono font-bold text-sm text-white">
-                      ${data.price.toFixed(2)}
+                      {data.price > 0 ? `$${data.price.toFixed(2)}` : 'Unavailable'}
                     </td>
 
                     <td className="p-3 font-mono font-semibold">

@@ -16,9 +16,14 @@ service cloud.firestore {
       return isSignedIn() && request.auth.uid == userId;
     }
 
+    function isEmailVerified() {
+      return isSignedIn() && request.auth.token.email_verified == true;
+    }
+
     function isAdmin() {
       return isSignedIn() && (
-        request.auth.token.email == 'khomchatwongwai@gmail.com' ||
+        request.auth.token.role == 'admin' ||
+        request.auth.token.role == 'super_admin' ||
         exists(/databases/$(database)/documents/admins/$(request.auth.uid))
       );
     }
@@ -39,8 +44,8 @@ service cloud.firestore {
     function isValidUserProfile(data) {
       return data.id is string && data.id.size() <= 128 &&
              data.email is string && data.email.size() <= 150 &&
-             data.role in ['user', 'admin'] &&
-             data.plan in ['free', 'basic', 'pro', 'premium', 'institutional'];
+             data.role in ['user', 'premium_user', 'support', 'moderator', 'admin', 'super_admin'] &&
+             data.plan in ['free', 'basic', 'pro', 'premium', 'institutional', 'enterprise'];
     }
 
     // Entity Validation: Watchlist
@@ -79,21 +84,49 @@ service cloud.firestore {
              data.status in ['Open', 'In Review', 'Resolved', 'Closed'];
     }
 
+    // Entity Validation: CommunityPost
+    function isValidCommunityPost(data) {
+      return data.id is string && data.id.size() <= 128 &&
+             data.authorId is string && data.authorId == request.auth.uid &&
+             data.content is string && data.content.size() > 0 && data.content.size() <= 5000 &&
+             data.status in ['PUBLISHED', 'HIDDEN', 'REMOVED'];
+    }
+
+    // Entity Validation: CommunityReport
+    function isValidCommunityReport(data) {
+      return data.id is string && data.id.size() <= 128 &&
+             data.reporterId is string && data.reporterId == request.auth.uid &&
+             data.targetType in ['POST', 'COMMENT', 'PROFILE'] &&
+             data.targetId is string && data.targetId.size() <= 128 &&
+             data.category is string && data.category.size() <= 100 &&
+             data.status in ['PENDING', 'ACTION_TAKEN', 'DISMISSED'];
+    }
+
     // --- USERS COLLECTION ---
     match /users/{userId} {
       allow get: if isOwner(userId) || isAdmin();
       allow list: if isAdmin();
       
       allow create: if isOwner(userId) && isValidId(userId) && isValidUserProfile(incoming()) && (
-        // Regular users cannot elevate their role to admin
-        (incoming().role == 'user') || isAdmin()
+        isAdmin() || (
+          incoming().role == 'user' &&
+          incoming().plan == 'free' &&
+          (incoming().subscriptionStatus == 'free' || !('subscriptionStatus' in incoming()))
+        )
       );
 
       allow update: if (isOwner(userId) || isAdmin()) && isValidUserProfile(incoming()) && (
         isAdmin() || (
-          // Prevent role escalation by user
+          // Prevent self-elevation of role, plan, billing, or trial status by normal users
+          incoming().id == existing().id &&
           incoming().role == existing().role &&
-          incoming().id == existing().id
+          incoming().plan == existing().plan &&
+          (!('planTier' in incoming()) || incoming().planTier == existing().planTier) &&
+          (!('subscriptionStatus' in incoming()) || incoming().subscriptionStatus == existing().subscriptionStatus) &&
+          (!('hasUsedTrial' in incoming()) || incoming().hasUsedTrial == existing().hasUsedTrial) &&
+          (!('paymentCustomerId' in incoming()) || incoming().paymentCustomerId == existing().paymentCustomerId) &&
+          (!('paymentSubscriptionId' in incoming()) || incoming().paymentSubscriptionId == existing().paymentSubscriptionId) &&
+          (!('monthlyPrice' in incoming()) || incoming().monthlyPrice == existing().monthlyPrice)
         )
       );
 
@@ -125,7 +158,18 @@ service cloud.firestore {
         allow list: if isOwner(userId) || isAdmin();
 
         allow create: if isOwner(userId) && isValidId(predictionId) && isValidPrediction(incoming());
-        allow update: if (isOwner(userId) || isAdmin()) && isValidId(predictionId) && isValidPrediction(incoming()) && incoming().userId == existing().userId;
+        allow update: if (isOwner(userId) || isAdmin()) && isValidId(predictionId) && isValidPrediction(incoming()) && (
+          isAdmin() || (
+            // Immutable prediction fields: user cannot modify original model prediction or finalize status
+            incoming().userId == existing().userId &&
+            incoming().ticker == existing().ticker &&
+            incoming().direction == existing().direction &&
+            (!('entryPrice' in existing()) || incoming().entryPrice == existing().entryPrice) &&
+            (!('timeframe' in existing()) || incoming().timeframe == existing().timeframe) &&
+            (!('createdAt' in existing()) || incoming().createdAt == existing().createdAt) &&
+            incoming().status == existing().status
+          )
+        );
         allow delete: if isOwner(userId) || isAdmin();
       }
     }
@@ -149,11 +193,8 @@ service cloud.firestore {
     // --- COMMUNITY POSTS COLLECTION ---
     match /community_posts/{postId} {
       allow read: if true;
-      allow create: if isSignedIn() && isValidId(postId) && (
-        incoming().authorId == request.auth.uid &&
-        incoming().status == 'PUBLISHED'
-      );
-      allow update: if isSignedIn() && (
+      allow create: if isSignedIn() && isValidId(postId) && isValidCommunityPost(incoming()) && incoming().status == 'PUBLISHED';
+      allow update: if isSignedIn() && isValidCommunityPost(incoming()) && (
         isAdmin() || (
           resource.data.authorId == request.auth.uid &&
           incoming().authorId == existing().authorId
@@ -167,8 +208,14 @@ service cloud.firestore {
     // --- COMMUNITY REPORTS COLLECTION ---
     match /community_reports/{reportId} {
       allow get, list: if isAdmin();
-      allow create: if isSignedIn() && isValidId(reportId) && incoming().reporterId == request.auth.uid;
+      allow create: if isSignedIn() && isValidId(reportId) && isValidCommunityReport(incoming()) && incoming().status == 'PENDING';
       allow update, delete: if isAdmin();
+    }
+
+    // --- ADMINS COLLECTION ---
+    match /admins/{adminId} {
+      allow get: if isSignedIn();
+      allow list, write: if isAdmin();
     }
 
     // System Health Status Document

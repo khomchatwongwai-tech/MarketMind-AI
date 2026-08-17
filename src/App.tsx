@@ -11,6 +11,10 @@ import { OptionsAnalyticsView } from './components/OptionsAnalyticsView';
 import { OptionsTraderView } from './components/optionsTrader/OptionsTraderView';
 import { EconomicFedView } from './components/EconomicFedView';
 import { NewsAnalyzerView } from './components/NewsAnalyzerView';
+import { NewsIntelligenceDashboard } from './components/news/NewsIntelligenceDashboard';
+import { MultiAssetMarketsView } from './components/markets/MultiAssetMarketsView';
+import { UniversalSearchModal } from './components/markets/UniversalSearchModal';
+import { MultiAssetAiAnalysisModal } from './components/markets/MultiAssetAiAnalysisModal';
 import { AskMarketMindChat } from './components/AskMarketMindChat';
 import { TradeSimulatorView } from './components/TradeSimulatorView';
 import { PredictionsBacktestView } from './components/PredictionsBacktestView';
@@ -36,19 +40,26 @@ import { OnboardingTourModal } from './components/OnboardingTourModal';
 import { PrivacyPolicyModal } from './components/PrivacyPolicyModal';
 import { TermsOfServiceModal } from './components/TermsOfServiceModal';
 import { ContactSupportModal } from './components/ContactSupportModal';
+import { FastOnboardingModal } from './components/FastOnboardingModal';
+import { NotificationCenterModal } from './components/NotificationCenterModal';
+import { MarketBriefsModal } from './components/MarketBriefsModal';
+import { ReportDataIssueModal } from './components/ReportDataIssueModal';
+import { SmartAlertEngine } from './services/smartAlertEngine';
+import { AnalyticsService } from './services/analyticsService';
 
 import {
   getComprehensiveMarketData,
-  simulateTick,
   fetchLiveMarketQuote,
   mergeLiveQuoteIntoComprehensiveData,
   ComprehensiveMarketData,
 } from './services/marketDataService';
 import { TickerSymbol, MarketAlert, LiveMarketDataSource } from './types/market';
+import { NormalizedInstrument } from './types/instrument';
+import { MASTER_INSTRUMENTS, InstrumentDirectoryService } from './services/marketProviders/InstrumentDirectoryService';
 import { UserProfile } from './types/user';
-import { DEFAULT_ADMIN_EMAIL, UserService } from './services/userService';
+import { UserService } from './services/userService';
 import { auth } from './config/firebase';
-import { onAuthStateChanged } from 'firebase/auth';
+import { onAuthStateChanged, signOut } from 'firebase/auth';
 import { FirestoreService } from './services/firestoreService';
 import { ShieldCheck, HelpCircle, Activity, FileText, Lock, MessageSquare } from 'lucide-react';
 
@@ -58,7 +69,7 @@ export default function App() {
     getComprehensiveMarketData('SPY')
   );
   const [activeTab, setActiveTab] = useState<ActiveTab>('overview');
-  const [isLive, setIsLive] = useState<boolean>(true);
+  const [isLive, setIsLive] = useState<boolean>(false);
   const [dataSource, setDataSource] = useState<LiveMarketDataSource>('Yahoo Finance (Real-Time)');
   const [tickSpeed, setTickSpeed] = useState<number>(3000);
   const [isLoadingLive, setIsLoadingLive] = useState<boolean>(false);
@@ -74,6 +85,38 @@ export default function App() {
   const [isPrivacyPolicyOpen, setIsPrivacyPolicyOpen] = useState<boolean>(false);
   const [isTermsOfServiceOpen, setIsTermsOfServiceOpen] = useState<boolean>(false);
   const [isContactSupportOpen, setIsContactSupportOpen] = useState<boolean>(false);
+  const [isUniversalSearchOpen, setIsUniversalSearchOpen] = useState<boolean>(false);
+  const [isFastOnboardingOpen, setIsFastOnboardingOpen] = useState<boolean>(false);
+  const [isNotificationCenterOpen, setIsNotificationCenterOpen] = useState<boolean>(false);
+  const [isMarketBriefsOpen, setIsMarketBriefsOpen] = useState<boolean>(false);
+  const [marketBriefType, setMarketBriefType] = useState<'morning' | 'eod'>('morning');
+  const [isReportIssueOpen, setIsReportIssueOpen] = useState<boolean>(false);
+  const [selectedInstrument, setSelectedInstrument] = useState<NormalizedInstrument>(MASTER_INSTRUMENTS[0]);
+  const [aiAnalysisInstrument, setAiAnalysisInstrument] = useState<NormalizedInstrument | null>(null);
+  const [watchlistIds, setWatchlistIds] = useState<string[]>([
+    'inst_stock_nvda_nasdaq',
+    'inst_stock_aapl_nasdaq',
+    'inst_stock_msft_nasdaq',
+    'inst_stock_tsla_nasdaq',
+    'inst_crypto_btc_usd',
+    'inst_forex_eur_usd',
+  ]);
+
+  // Global Keyboard Shortcuts (Cmd+K / Ctrl+K for Universal Search)
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 'k') {
+        e.preventDefault();
+        setIsUniversalSearchOpen((prev) => !prev);
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, []);
+
+  const handleToggleWatchlist = (id: string) => {
+    setWatchlistIds((prev) => (prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]));
+  };
 
   // Auto trigger onboarding tour for first-time visitors
   useEffect(() => {
@@ -89,8 +132,7 @@ export default function App() {
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, async (fbUser) => {
       if (fbUser) {
-        const userEmail = fbUser.email || DEFAULT_ADMIN_EMAIL;
-        const isMasterAdmin = userEmail.toLowerCase() === DEFAULT_ADMIN_EMAIL.toLowerCase();
+        const userEmail = fbUser.email ?? '';
         try {
           const profile = await FirestoreService.getUserProfile(fbUser.uid);
           if (profile) {
@@ -101,12 +143,12 @@ export default function App() {
               ...currentUser,
               id: fbUser.uid,
               email: userEmail,
-              name: fbUser.displayName || userEmail.split('@')[0],
+              name: fbUser.displayName || (userEmail ? userEmail.split('@')[0] : 'Trader'),
               avatarUrl: fbUser.photoURL || currentUser.avatarUrl,
               emailVerified: fbUser.emailVerified,
-              role: isMasterAdmin ? 'admin' : 'user',
-              plan: isMasterAdmin ? 'premium' : 'pro',
-              planTier: isMasterAdmin ? 'PREMIUM' : 'PRO',
+              role: 'user',
+              plan: 'free',
+              planTier: 'FREE',
               isGuest: false,
             };
             setCurrentUser(newProfile);
@@ -126,26 +168,15 @@ export default function App() {
     setCurrentUser(updatedUser);
   };
 
-  const [alerts, setAlerts] = useState<MarketAlert[]>([
-    {
-      id: 'a1',
-      timestamp: '10:42 AM',
-      type: 'RESISTANCE_APPROACH',
-      title: 'R1 Resistance Approaching',
-      message: 'SPY is trading within $0.45 of primary R1 overhead level ($514.80).',
-      severity: 'WARNING',
-      read: false,
-    },
-    {
-      id: 'a2',
-      timestamp: '10:15 AM',
-      type: 'UNUSUAL_SWEEP',
-      title: 'Large Bullish Sweep Detected',
-      message: 'SPY $515.00 Call Sweep for $1,240,000 premium executed above ask.',
-      severity: 'INFO',
-      read: false,
-    },
-  ]);
+  const handleSignOut = async () => {
+    await signOut(auth);
+    const guestUser = UserService.logout();
+    setCurrentUser(guestUser);
+    setIsSettingsModalOpen(false);
+    setIsAuthModalOpen(true);
+  };
+
+  const [alerts, setAlerts] = useState<MarketAlert[]>([]);
 
   // Fetch real-time live market movement from Yahoo Finance / Google Finance
   const syncLiveMarket = useCallback(async (ticker: TickerSymbol, source: LiveMarketDataSource) => {
@@ -154,6 +185,7 @@ export default function App() {
       const liveResult = await fetchLiveMarketQuote(ticker, source);
       if (liveResult && liveResult.price) {
         setMarketData((prev) => mergeLiveQuoteIntoComprehensiveData(prev, liveResult));
+        setIsLive(true);
       }
     } catch (e) {
       console.warn('Live sync error:', e);
@@ -164,11 +196,14 @@ export default function App() {
 
   // Load new ticker data when selection changes
   const handleSelectTicker = (ticker: TickerSymbol) => {
-    setSelectedTicker(ticker);
-    const newData = getComprehensiveMarketData(ticker);
+    const cleanTicker = ticker.trim().toUpperCase() as TickerSymbol;
+    setSelectedTicker(cleanTicker);
+    const matchedInstrument = InstrumentDirectoryService.getBySymbol(cleanTicker);
+    if (matchedInstrument) setSelectedInstrument(matchedInstrument);
+    const newData = getComprehensiveMarketData(cleanTicker);
     setMarketData(newData);
     // Fetch live quote immediately for new ticker
-    syncLiveMarket(ticker, dataSource);
+    syncLiveMarket(cleanTicker, dataSource);
   };
 
   // Initial load sync
@@ -181,43 +216,39 @@ export default function App() {
     syncLiveMarket(selectedTicker, dataSource);
   };
 
-  // Real-time live movement polling & tick engine
+  // Provider-backed polling only. Never interpolate or invent prices between responses.
   useEffect(() => {
     if (!isLive) return;
 
-    let tickCount = 0;
     const interval = setInterval(async () => {
-      tickCount++;
-      // Every 3 ticks, fetch fresh quote from Yahoo / Google
-      if (tickCount % 3 === 0) {
-        const liveResult = await fetchLiveMarketQuote(selectedTicker, dataSource);
-        if (liveResult && liveResult.price) {
-          setMarketData((prev) => mergeLiveQuoteIntoComprehensiveData(prev, liveResult));
-          return;
-        }
-      }
-
-      // Fast tick movement interpolation between live queries
-      setMarketData((prev) => {
-        const next = simulateTick(prev);
-        // Occasionally trigger dynamic alert if price crosses R1 or VWAP
-        if (next.quote.price > next.supportResistance.r1 && Math.random() < 0.15) {
+      const liveResult = await fetchLiveMarketQuote(selectedTicker, dataSource);
+      if (liveResult && Number(liveResult.price) > 0) {
+        setMarketData((prev) => {
+          const next = mergeLiveQuoteIntoComprehensiveData(prev, liveResult);
+        const smartAlert = SmartAlertEngine.evaluateQuoteAlerts(
+          next.quote,
+          undefined,
+          next.supportResistance.s1,
+          next.supportResistance.r1
+        );
+        if (smartAlert) {
           setAlerts((prevAlerts) => [
             {
-              id: String(Date.now()),
-              timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
-              type: 'BREAKOUT',
-              title: `${next.quote.ticker} Breakout Alert`,
-              message: `${next.quote.ticker} crossed above R1 resistance (${next.supportResistance.r1.toFixed(2)}) with active buying volume.`,
-              severity: 'WARNING',
+              id: smartAlert.id,
+              timestamp: new Date(smartAlert.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+              type: smartAlert.triggerType === 'R1_BREAKOUT' || smartAlert.triggerType === 'VWAP_CROSS' ? 'BREAKOUT' : 'SWING',
+              title: `${smartAlert.symbol} ${smartAlert.triggerType.replace(/_/g, ' ')}`,
+              message: smartAlert.message,
+              severity: smartAlert.severity === 'CRITICAL' || smartAlert.severity === 'HIGH' ? 'WARNING' : 'INFO',
               read: false,
             },
             ...prevAlerts.slice(0, 15),
           ]);
         }
         return next;
-      });
-    }, tickSpeed);
+        });
+      }
+    }, Math.max(tickSpeed, 15000));
 
     return () => clearInterval(interval);
   }, [isLive, selectedTicker, dataSource, tickSpeed]);
@@ -256,9 +287,14 @@ export default function App() {
         onToggleLive={() => setIsLive(!isLive)}
         onManualRefresh={handleManualRefresh}
         unreadAlertCount={unreadAlertCount}
-        onOpenReport={(type) => setReportModalType(type)}
-        onOpenAlerts={() => setActiveTab('saved_alerts')}
+        onOpenReport={(type) => {
+          setMarketBriefType(type);
+          setIsMarketBriefsOpen(true);
+        }}
+        onOpenAlerts={() => setIsNotificationCenterOpen(true)}
         onOpenChat={() => setActiveTab('chat')}
+        onOpenUniversalSearch={() => setIsUniversalSearchOpen(true)}
+        onOpenReportIssue={() => setIsReportIssueOpen(true)}
         dataSource={dataSource}
         onChangeDataSource={setDataSource}
         tickSpeed={tickSpeed}
@@ -277,6 +313,7 @@ export default function App() {
         onTabChange={setActiveTab}
         setupQuality={marketData.probabilities.setupQuality}
         breadthStatus={marketData.breadth.breadthStatus}
+        currentUser={currentUser}
       />
 
       {/* Main Content Area Routing */}
@@ -287,6 +324,21 @@ export default function App() {
             probabilities={marketData.probabilities}
             onNavigateTab={handleNavigateTab}
             onAskQuestion={handleAskQuestionFromDashboard}
+          />
+        )}
+
+        {activeTab === 'multi_asset_markets' && (
+          <MultiAssetMarketsView
+            selectedInstrument={selectedInstrument}
+            onSelectInstrument={(inst) => {
+              setSelectedInstrument(inst);
+              if (inst.providerSymbol) {
+                handleSelectTicker(inst.providerSymbol as TickerSymbol);
+              }
+            }}
+            onOpenAiAnalysis={(inst) => setAiAnalysisInstrument(inst)}
+            watchlistIds={watchlistIds}
+            onToggleWatchlist={handleToggleWatchlist}
           />
         )}
 
@@ -314,7 +366,15 @@ export default function App() {
 
         {activeTab === 'economic_fed' && <EconomicFedView data={marketData} />}
 
-        {activeTab === 'news' && <NewsAnalyzerView data={marketData} />}
+        {activeTab === 'news' && (
+          <NewsIntelligenceDashboard
+            data={marketData}
+            onSelectTicker={(ticker) => {
+              handleSelectTicker(ticker as TickerSymbol);
+              setActiveTab('overview');
+            }}
+          />
+        )}
 
         {activeTab === 'community' && (
           <CommunityView
@@ -446,7 +506,8 @@ export default function App() {
       <AuthModal
         isOpen={isAuthModalOpen}
         onClose={() => setIsAuthModalOpen(false)}
-        onUserLoggedIn={handleUserChange}
+        currentUser={currentUser}
+        onUserChange={handleUserChange}
       />
 
       {/* Subscription Pricing Modal */}
@@ -463,6 +524,7 @@ export default function App() {
         onClose={() => setIsSettingsModalOpen(false)}
         currentUser={currentUser}
         onUserSaved={handleUserChange}
+        onSignOut={handleSignOut}
         onOpenSubscription={() => {
           setIsSettingsModalOpen(false);
           setIsSubscriptionModalOpen(true);
@@ -492,6 +554,70 @@ export default function App() {
         isOpen={isContactSupportOpen}
         onClose={() => setIsContactSupportOpen(false)}
         currentUser={currentUser}
+      />
+
+      {/* Universal Multi-Asset Global Directory Search Modal */}
+      <UniversalSearchModal
+        isOpen={isUniversalSearchOpen}
+        onClose={() => setIsUniversalSearchOpen(false)}
+        onSelectInstrument={(inst) => {
+          setSelectedInstrument(inst);
+          if (inst.providerSymbol) {
+            handleSelectTicker(inst.providerSymbol as TickerSymbol);
+          }
+          setIsUniversalSearchOpen(false);
+        }}
+      />
+
+      {/* Multi-Asset AI Gemini Analysis & Synthesis Modal */}
+      {aiAnalysisInstrument && (
+        <MultiAssetAiAnalysisModal
+          isOpen={!!aiAnalysisInstrument}
+          onClose={() => setAiAnalysisInstrument(null)}
+          instrument={aiAnalysisInstrument}
+        />
+      )}
+
+      {/* Institutional Market Briefings Modal (Morning Brief / Closing Bell) */}
+      {isMarketBriefsOpen && (
+        <MarketBriefsModal
+          isOpen={isMarketBriefsOpen}
+          onClose={() => setIsMarketBriefsOpen(false)}
+          briefType={marketBriefType}
+          onSelectSymbol={(sym) => {
+            handleSelectTicker(sym as TickerSymbol);
+            setActiveTab('overview');
+          }}
+          onAskQuestion={handleAskQuestionFromDashboard}
+        />
+      )}
+
+      {/* Verified Smart Notification Center */}
+      <NotificationCenterModal
+        isOpen={isNotificationCenterOpen}
+        onClose={() => setIsNotificationCenterOpen(false)}
+        onSelectSymbol={(sym) => {
+          handleSelectTicker(sym as TickerSymbol);
+          setActiveTab('overview');
+        }}
+      />
+
+      {/* Fast User Onboarding & Personalization */}
+      <FastOnboardingModal
+        isOpen={isFastOnboardingOpen}
+        onClose={() => setIsFastOnboardingOpen(false)}
+        onComplete={(answers) => {
+          AnalyticsService.track('onboarding_completed', { ...answers });
+          setIsFastOnboardingOpen(false);
+        }}
+      />
+
+      {/* Report Data Issue Quality Feedback Modal */}
+      <ReportDataIssueModal
+        isOpen={isReportIssueOpen}
+        onClose={() => setIsReportIssueOpen(false)}
+        activeSymbol={selectedTicker}
+        dataSource={dataSource}
       />
     </div>
   );

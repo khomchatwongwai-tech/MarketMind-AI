@@ -23,12 +23,16 @@ import {
   ShieldCheck,
   Compass,
   Crown,
+  AlertTriangle,
 } from 'lucide-react';
 import { MarketQuote, Probabilities, TickerSymbol, LiveMarketDataSource } from '../types/market';
 import { UserProfile } from '../types/user';
 import { searchMarketSymbols } from '../services/marketDataService';
 import { useI18n } from '../i18n/I18nContext';
 import { LanguageSelector } from './LanguageSelector';
+import { ThemeToggle } from './ThemeToggle';
+import { AppConfig } from '../config/environment';
+import { MASTER_INSTRUMENTS } from '../services/marketProviders/InstrumentDirectoryService';
 
 interface HeaderProps {
   quote: MarketQuote;
@@ -43,6 +47,7 @@ interface HeaderProps {
   onOpenAlerts: () => void;
   onOpenChat?: () => void;
   onOpenUniversalSearch?: () => void;
+  onOpenReportIssue?: () => void;
   dataSource: LiveMarketDataSource;
   onChangeDataSource: (source: LiveMarketDataSource) => void;
   tickSpeed: number;
@@ -55,7 +60,9 @@ interface HeaderProps {
   onOpenTour: () => void;
 }
 
-const PRESET_TICKERS: TickerSymbol[] = ['SPY', 'QQQ', 'NVDA', 'TSLA', 'AAPL', 'MSFT', 'AMZN', 'META', 'AMD', 'IWM', 'COIN', 'PLTR'];
+const DIRECTORY_TICKERS = Array.from(
+  new Map(MASTER_INSTRUMENTS.map((instrument) => [instrument.providerSymbol, instrument])).values()
+);
 
 export const Header: React.FC<HeaderProps> = ({
   quote,
@@ -80,6 +87,7 @@ export const Header: React.FC<HeaderProps> = ({
   onOpenSettings,
   onOpenTour,
   onOpenUniversalSearch,
+  onOpenReportIssue,
 }) => {
   const { t } = useI18n();
   const [searchInput, setSearchInput] = useState('');
@@ -141,17 +149,31 @@ export const Header: React.FC<HeaderProps> = ({
 
   return (
     <header className="flex flex-col bg-[#0A0A0A] border border-[#242424] rounded-xl p-3.5 mb-2.5 gap-3.5 select-none text-[#E5E5E5] shadow-2xl">
+      {/* PERSISTENT DEMO MODE BANNER (When Simulation / Demo Mode is Active) */}
+      {AppConfig.isDemoMode && (
+        <div className="bg-amber-500/15 border border-amber-500/40 rounded-lg px-3 py-1.5 text-center text-amber-300 text-xs font-mono font-bold flex flex-wrap items-center justify-between gap-2 shadow-inner">
+          <div className="flex items-center gap-2">
+            <span className="px-1.5 py-0.5 bg-amber-500 text-black text-[10px] font-black rounded">
+              DEMO
+            </span>
+            <span># DEMO — SIMULATED MARKET DATA</span>
+          </div>
+          <span className="text-[11px] text-amber-200/80 font-normal">
+            Sandbox mode active. Switch data source to Yahoo/Google for verified live quotes.
+          </span>
+        </div>
+      )}
+
       {/* Top Row: Brand, Search, Data Source, User Controls */}
       <div className="flex flex-wrap items-center justify-between gap-3 border-b border-[#1C1C1C] pb-3">
         {/* Left: Minimal Luxury Brand Wordmark */}
         <div className="flex items-center gap-3">
           <div className="flex items-center gap-2">
-            {/* Geometric Gold Logo Emblem */}
-            <div className="w-7 h-7 rounded-lg bg-gradient-to-br from-[#8C6B18] via-[#D4AF37] to-[#FFE08A] p-[1px] shadow-sm flex items-center justify-center">
-              <div className="w-full h-full bg-[#0A0A0A] rounded-[7px] flex items-center justify-center">
-                <span className="gold-gradient-text font-black text-xs tracking-tighter">M</span>
-              </div>
-            </div>
+            <img
+              src="/marketmind-icon.png"
+              alt="MarketMind AI"
+              className="w-9 h-9 object-contain drop-shadow-[0_0_8px_rgba(212,175,55,0.28)]"
+            />
             <div className="flex flex-col">
               <div className="flex items-center gap-1.5 leading-none">
                 <span className="text-sm font-black text-white tracking-wider">MARKETMIND</span>
@@ -167,25 +189,31 @@ export const Header: React.FC<HeaderProps> = ({
 
           {/* Real-time Data Source Selector */}
           <div className="flex items-center bg-[#101010] border border-[#242424] hover:border-[rgba(212,175,55,0.4)] rounded-lg px-2.5 py-1 text-xs transition">
-            <Radio className="w-3 h-3 text-[#22C55E] mr-1.5 animate-pulse" />
-            <select
-              value={dataSource}
-              onChange={(e) => onChangeDataSource(e.target.value as LiveMarketDataSource)}
-              className="bg-transparent text-[#E5E5E5] font-mono text-[11px] font-semibold focus:outline-none cursor-pointer"
-            >
-              <option value="Massive WebSocket (Real-Time Live Feed)" className="bg-[#101010] text-[#E5E5E5]">
-                ⚡ Massive WebSocket (Live Stream)
-              </option>
-              <option value="Yahoo Finance (Real-Time)" className="bg-[#101010] text-[#E5E5E5]">
-                📈 Yahoo Finance (Real-Time)
-              </option>
-              <option value="Google Finance Feed" className="bg-[#101010] text-[#E5E5E5]">
-                🌐 Google Finance Gateway
-              </option>
-              <option value="Robinhood Multi-Feed" className="bg-[#101010] text-[#E5E5E5]">
-                📱 Multi-Exchange Stream
-              </option>
-            </select>
+            <Radio className={`w-3 h-3 mr-1.5 ${AppConfig.marketDataMode === 'end_of_day' ? 'text-purple-400' : 'text-[#22C55E] animate-pulse'}`} />
+            {AppConfig.marketDataMode === 'end_of_day' ? (
+              <span className="text-purple-300 font-mono text-[11px] font-semibold">
+                Massive End-of-Day (Free)
+              </span>
+            ) : (
+              <select
+                value={dataSource}
+                onChange={(e) => onChangeDataSource(e.target.value as LiveMarketDataSource)}
+                className="bg-transparent text-[#E5E5E5] font-mono text-[11px] font-semibold focus:outline-none cursor-pointer"
+              >
+                <option value="Massive WebSocket (Real-Time Live Feed)" className="bg-[#101010] text-[#E5E5E5]">
+                  ⚡ Massive WebSocket (Live Stream)
+                </option>
+                <option value="Yahoo Finance (Real-Time)" className="bg-[#101010] text-[#E5E5E5]">
+                  📈 Yahoo Finance (Real-Time)
+                </option>
+                <option value="Google Finance Feed" className="bg-[#101010] text-[#E5E5E5]">
+                  🌐 Google Finance Gateway
+                </option>
+                <option value="Robinhood Multi-Feed" className="bg-[#101010] text-[#E5E5E5]">
+                  📱 Multi-Exchange Stream
+                </option>
+              </select>
+            )}
           </div>
 
           {/* Refresh Rate Selector */}
@@ -263,6 +291,9 @@ export const Header: React.FC<HeaderProps> = ({
           {/* Language Selector Dropdown */}
           <LanguageSelector />
 
+          {/* Day / Night Visual Theme Switcher */}
+          <ThemeToggle variant="dropdown" />
+
           {/* Quick Tour Button */}
           <button
             onClick={onOpenTour}
@@ -296,6 +327,17 @@ export const Header: React.FC<HeaderProps> = ({
             </span>
           </button>
 
+          {/* Report Data Issue Feedback Button */}
+          {onOpenReportIssue && (
+            <button
+              onClick={onOpenReportIssue}
+              className="p-1.5 bg-[#101010] hover:bg-[#151515] border border-[#242424] hover:border-amber-500/50 text-[#9CA3AF] hover:text-amber-300 rounded-lg transition"
+              title="Report Data / Quality Issue"
+            >
+              <AlertTriangle className="w-4 h-4 text-amber-400" />
+            </button>
+          )}
+
           <button
             onClick={onOpenSettings}
             className="p-1.5 bg-[#101010] hover:bg-[#151515] border border-[#242424] hover:border-[#D4AF37]/50 text-[#9CA3AF] hover:text-white rounded-lg transition"
@@ -317,12 +359,20 @@ export const Header: React.FC<HeaderProps> = ({
                 onChange={(e) => onSelectTicker(e.target.value as TickerSymbol)}
                 className="bg-[#101010] text-2xl md:text-3xl font-black text-white px-2 py-0.5 rounded-lg border border-[#242424] hover:border-[#D4AF37] focus:outline-none cursor-pointer tracking-tight"
               >
-                {PRESET_TICKERS.map((t) => (
-                  <option key={t} value={t} className="bg-[#101010] text-white">
-                    {t}
-                  </option>
-                ))}
-                {!PRESET_TICKERS.includes(selectedTicker) && (
+                {(['STOCK', 'ADR', 'ETF', 'FUND', 'CRYPTO', 'CRYPTO_PAIR', 'FOREX', 'FUTURES', 'COMMODITY', 'BOND', 'TREASURY', 'INDEX', 'OPTION', 'INDEX_OPTION', 'ECONOMIC_INDICATOR'] as const).map((assetClass) => {
+                  const instruments = DIRECTORY_TICKERS.filter((instrument) => instrument.assetClass === assetClass);
+                  if (!instruments.length) return null;
+                  return (
+                    <optgroup key={assetClass} label={assetClass.replace('_', ' ')} className="bg-[#101010] text-[#D4AF37]">
+                      {instruments.map((instrument) => (
+                        <option key={instrument.instrumentId} value={instrument.providerSymbol} className="bg-[#101010] text-white">
+                          {instrument.displaySymbol} — {instrument.name}
+                        </option>
+                      ))}
+                    </optgroup>
+                  );
+                })}
+                {!DIRECTORY_TICKERS.some((instrument) => instrument.providerSymbol === selectedTicker) && (
                   <option value={selectedTicker} className="bg-[#101010] text-white">{selectedTicker}</option>
                 )}
               </select>
@@ -331,7 +381,7 @@ export const Header: React.FC<HeaderProps> = ({
                   {quote.name}
                 </span>
                 <span className="text-[10px] text-[#9CA3AF] font-mono">
-                  {quote.exchange || 'US Market'} • <span className="text-[#D4AF37]">{quote.dataSource || 'Live Feed'}</span>
+                  {quote.exchange || 'US Market'} • <span className="text-[#D4AF37]">{quote.dataSource || (AppConfig.marketDataMode === 'end_of_day' ? 'End-of-Day Data' : 'Live Feed')}</span>
                 </span>
               </div>
             </div>
@@ -503,5 +553,3 @@ export const Header: React.FC<HeaderProps> = ({
     </header>
   );
 };
-
-

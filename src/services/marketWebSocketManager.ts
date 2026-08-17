@@ -80,7 +80,7 @@ export class MarketWebSocketManagerClient {
 
       this.ws.onopen = () => {
         this.reconnectAttempts = 0;
-        this.setState('LIVE');
+        this.setState('DELAYED');
         this.startHeartbeat();
         // Resubscribe to all active symbols
         if (this.activeSubscriptions.size > 0) {
@@ -97,29 +97,32 @@ export class MarketWebSocketManagerClient {
             this.lastLatencyMs = Math.max(4, Date.now() - data.clientTime);
           } else if (data.type === 'QUOTE' || data.type === 'TRADE' || data.type === 'TICK') {
             const ticker = (data.ticker || data.symbol || 'SPY').toUpperCase();
+            const price = Number(data.price ?? data.close);
+            if (!Number.isFinite(price) || price <= 0) return;
             const quote: MarketQuote = {
               ticker: ticker as any,
               name: data.name || `${ticker} Stock`,
-              price: data.price || data.close || 500,
-              change: data.change || 0,
-              changePercent: data.changePercent || 0,
-              dayHigh: data.high || data.price,
-              dayLow: data.low || data.price,
-              openPrice: data.open || data.price,
-              previousClose: data.previousClose || data.price,
-              preMarketPrice: data.preMarketPrice || data.price,
-              preMarketChangePercent: data.preMarketChangePercent || 0,
-              volume: data.volume || data.cumulativeVolume || 1000000,
-              avgVolume: data.avgVolume || 1500000,
-              relativeVolume: data.relativeVolume || 1.1,
-              fiftyTwoWeekHigh: data.fiftyTwoWeekHigh || data.price * 1.25,
-              fiftyTwoWeekLow: data.fiftyTwoWeekLow || data.price * 0.75,
+              price,
+              change: Number(data.change) || 0,
+              changePercent: Number(data.changePercent) || 0,
+              dayHigh: Number(data.high) || 0,
+              dayLow: Number(data.low) || 0,
+              openPrice: Number(data.open) || 0,
+              previousClose: Number(data.previousClose) || 0,
+              preMarketPrice: Number(data.preMarketPrice) || 0,
+              preMarketChangePercent: Number(data.preMarketChangePercent) || 0,
+              volume: Number(data.volume ?? data.cumulativeVolume) || 0,
+              avgVolume: Number(data.avgVolume) || 0,
+              relativeVolume: Number(data.relativeVolume) || 0,
+              fiftyTwoWeekHigh: Number(data.fiftyTwoWeekHigh) || 0,
+              fiftyTwoWeekLow: Number(data.fiftyTwoWeekLow) || 0,
               timestamp: new Date().toLocaleTimeString('en-US', { timeZone: 'America/New_York' }) + ' ET',
               marketStatus: data.marketStatus || (data.isDelayed ? 'REGULAR' : 'REGULAR'),
-              dataSource: 'Massive Real-Time WebSocket',
+              dataSource: String(data.dataSource || 'Massive/Polygon server WebSocket'),
               latencyMs: this.lastLatencyMs,
             };
 
+            this.setState(data.isDelayed ? 'DELAYED' : 'LIVE');
             this.quoteCache.set(ticker, quote);
             const listeners = this.quoteCallbacks.get(ticker);
             if (listeners) {

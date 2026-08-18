@@ -33,6 +33,9 @@ import { BillingAdapterRegistry } from './src/services/billing/BillingAdapterReg
 import { LegalConsentStore } from './src/server/legalConsentStore';
 import { validateProductionEnvironment, enforceProductionPreflight } from './src/server/productionPreflight';
 import { getSupabaseAdmin } from './src/server/supabaseAdmin';
+import { multiAIOrchestrator } from './src/server/ai';
+import { AIProviderError, publicAIError, publicMarketDataError } from './src/server/ai/errors';
+import { IntentRouter } from './src/services/ai/intentRouter';
 
 dotenv.config();
 
@@ -127,6 +130,24 @@ app.get('/api/preflight', (req, res) => {
     preflight: result,
     timestamp: new Date().toISOString(),
   });
+});
+
+app.post('/api/ai/orchestrate', requireAuth, async (req: AuthenticatedRequest, res) => {
+  const query = typeof req.body?.query === 'string' ? req.body.query.trim() : '';
+  const symbol = typeof req.body?.symbol === 'string' ? req.body.symbol.trim().toUpperCase() : undefined;
+  const clientContext = req.body?.context && typeof req.body.context === 'object' && !Array.isArray(req.body.context) ? req.body.context : undefined;
+  if (!query || query.length > 8_000) return res.status(400).json({ error: 'A query between 1 and 8000 characters is required.', code: 'INVALID_AI_REQUEST' });
+  try {
+    const intent = IntentRouter.classify(query, symbol);
+    const marketData = intent.requiresLiveMarketData && symbol ? await DataProviderRouter.getQuote(symbol) : undefined;
+    const context = { ...(clientContext || {}), marketData, marketDataSources: marketData?.quote?.dataSource ? [marketData.quote.dataSource] : [] };
+    const result = await multiAIOrchestrator.execute({ query, symbol, context, userId: req.user!.uid });
+    return res.json(result);
+  } catch (error) {
+    if (error instanceof Error && error.message === 'AUTHORITATIVE_MARKET_DATA_UNAVAILABLE') return res.status(503).json(publicMarketDataError());
+    if (error instanceof AIProviderError) return res.status(error.kind === 'rate_limit' ? 429 : 503).json(publicAIError());
+    console.error('[AI_ORCHESTRATE] unexpected failure'); return res.status(500).json(publicAIError());
+  }
 });
 
 // ==========================================

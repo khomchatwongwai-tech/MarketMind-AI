@@ -32,6 +32,7 @@ import { UsageService } from './src/server/usageService';
 import { BillingAdapterRegistry } from './src/services/billing/BillingAdapterRegistry';
 import { LegalConsentStore } from './src/server/legalConsentStore';
 import { validateProductionEnvironment, enforceProductionPreflight } from './src/server/productionPreflight';
+import { getSupabaseAdmin } from './src/server/supabaseAdmin';
 
 dotenv.config();
 
@@ -1836,6 +1837,73 @@ app.put('/api/auth/profile', requireAuth, (req: AuthenticatedRequest, res) => {
     const statusCode = error.statusCode || 400;
     return res.status(statusCode).json({ error: error.message || 'Failed to update profile.', code: error.code || 'PROFILE_UPDATE_FAILED' });
   }
+});
+
+// ==========================================
+// USER WATCHLIST ENDPOINTS (FIREBASE AUTHENTICATED & SUPABASE PERSISTED)
+// ==========================================
+
+const userWatchlists: Map<string, string[]> = new Map();
+
+app.get('/api/watchlist', requireAuth, async (req: AuthenticatedRequest, res) => {
+  const uid = req.user!.uid;
+  try {
+    if (process.env.SUPABASE_URL && (process.env.SUPABASE_SECRET_KEY || process.env.SUPABASE_SERVICE_ROLE_KEY)) {
+      const { data, error } = await getSupabaseAdmin()
+        .from('watchlists')
+        .select('data')
+        .eq('firebase_uid', uid);
+      if (!error && data && data.length > 0) {
+        const symbols = data.map((row: any) => row.data?.symbol || row.data).filter(Boolean);
+        return res.json({ symbols });
+      }
+    }
+  } catch {}
+  const list = userWatchlists.get(uid) || ['SPY', 'QQQ', 'AAPL', 'NVDA', 'MSFT'];
+  return res.json({ symbols: list });
+});
+
+app.post('/api/watchlist', requireAuth, async (req: AuthenticatedRequest, res) => {
+  const uid = req.user!.uid;
+  const { symbol } = req.body;
+  if (!symbol || typeof symbol !== 'string') {
+    return res.status(400).json({ error: 'Valid symbol required' });
+  }
+  const cleanSym = symbol.toUpperCase().trim();
+  const current = userWatchlists.get(uid) || ['SPY', 'QQQ', 'AAPL', 'NVDA', 'MSFT'];
+  if (!current.includes(cleanSym)) {
+    current.push(cleanSym);
+    userWatchlists.set(uid, current);
+  }
+  try {
+    if (process.env.SUPABASE_URL && (process.env.SUPABASE_SECRET_KEY || process.env.SUPABASE_SERVICE_ROLE_KEY)) {
+      await getSupabaseAdmin()
+        .from('watchlists')
+        .upsert({
+          id: `${uid}_${cleanSym}`,
+          firebase_uid: uid,
+          data: { symbol: cleanSym },
+          updated_at: new Date().toISOString(),
+        });
+    }
+  } catch {}
+  return res.json({ success: true, symbols: current });
+});
+
+app.delete('/api/watchlist/:symbol', requireAuth, async (req: AuthenticatedRequest, res) => {
+  const uid = req.user!.uid;
+  const symbol = (req.params.symbol || '').toUpperCase().trim();
+  const current = userWatchlists.get(uid) || ['SPY', 'QQQ', 'AAPL', 'NVDA', 'MSFT'];
+  const updated = current.filter((s) => s !== symbol);
+  userWatchlists.set(uid, updated);
+  try {
+    if (process.env.SUPABASE_URL && (process.env.SUPABASE_SECRET_KEY || process.env.SUPABASE_SERVICE_ROLE_KEY)) {
+      await getSupabaseAdmin()
+        .from('watchlists')
+        .delete();
+    }
+  } catch {}
+  return res.json({ success: true, symbols: updated });
 });
 
 // ==========================================

@@ -109,8 +109,8 @@ ALTER TABLE user_usage_records ENABLE ROW LEVEL SECURITY;
 ALTER TABLE billing_invoices ENABLE ROW LEVEL SECURITY;
 
 -- Users can read their own records
-CREATE POLICY "Users can view own subscription" ON subscriptions FOR SELECT USING (auth.uid()::text = user_id);
-CREATE POLICY "Users can view own legal consents" ON legal_consents FOR SELECT USING (auth.uid()::text = user_id);
-CREATE POLICY "Users can insert own legal consents" ON legal_consents FOR INSERT WITH CHECK (auth.uid()::text = user_id);
-CREATE POLICY "Users can view own usage" ON user_usage_records FOR SELECT USING (auth.uid()::text = user_id);
-CREATE POLICY "Users can view own invoices" ON billing_invoices FOR SELECT USING (auth.uid()::text = user_id);
+CREATE POLICY "Users can view own subscription" ON subscriptions FOR SELECT USING (coalesce((select auth.jwt()->>'sub'), auth.uid()::text) = user_id);
+CREATE POLICY "Users can view own legal consents" ON legal_consents FOR SELECT USING (coalesce((select auth.jwt()->>'sub'), auth.uid()::text) = user_id);
+CREATE POLICY "Users can insert own legal consents" ON legal_consents FOR INSERT WITH CHECK (coalesce((select auth.jwt()->>'sub'), auth.uid()::text) = user_id);
+CREATE POLICY "Users can view own usage" ON user_usage_records FOR SELECT USING (coalesce((select auth.jwt()->>'sub'), auth.uid()::text) = user_id);
+CREATE POLICY "Users can view own invoices" ON billing_invoices FOR SELECT USING (coalesce((select auth.jwt()->>'sub'), auth.uid()::text) = user_id);

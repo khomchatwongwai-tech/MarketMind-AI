@@ -1,6 +1,8 @@
 import { WebSocket, WebSocketServer } from 'ws';
 import type { Server as HttpServer } from 'http';
 import https from 'https';
+import { StreamSubscriptionManager, StreamPriorityLevel } from './streamSubscriptionManager';
+import { MarketDataCache } from './marketDataCache';
 
 export interface UpstreamProviderStatus {
   id: string;
@@ -17,18 +19,25 @@ export class RealtimeServerManager {
   private wss: WebSocketServer | null = null;
   private clients = new Set<WebSocket>();
 
+  private alpacaWs: WebSocket | null = null;
   private massiveWs: WebSocket | null = null;
   private finnhubWs: WebSocket | null = null;
   private cryptoWs: WebSocket | null = null;
 
-  private activeSymbols = new Set<string>(['SPY', 'QQQ', 'NVDA', 'AAPL', 'BTC-USD', 'ETH-USD']);
   private latestQuotes = new Map<string, any>();
   private upstreamStatuses: Map<string, UpstreamProviderStatus> = new Map();
 
   private pollingTimer: NodeJS.Timeout | null = null;
-  private heartbeatTimer: NodeJS.Timeout | null = null;
 
   constructor() {
+    this.upstreamStatuses.set('alpaca', {
+      id: 'alpaca',
+      name: 'Alpaca Free IEX Feed',
+      isConfigured: Boolean(process.env.ALPACA_API_KEY && process.env.ALPACA_API_SECRET),
+      wsStatus: 'DISCONNECTED',
+      tickCount: 0,
+    });
+
     this.upstreamStatuses.set('massive', {
       id: 'massive',
       name: 'Massive / Polygon.io',
@@ -52,6 +61,21 @@ export class RealtimeServerManager {
       wsStatus: 'DISCONNECTED',
       tickCount: 0,
     });
+
+    // Register initial core symbols in StreamSubscriptionManager
+    const initialSymbols = ['SPY', 'QQQ', 'NVDA', 'AAPL', 'MSFT', 'AMZN', 'GOOGL', 'META', 'TSLA', 'IWM'];
+    const manager = StreamSubscriptionManager.getInstance();
+    for (const sym of initialSymbols) {
+      manager.subscribe(sym, 'ACTIVE_VIEW');
+    }
+
+    manager.setStreamChangeHandler((action, symbol) => {
+      if (action === 'SUBSCRIBE') {
+        this.resubscribeSingleSymbol(symbol);
+      } else if (action === 'UNSUBSCRIBE') {
+        this.unsubscribeSingleSymbol(symbol);
+      }
+    });
   }
 
   public static getInstance(): RealtimeServerManager {
@@ -66,14 +90,14 @@ export class RealtimeServerManager {
 
     this.wss.on('connection', (ws: WebSocket) => {
       this.clients.add(ws);
-      console.log(`[Realtime Server] Client connected. Active clients: ${this.clients.size}`);
 
-      // Send initial status & cached quotes
+      // Send initial status
       ws.send(
         JSON.stringify({
           type: 'STATUS',
           status: 'CONNECTED',
           timestamp: Date.now(),
+          subscriptionStats: StreamSubscriptionManager.getInstance().getStats(),
         })
       );
 
@@ -93,12 +117,12 @@ export class RealtimeServerManager {
 
       ws.on('close', () => {
         this.clients.delete(ws);
-        console.log(`[Realtime Server] Client disconnected. Active clients: ${this.clients.size}`);
       });
     });
 
     // Connect to upstreams
     this.initCryptoStream();
+    this.initAlpacaStream();
     this.initMassiveStream();
     this.initFinnhubStream();
     this.startVerifiedPolling();
@@ -111,11 +135,13 @@ export class RealtimeServerManager {
     }
 
     if (msg.action === 'subscribe' && Array.isArray(msg.symbols)) {
+      const priority: StreamPriorityLevel = msg.priority || 'ACTIVE_VIEW';
+      const manager = StreamSubscriptionManager.getInstance();
+
       msg.symbols.forEach((s: string) => {
-        const sym = (s || '').toUpperCase();
+        const sym = (s || '').toUpperCase().trim();
         if (sym) {
-          this.activeSymbols.add(sym);
-          // If we already have a cached quote, emit immediately
+          const result = manager.subscribe(sym, priority);
           if (this.latestQuotes.has(sym)) {
             ws.send(JSON.stringify(this.latestQuotes.get(sym)));
           }
@@ -126,8 +152,9 @@ export class RealtimeServerManager {
     }
 
     if (msg.action === 'unsubscribe' && Array.isArray(msg.symbols)) {
+      const manager = StreamSubscriptionManager.getInstance();
       msg.symbols.forEach((s: string) => {
-        this.activeSymbols.delete((s || '').toUpperCase());
+        manager.unsubscribe(s);
       });
       return;
     }
@@ -144,6 +171,149 @@ export class RealtimeServerManager {
         }
       }
     });
+  }
+
+  private isPlaceholderKey(key: string | undefined): boolean {
+    if (!key) return true;
+    const trimmed = key.trim();
+    if (trimmed.length < 8) return true;
+    const lower = trimmed.toLowerCase();
+    return (
+      lower.startsWith('my_') ||
+      lower.startsWith('your_') ||
+      lower.startsWith('placeholder') ||
+      lower.startsWith('example') ||
+      lower.startsWith('api_key') ||
+      lower.startsWith('dummy') ||
+      lower.startsWith('test_') ||
+      lower.includes('placeholder') ||
+      lower.includes('example') ||
+      lower.includes('api_key') ||
+      lower === 'undefined' ||
+      lower === 'null'
+    );
+  }
+
+  // --- Upstream 0: Alpaca Free IEX WebSocket Stream ---
+  private initAlpacaStream() {
+    const key = process.env.ALPACA_API_KEY;
+    const secret = process.env.ALPACA_API_SECRET;
+    const status = this.upstreamStatuses.get('alpaca')!;
+
+    if (!key || !secret || this.isPlaceholderKey(key) || this.isPlaceholderKey(secret)) {
+      status.wsStatus = 'DISCONNECTED';
+      status.isConfigured = false;
+      return;
+    }
+
+    status.isConfigured = true;
+
+    try {
+      status.wsStatus = 'CONNECTING';
+      const streamUrl = process.env.ALPACA_STREAM_BASE_URL || 'wss://stream.data.alpaca.markets/v2/iex';
+      this.alpacaWs = new WebSocket(streamUrl);
+
+      this.alpacaWs.on('open', () => {
+        // Authenticate
+        this.alpacaWs?.send(
+          JSON.stringify({
+            action: 'auth',
+            key: key.trim(),
+            secret: secret.trim(),
+          })
+        );
+      });
+
+      this.alpacaWs.on('message', (raw: any) => {
+        try {
+          const events = JSON.parse(raw.toString());
+          if (Array.isArray(events)) {
+            for (const ev of events) {
+              if (ev.T === 'success' && ev.msg === 'authenticated') {
+                status.wsStatus = 'CONNECTED';
+                this.resubscribeAlpaca();
+              } else if (ev.T === 'error') {
+                status.lastError = ev.msg;
+                if (ev.code === 402 || ev.msg?.includes('auth')) {
+                  status.wsStatus = 'AUTH_ERROR';
+                  try {
+                    this.alpacaWs?.close();
+                  } catch {}
+                }
+              } else if (ev.T === 't') {
+                // Alpaca Trade: { T: 't', S: 'AAPL', p: 150.25, s: 100, t: '...' }
+                status.tickCount++;
+                status.lastTickTimestamp = Date.now();
+                const trade = {
+                  type: 'TRADE',
+                  symbol: ev.S,
+                  price: ev.p,
+                  size: ev.s,
+                  timestamp: Date.parse(ev.t) || Date.now(),
+                  provider: 'Alpaca Free IEX',
+                  mode: 'REAL_TIME',
+                };
+                MarketDataCache.getInstance().setTrade(ev.S, trade);
+                this.broadcast(trade);
+              } else if (ev.T === 'q') {
+                // Alpaca Quote: { T: 'q', S: 'AAPL', bp: 150.2, bs: 5, ap: 150.3, as: 10, t: '...' }
+                status.tickCount++;
+                status.lastTickTimestamp = Date.now();
+                const mid = (ev.bp + ev.ap) / 2;
+                const quote = {
+                  type: 'QUOTE',
+                  symbol: ev.S,
+                  price: mid,
+                  bid: ev.bp,
+                  ask: ev.ap,
+                  bidSize: ev.bs,
+                  askSize: ev.as,
+                  timestamp: Date.parse(ev.t) || Date.now(),
+                  provider: 'Alpaca Free IEX',
+                  mode: 'REAL_TIME',
+                };
+                this.latestQuotes.set(ev.S, quote);
+                this.broadcast(quote);
+              } else if (ev.T === 'b') {
+                // Alpaca 1-min Bar
+                status.tickCount++;
+                status.lastTickTimestamp = Date.now();
+                const quote = {
+                  type: 'QUOTE',
+                  symbol: ev.S,
+                  price: ev.c,
+                  open: ev.o,
+                  high: ev.h,
+                  low: ev.l,
+                  volume: ev.v,
+                  timestamp: Date.parse(ev.t) || Date.now(),
+                  provider: 'Alpaca Free IEX',
+                  mode: 'REAL_TIME',
+                };
+                this.latestQuotes.set(ev.S, quote);
+                this.broadcast(quote);
+              }
+            }
+          }
+        } catch (err) {
+          console.error('[Realtime Server] Alpaca message parse error:', err);
+        }
+      });
+
+      this.alpacaWs.on('error', (err) => {
+        status.wsStatus = 'FAILED';
+        status.lastError = err.message;
+      });
+
+      this.alpacaWs.on('close', () => {
+        if (status.wsStatus === 'AUTH_ERROR') return;
+        status.wsStatus = 'DISCONNECTED';
+        setTimeout(() => this.initAlpacaStream(), 10000);
+      });
+    } catch (err: any) {
+      status.wsStatus = 'FAILED';
+      status.lastError = err?.message;
+    }
   }
 
   // --- Upstream 1: 24/7 Crypto Stream ---
@@ -226,27 +396,6 @@ export class RealtimeServerManager {
     }
   }
 
-  private isPlaceholderKey(key: string | undefined): boolean {
-    if (!key) return true;
-    const trimmed = key.trim();
-    if (trimmed.length < 8) return true;
-    const lower = trimmed.toLowerCase();
-    return (
-      lower.startsWith('my_') ||
-      lower.startsWith('your_') ||
-      lower.startsWith('placeholder') ||
-      lower.startsWith('example') ||
-      lower.startsWith('api_key') ||
-      lower.startsWith('dummy') ||
-      lower.startsWith('test_') ||
-      lower.includes('placeholder') ||
-      lower.includes('example') ||
-      lower.includes('api_key') ||
-      lower === 'undefined' ||
-      lower === 'null'
-    );
-  }
-
   // --- Upstream 2: Polygon / Massive Stream ---
   private initMassiveStream() {
     const rawApiKey = process.env.MASSIVE_API_KEY || process.env.POLYGON_API_KEY;
@@ -264,7 +413,6 @@ export class RealtimeServerManager {
       this.massiveWs = new WebSocket('wss://socket.polygon.io/stocks');
 
       this.massiveWs.on('open', () => {
-        // Authenticate
         this.massiveWs?.send(JSON.stringify({ action: 'auth', params: apiKey }));
       });
 
@@ -282,12 +430,9 @@ export class RealtimeServerManager {
                   status.lastError = ev.message;
                   try {
                     this.massiveWs?.close();
-                  } catch {
-                    // ignore
-                  }
+                  } catch {}
                 }
               } else if (ev.ev === 'T') {
-                // Trade
                 status.tickCount++;
                 status.lastTickTimestamp = Date.now();
                 const trade = {
@@ -301,7 +446,6 @@ export class RealtimeServerManager {
                 };
                 this.broadcast(trade);
               } else if (ev.ev === 'Q') {
-                // Quote
                 status.tickCount++;
                 status.lastTickTimestamp = Date.now();
                 const mid = (ev.bp + ev.ap) / 2;
@@ -333,10 +477,7 @@ export class RealtimeServerManager {
       });
 
       this.massiveWs.on('close', () => {
-        if (status.wsStatus === 'AUTH_ERROR') {
-          // Do not retry if credentials rejected
-          return;
-        }
+        if (status.wsStatus === 'AUTH_ERROR') return;
         status.wsStatus = 'DISCONNECTED';
         setTimeout(() => this.initMassiveStream(), 10000);
       });
@@ -418,13 +559,76 @@ export class RealtimeServerManager {
   }
 
   private resubscribeUpstreams() {
+    this.resubscribeAlpaca();
     this.resubscribePolygon();
     this.resubscribeFinnhub();
   }
 
+  private resubscribeAlpaca() {
+    if (this.alpacaWs && this.alpacaWs.readyState === WebSocket.OPEN) {
+      const symbols = StreamSubscriptionManager.getInstance()
+        .getActiveStreamSymbols()
+        .filter((s) => !s.includes('-USD') && !s.includes('='));
+      if (symbols.length > 0) {
+        this.alpacaWs.send(
+          JSON.stringify({
+            action: 'subscribe',
+            trades: symbols,
+            quotes: symbols,
+            bars: symbols,
+          })
+        );
+      }
+    }
+  }
+
+  private resubscribeSingleSymbol(symbol: string) {
+    if (symbol.includes('-USD') || symbol.includes('=')) return;
+
+    if (this.alpacaWs && this.alpacaWs.readyState === WebSocket.OPEN) {
+      this.alpacaWs.send(
+        JSON.stringify({
+          action: 'subscribe',
+          trades: [symbol],
+          quotes: [symbol],
+          bars: [symbol],
+        })
+      );
+    }
+    if (this.massiveWs && this.massiveWs.readyState === WebSocket.OPEN) {
+      this.massiveWs.send(JSON.stringify({ action: 'subscribe', params: `T.${symbol},Q.${symbol}` }));
+    }
+    if (this.finnhubWs && this.finnhubWs.readyState === WebSocket.OPEN) {
+      this.finnhubWs.send(JSON.stringify({ type: 'subscribe', symbol }));
+    }
+  }
+
+  private unsubscribeSingleSymbol(symbol: string) {
+    if (symbol.includes('-USD') || symbol.includes('=')) return;
+
+    if (this.alpacaWs && this.alpacaWs.readyState === WebSocket.OPEN) {
+      this.alpacaWs.send(
+        JSON.stringify({
+          action: 'unsubscribe',
+          trades: [symbol],
+          quotes: [symbol],
+          bars: [symbol],
+        })
+      );
+    }
+    if (this.massiveWs && this.massiveWs.readyState === WebSocket.OPEN) {
+      this.massiveWs.send(JSON.stringify({ action: 'unsubscribe', params: `T.${symbol},Q.${symbol}` }));
+    }
+    if (this.finnhubWs && this.finnhubWs.readyState === WebSocket.OPEN) {
+      this.finnhubWs.send(JSON.stringify({ type: 'unsubscribe', symbol }));
+    }
+  }
+
   private resubscribePolygon() {
     if (this.massiveWs && this.massiveWs.readyState === WebSocket.OPEN) {
-      const symbols = Array.from(this.activeSymbols).filter((s) => !s.includes('-USD'));
+      const symbols = StreamSubscriptionManager.getInstance()
+        .getActiveStreamSymbols()
+        .filter((s) => !s.includes('-USD') && !s.includes('='));
       for (const sym of symbols) {
         this.massiveWs.send(JSON.stringify({ action: 'subscribe', params: `T.${sym},Q.${sym}` }));
       }
@@ -433,7 +637,9 @@ export class RealtimeServerManager {
 
   private resubscribeFinnhub() {
     if (this.finnhubWs && this.finnhubWs.readyState === WebSocket.OPEN) {
-      const symbols = Array.from(this.activeSymbols).filter((s) => !s.includes('-USD'));
+      const symbols = StreamSubscriptionManager.getInstance()
+        .getActiveStreamSymbols()
+        .filter((s) => !s.includes('-USD') && !s.includes('='));
       for (const sym of symbols) {
         this.finnhubWs.send(JSON.stringify({ type: 'subscribe', symbol: sym }));
       }
@@ -442,54 +648,65 @@ export class RealtimeServerManager {
 
   /**
    * Fast verified REST polling fallback (strictly real quotes, never simulated)
+   * Polls active stream symbols and rest-fallback symbols on a staggered cadence
    */
   private startVerifiedPolling() {
     if (this.pollingTimer) clearInterval(this.pollingTimer);
 
     this.pollingTimer = setInterval(async () => {
-      const stockSymbols = Array.from(this.activeSymbols).filter((s) => !s.includes('-USD')).slice(0, 10);
-      if (stockSymbols.length === 0) return;
+      const manager = StreamSubscriptionManager.getInstance();
+      const activeSymbols = manager.getActiveStreamSymbols();
+      const fallbackSymbols = manager.getRestFallbackSymbols();
+      const allToPoll = [...activeSymbols, ...fallbackSymbols]
+        .filter((s) => !s.includes('-USD') && !s.includes('='))
+        .slice(0, 15);
+
+      if (allToPoll.length === 0) return;
 
       try {
-        const url = `https://query1.finance.yahoo.com/v7/finance/quote?symbols=${encodeURIComponent(stockSymbols.join(','))}`;
-        https.get(url, { headers: { 'User-Agent': 'Mozilla/5.0' }, timeout: 4000 }, (res) => {
-          let body = '';
-          res.on('data', (c) => (body += c));
-          res.on('end', () => {
-            try {
-              const data = JSON.parse(body);
-              const results = data?.quoteResponse?.result || [];
-              for (const r of results) {
-                const sym = r.symbol?.toUpperCase();
-                if (sym && r.regularMarketPrice) {
-                  const quote = {
-                    type: 'QUOTE',
-                    symbol: sym,
-                    price: r.regularMarketPrice,
-                    bid: r.bid,
-                    ask: r.ask,
-                    high: r.regularMarketDayHigh,
-                    low: r.regularMarketDayLow,
-                    open: r.regularMarketOpen,
-                    previousClose: r.regularMarketPreviousClose,
-                    change: r.regularMarketChange,
-                    changePercent: r.regularMarketChangePercent,
-                    volume: r.regularMarketVolume,
-                    timestamp: (r.regularMarketTime || Math.floor(Date.now() / 1000)) * 1000,
-                    provider: 'Yahoo Finance Real-Time Gateway',
-                    mode: r.marketState === 'REGULAR' ? 'REAL_TIME' : 'CLOSED',
-                  };
-                  this.latestQuotes.set(sym, quote);
-                  this.broadcast(quote);
+        const url = `https://query1.finance.yahoo.com/v7/finance/quote?symbols=${encodeURIComponent(
+          allToPoll.join(',')
+        )}`;
+        https
+          .get(url, { headers: { 'User-Agent': 'Mozilla/5.0' }, timeout: 4000 }, (res) => {
+            let body = '';
+            res.on('data', (c) => (body += c));
+            res.on('end', () => {
+              try {
+                const data = JSON.parse(body);
+                const results = data?.quoteResponse?.result || [];
+                for (const r of results) {
+                  const sym = r.symbol?.toUpperCase();
+                  if (sym && r.regularMarketPrice) {
+                    const quote = {
+                      type: 'QUOTE',
+                      symbol: sym,
+                      price: r.regularMarketPrice,
+                      bid: r.bid,
+                      ask: r.ask,
+                      high: r.regularMarketDayHigh,
+                      low: r.regularMarketDayLow,
+                      open: r.regularMarketOpen,
+                      previousClose: r.regularMarketPreviousClose,
+                      change: r.regularMarketChange,
+                      changePercent: r.regularMarketChangePercent,
+                      volume: r.regularMarketVolume,
+                      timestamp: (r.regularMarketTime || Math.floor(Date.now() / 1000)) * 1000,
+                      provider: 'Yahoo Finance Real-Time Gateway',
+                      mode: r.marketState === 'REGULAR' ? 'REAL_TIME' : 'CLOSED',
+                    };
+                    this.latestQuotes.set(sym, quote);
+                    this.broadcast(quote);
+                  }
                 }
+              } catch (e) {
+                // ignore parse errors
               }
-            } catch (e) {
-              // ignore parse errors
-            }
+            });
+          })
+          .on('error', () => {
+            // ignore network errors
           });
-        }).on('error', () => {
-          // ignore network errors
-        });
       } catch (err) {
         // quiet fallback
       }
@@ -509,9 +726,13 @@ export class RealtimeServerManager {
       });
     });
 
+    const subManager = StreamSubscriptionManager.getInstance();
+
     return {
       connectedClients: this.clients.size,
-      activeSubscribedSymbols: Array.from(this.activeSymbols),
+      activeSubscribedSymbols: subManager.getActiveStreamSymbols(),
+      restFallbackSymbols: subManager.getRestFallbackSymbols(),
+      subscriptionStats: subManager.getStats(),
       cachedQuotesCount: this.latestQuotes.size,
       upstreams: statuses,
     };

@@ -58,7 +58,9 @@ import {
 } from './services/marketDataService';
 import { TickerSymbol, MarketAlert, LiveMarketDataSource } from './types/market';
 import { NormalizedInstrument } from './types/instrument';
-import { MASTER_INSTRUMENTS } from './services/marketProviders/InstrumentDirectoryService';
+import { MobileNavigationBar } from './components/mobile/MobileNavigationBar';
+import { DeepLinkManager } from './services/mobile/deepLinking';
+import { InstrumentDirectoryService, MASTER_INSTRUMENTS } from './services/marketProviders/InstrumentDirectoryService';
 import { UserProfile } from './types/user';
 import { UserService } from './services/userService';
 import { auth } from './config/firebase';
@@ -116,6 +118,27 @@ export default function App() {
     };
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
+  }, []);
+
+  // Deep Link Listener for Universal Links and Custom App Links (e.g. marketmind://stock/NVDA)
+  useEffect(() => {
+    const unregister = DeepLinkManager.onRoute((route) => {
+      if (route.type === 'STOCK' && route.symbol) {
+        const found =
+          InstrumentDirectoryService.getBySymbol(route.symbol) ||
+          InstrumentDirectoryService.getById(route.symbol);
+        if (found) {
+          setSelectedInstrument(found);
+          setSelectedTicker(found.displaySymbol as TickerSymbol || found.symbol as TickerSymbol);
+          setActiveTab('overview');
+        }
+      } else if (route.type === 'WATCHLIST') {
+        setActiveTab('watchlists');
+      } else if (route.type === 'NEWS') {
+        setActiveTab('news');
+      }
+    });
+    return unregister;
   }, []);
 
   const handleToggleWatchlist = (id: string) => {
@@ -642,6 +665,30 @@ export default function App() {
         onClose={() => setIsReportIssueOpen(false)}
         activeSymbol={selectedTicker}
         dataSource={dataSource}
+      />
+
+      {/* Mobile Sticky Bottom Navigation Bar */}
+      <MobileNavigationBar
+        activeTab={
+          activeTab === 'overview'
+            ? 'MARKETS'
+            : activeTab === 'watchlists'
+            ? 'WATCHLIST'
+            : activeTab === 'news'
+            ? 'NEWS'
+            : activeTab === 'connected-accounts'
+            ? 'PORTFOLIO'
+            : 'MARKETS'
+        }
+        onSelectTab={(tab) => {
+          if (tab === 'MARKETS') setActiveTab('overview');
+          else if (tab === 'SEARCH') setIsUniversalSearchOpen(true);
+          else if (tab === 'WATCHLIST') setActiveTab('watchlists');
+          else if (tab === 'PORTFOLIO') setActiveTab('connected-accounts');
+          else if (tab === 'NEWS') setActiveTab('news');
+          else if (tab === 'AI_CHAT') setActiveTab('ask-ai');
+        }}
+        watchlistCount={watchlistIds.length}
       />
     </div>
   );

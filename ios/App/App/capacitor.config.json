@@ -2,5 +2,16 @@
 	"appId": "com.marketmindai.app",
 	"appName": "MarketMind AI",
 	"webDir": "dist",
+	"bundledWebRuntime": false,
+	"server": {
+		"androidScheme": "https",
+		"iosScheme": "https"
+	},
+	"plugins": {
+		"SplashScreen": {
+			"launchShowDuration": 1500,
+			"backgroundColor": "#0b0e14"
+		}
+	},
 	"packageClassList": []
 }

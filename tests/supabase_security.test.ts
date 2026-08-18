@@ -4,6 +4,7 @@ import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 
 const migration = readFileSync(join(process.cwd(), 'supabase/migrations/20260816215321_marketmind_persistence_rls.sql'), 'utf8');
+const instrumentsMigration = readFileSync(join(process.cwd(), 'supabase/migrations/20260817010000_instruments_catalog_and_rls.sql'), 'utf8');
 const tenantTables = ['user_profiles','watchlists','alerts','prediction_history','saved_ai_analyses','support_tickets','subscription_records','billing_invoices','broker_connections','ai_usage_records','community_posts'];
 
 test('every exposed MarketMind application table enables RLS', () => {
@@ -27,4 +28,11 @@ test('billing and webhook authority are inaccessible to browser roles', () => {
 test('private user storage requires UID-prefixed object paths', () => {
   assert.match(migration, /values \('user-content', 'user-content', false/i);
   assert.match(migration, /storage\.foldername\(name\)\)\[1\] = \(select auth\.jwt\(\)->>'sub'\)/i);
+});
+
+test('instruments table enables RLS and restricts modifications to service_role', () => {
+  assert.match(instrumentsMigration, /alter table public\.instruments enable row level security/i);
+  assert.match(instrumentsMigration, /create policy "Public active instruments are viewable by all"/i);
+  assert.match(instrumentsMigration, /create policy "Service role has full management over instruments"/i);
+  assert.match(instrumentsMigration, /to service_role/i);
 });

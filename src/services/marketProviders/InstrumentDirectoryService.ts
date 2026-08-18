@@ -1736,14 +1736,36 @@ export class InstrumentDirectoryService {
 
   // Find instrument by ID
   public static getById(instrumentId: string): NormalizedInstrument | null {
-    return this.directory.get(instrumentId) || null;
+    const existing = this.directory.get(instrumentId);
+    if (existing) return existing;
+
+    try {
+      const { InstrumentStore } = require('../../server/instrumentStore');
+      const dbInst = InstrumentStore.getById(instrumentId);
+      if (dbInst) {
+        return InstrumentStore.toNormalizedInstrument(dbInst);
+      }
+    } catch {}
+
+    return null;
   }
 
   // Find instrument by Ticker symbol or provider symbol
   public static getBySymbol(symbol: string): NormalizedInstrument | null {
     if (!symbol) return null;
     const clean = symbol.trim().toUpperCase();
-    return this.symbolIndex.get(clean) || null;
+    const existing = this.symbolIndex.get(clean);
+    if (existing) return existing;
+
+    try {
+      const { InstrumentStore } = require('../../server/instrumentStore');
+      const dbInst = InstrumentStore.getBySymbol(clean);
+      if (dbInst) {
+        return InstrumentStore.toNormalizedInstrument(dbInst);
+      }
+    } catch {}
+
+    return null;
   }
 
   // Get all instruments in directory
@@ -1756,28 +1778,28 @@ export class InstrumentDirectoryService {
     return this.getAll().filter((inst) => inst.assetClass === assetClass);
   }
 
-  // Universal Search with Fuzzy Matching and Grouping
-  public static search(query: string, assetClassFilter?: UniversalAssetClass): {
+  // Universal Search with Fuzzy Matching and Grouping across 5000+ catalog
+  public static search(
+    query: string,
+    assetClassFilter?: UniversalAssetClass,
+    limit = 50
+  ): {
     results: NormalizedInstrument[];
     groupedResults: InstrumentSearchResultGroup[];
     totalCount: number;
   } {
-    if (!query || query.trim().length === 0) {
-      const all = assetClassFilter ? this.getByAssetClass(assetClassFilter) : this.getAll();
-      return {
-        results: all.slice(0, 30),
-        groupedResults: this.groupInstruments(all.slice(0, 30)),
-        totalCount: all.length,
-      };
-    }
+    const q = (query || '').trim().toLowerCase();
+    const seenSymbols = new Set<string>();
+    const combined: NormalizedInstrument[] = [];
 
-    const q = query.trim().toLowerCase();
     const cleanQ = q.replace(/[^a-z0-9]/g, '');
 
-    const matches = this.getAll().filter((inst) => {
+    // 1. Search local master instruments
+    const localMatches = this.getAll().filter((inst) => {
       if (assetClassFilter && inst.assetClass !== assetClassFilter) {
         return false;
       }
+      if (!q) return true;
       const sym = inst.symbol.toLowerCase();
       const disp = inst.displaySymbol.toLowerCase();
       const prov = (inst.providerSymbol || '').toLowerCase();
@@ -1804,21 +1826,62 @@ export class InstrumentDirectoryService {
       );
     });
 
-    // Sort by exact symbol match first, then starting with query, then name match
-    matches.sort((a, b) => {
+    for (const inst of localMatches) {
+      const sym = inst.symbol.toUpperCase();
+      if (!seenSymbols.has(sym)) {
+        seenSymbols.add(sym);
+        combined.push(inst);
+      }
+    }
+
+    // 2. Search 5000+ Universe Store if applicable
+    try {
+      const { InstrumentStore } = require('../../server/instrumentStore');
+      const storeResults = InstrumentStore.search(query, {
+        limit: 50,
+        assetType: assetClassFilter === 'ETF' ? 'ETF' : assetClassFilter === 'STOCK' ? 'STOCK' : undefined,
+      });
+
+      for (const dbInst of storeResults) {
+        const sym = dbInst.symbol.toUpperCase();
+        if (!seenSymbols.has(sym)) {
+          seenSymbols.add(sym);
+          combined.push(InstrumentStore.toNormalizedInstrument(dbInst));
+        }
+      }
+    } catch {}
+
+    // 3. Sort with strict precision ranking
+    // 1st: Exact symbol match
+    // 2nd: Starts with symbol
+    // 3rd: Name starts with word
+    // 4th: Contains query
+    combined.sort((a, b) => {
       const aSym = a.symbol.toLowerCase();
       const bSym = b.symbol.toLowerCase();
+      const aName = a.name.toLowerCase();
+      const bName = b.name.toLowerCase();
+
       if (aSym === q && bSym !== q) return -1;
       if (bSym === q && aSym !== q) return 1;
+
       if (aSym.startsWith(q) && !bSym.startsWith(q)) return -1;
       if (bSym.startsWith(q) && !aSym.startsWith(q)) return 1;
-      return 0;
+
+      const aNameStarts = aName.startsWith(q);
+      const bNameStarts = bName.startsWith(q);
+      if (aNameStarts && !bNameStarts) return -1;
+      if (bNameStarts && !aNameStarts) return 1;
+
+      return aSym.localeCompare(bSym);
     });
 
+    const finalResults = combined.slice(0, limit);
+
     return {
-      results: matches,
-      groupedResults: this.groupInstruments(matches),
-      totalCount: matches.length,
+      results: finalResults,
+      groupedResults: this.groupInstruments(finalResults),
+      totalCount: combined.length,
     };
   }
 

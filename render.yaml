@@ -56,9 +56,21 @@ services:
         sync: false
       - key: ALPACA_API_SECRET
         sync: false
+      - key: ALPACA_DATA_FEED
+        value: "iex"
+      - key: MAX_ACTIVE_STREAM_SYMBOLS
+        value: "30"
+      - key: INSTRUMENT_SYNC_PROVIDER
+        value: "alpaca"
       - key: ALLOW_SIMULATED_MARKET_DATA
         value: "false"
       - key: MARKET_DATA_MODE
-        value: provider
-      - key: DEMO_MODE
-        value: "false"
+        value: end_of_day
+      - key: VITE_MARKET_DATA_MODE
+        value: end_of_day
+      - key: FINNHUB_API_KEY
+        sync: false
+      - key: BENZINGA_API_KEY
+        sync: false
+      - key: SEC_USER_AGENT
+        value: MarketMindAI Research/2.0 (contact@marketmind.ai)

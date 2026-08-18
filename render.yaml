@@ -1,0 +1,64 @@
+services:
+  - type: web
+    name: marketmind-ai
+    env: node
+    plan: standard
+    buildCommand: npm run build
+    startCommand: npm run start
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: APP_URL
+        sync: false
+      - key: FIREBASE_PROJECT_ID
+        value: ai-studio-marketmindai-52b43fbe-5366-4a57-8a3b-5ac098b91d46
+      - key: FIREBASE_DATABASE_ID
+        sync: false
+      - key: FIREBASE_SERVICE_ACCOUNT_KEY
+        sync: false
+      - key: VITE_SUPABASE_URL
+        sync: false
+      - key: VITE_SUPABASE_PUBLISHABLE_KEY
+        sync: false
+      - key: SUPABASE_URL
+        sync: false
+      - key: SUPABASE_SECRET_KEY
+        sync: false
+      - key: GEMINI_API_KEY
+        sync: false
+      - key: GEMINI_MODEL
+        value: gemini-2.5-flash
+      - key: STRIPE_SECRET_KEY
+        sync: false
+      - key: STRIPE_WEBHOOK_SECRET
+        sync: false
+      - key: STRIPE_PRICE_BASIC_MONTHLY
+        sync: false
+      - key: STRIPE_PRICE_BASIC_ANNUAL
+        sync: false
+      - key: STRIPE_PRICE_PRO_MONTHLY
+        sync: false
+      - key: STRIPE_PRICE_PRO_ANNUAL
+        sync: false
+      - key: STRIPE_PRICE_PREMIUM_MONTHLY
+        sync: false
+      - key: STRIPE_PRICE_PREMIUM_ANNUAL
+        sync: false
+      - key: STRIPE_PRICE_ULTRA_MONTHLY
+        sync: false
+      - key: STRIPE_PRICE_ULTRA_ANNUAL
+        sync: false
+      - key: MASSIVE_API_KEY
+        sync: false
+      - key: POLYGON_API_KEY
+        sync: false
+      - key: ALPACA_API_KEY
+        sync: false
+      - key: ALPACA_API_SECRET
+        sync: false
+      - key: ALLOW_SIMULATED_MARKET_DATA
+        value: "false"
+      - key: MARKET_DATA_MODE
+        value: provider
+      - key: DEMO_MODE
+        value: "false"

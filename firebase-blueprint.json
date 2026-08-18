@@ -1,0 +1,177 @@
+{
+  "entities": {
+    "UserProfile": {
+      "title": "UserProfile",
+      "description": "Trader profile and subscription state in MarketMind AI",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string", "maxLength": 128, "description": "Unique user ID matching auth UID" },
+        "name": { "type": "string", "maxLength": 100, "description": "Display name of the user" },
+        "firstName": { "type": "string", "maxLength": 50, "description": "First name" },
+        "lastName": { "type": "string", "maxLength": 50, "description": "Last name" },
+        "email": { "type": "string", "format": "email", "maxLength": 150, "description": "Email address" },
+        "role": { "type": "string", "enum": ["user", "premium_user", "support", "moderator", "admin", "super_admin"], "description": "User access role" },
+        "plan": { "type": "string", "enum": ["free", "basic", "pro", "premium", "institutional"], "description": "Active subscription plan" },
+        "planTier": { "type": "string", "maxLength": 30, "description": "Subscription tier label" },
+        "subscriptionStatus": { "type": "string", "enum": ["active", "trialing", "past_due", "canceled"], "description": "Subscription status" },
+        "hasUsedTrial": { "type": "boolean", "description": "Whether user has consumed the 15-day trial" },
+        "planBillingCycle": { "type": "string", "enum": ["monthly", "annual"], "description": "Billing cadence" },
+        "planRenewsAt": { "type": "string", "maxLength": 30, "description": "ISO expiration or renewal date" },
+        "monthlyPrice": { "type": "number", "description": "Monthly price paid" },
+        "cancelAtPeriodEnd": { "type": "boolean", "description": "Whether subscription cancels at term end" },
+        "tradingExperience": { "type": "string", "maxLength": 50, "description": "Experience level" },
+        "defaultTicker": { "type": "string", "maxLength": 20, "description": "Default ticker symbol" },
+        "defaultTimeframe": { "type": "string", "maxLength": 10, "description": "Default chart timeframe" },
+        "riskTolerance": { "type": "string", "maxLength": 30, "description": "Risk tolerance setting" },
+        "language": { "type": "string", "maxLength": 10, "description": "Interface language" },
+        "region": { "type": "string", "maxLength": 10, "description": "Region code" },
+        "timezone": { "type": "string", "maxLength": 50, "description": "User timezone" },
+        "createdAt": { "type": "string", "maxLength": 50, "description": "Account creation timestamp" },
+        "updatedAt": { "type": "string", "maxLength": 50, "description": "Last update timestamp" }
+      },
+      "required": ["id", "email", "role", "plan"]
+    },
+    "Watchlist": {
+      "title": "Watchlist",
+      "description": "User created stock watchlist",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string", "maxLength": 128, "description": "Unique watchlist identifier" },
+        "userId": { "type": "string", "maxLength": 128, "description": "Owner user UID" },
+        "name": { "type": "string", "maxLength": 100, "description": "Watchlist name" },
+        "description": { "type": "string", "maxLength": 250, "description": "Watchlist description" },
+        "tickers": { "type": "array", "description": "List of ticker symbols" },
+        "isDefault": { "type": "boolean", "description": "Whether this is default watchlist" },
+        "createdAt": { "type": "string", "maxLength": 50, "description": "Creation timestamp" },
+        "updatedAt": { "type": "string", "maxLength": 50, "description": "Last update timestamp" }
+      },
+      "required": ["id", "userId", "name", "tickers"]
+    },
+    "SavedAlert": {
+      "title": "SavedAlert",
+      "description": "User defined price or technical indicator alert",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string", "maxLength": 128, "description": "Unique alert identifier" },
+        "userId": { "type": "string", "maxLength": 128, "description": "Owner user UID" },
+        "ticker": { "type": "string", "maxLength": 20, "description": "Target ticker symbol" },
+        "type": { "type": "string", "maxLength": 50, "description": "Alert rule type" },
+        "targetValue": { "type": "number", "description": "Target numeric threshold" },
+        "label": { "type": "string", "maxLength": 150, "description": "Alert label" },
+        "condition": { "type": "string", "maxLength": 250, "description": "Condition description" },
+        "status": { "type": "string", "enum": ["active", "paused", "triggered"], "description": "Alert status" },
+        "soundAlert": { "type": "boolean", "description": "Audible alert enabled" },
+        "webhookAlert": { "type": "boolean", "description": "Webhook dispatch enabled" },
+        "notes": { "type": "string", "maxLength": 300, "description": "User notes" },
+        "createdAt": { "type": "string", "maxLength": 50, "description": "Creation timestamp" },
+        "triggeredAt": { "type": "string", "maxLength": 50, "description": "Trigger timestamp" }
+      },
+      "required": ["id", "userId", "ticker", "type", "status"]
+    },
+    "HistoricalPrediction": {
+      "title": "HistoricalPrediction",
+      "description": "Saved AI prediction and audit record",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string", "maxLength": 128, "description": "Unique prediction identifier" },
+        "userId": { "type": "string", "maxLength": 128, "description": "Owner user UID" },
+        "ticker": { "type": "string", "maxLength": 20, "description": "Ticker symbol" },
+        "timestamp": { "type": "string", "maxLength": 50, "description": "Prediction timestamp" },
+        "timeframe": { "type": "string", "maxLength": 20, "description": "Horizon timeframe" },
+        "direction": { "type": "string", "enum": ["BULLISH", "BEARISH", "NEUTRAL"], "description": "Market direction bias" },
+        "entryPrice": { "type": "number", "description": "Price at signal time" },
+        "targetPrice": { "type": "number", "description": "Target level" },
+        "stopLossPrice": { "type": "number", "description": "Stop loss level" },
+        "confidenceScore": { "type": "number", "description": "Confidence percentage" },
+        "status": { "type": "string", "enum": ["WIN", "LOSS", "IN_PROGRESS", "EXPIRED"], "description": "Validation status" },
+        "finalPrice": { "type": "number", "description": "Final close price upon resolution" },
+        "returnPercent": { "type": "number", "description": "Return percentage" },
+        "primaryCatalyst": { "type": "string", "maxLength": 500, "description": "Key driver or catalyst" },
+        "brierScore": { "type": "number", "description": "Brier accuracy score" },
+        "resolvedAt": { "type": "string", "maxLength": 50, "description": "Resolution timestamp" }
+      },
+      "required": ["id", "userId", "ticker", "direction", "entryPrice", "status"]
+    },
+    "SupportTicket": {
+      "title": "SupportTicket",
+      "description": "Customer inquiry and support ticket",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string", "maxLength": 128, "description": "Unique ticket identifier" },
+        "userId": { "type": "string", "maxLength": 128, "description": "Owner user UID" },
+        "userEmail": { "type": "string", "format": "email", "maxLength": 150, "description": "User contact email" },
+        "userName": { "type": "string", "maxLength": 100, "description": "User name" },
+        "subject": { "type": "string", "maxLength": 200, "description": "Ticket subject line" },
+        "category": { "type": "string", "maxLength": 50, "description": "Inquiry category" },
+        "priority": { "type": "string", "enum": ["Low", "Medium", "High", "Critical"], "description": "Ticket priority" },
+        "message": { "type": "string", "maxLength": 2000, "description": "Ticket message text" },
+        "status": { "type": "string", "enum": ["Open", "In Review", "Resolved", "Closed"], "description": "Ticket status" },
+        "response": { "type": "string", "maxLength": 2000, "description": "Admin response" },
+        "createdAt": { "type": "string", "maxLength": 50, "description": "Creation timestamp" },
+        "updatedAt": { "type": "string", "maxLength": 50, "description": "Last update timestamp" }
+      },
+      "required": ["id", "userId", "userEmail", "subject", "message", "status"]
+    },
+    "CommunityPost": {
+      "title": "CommunityPost",
+      "description": "Trader publication on the social market stream",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string", "maxLength": 128, "description": "Unique post ID" },
+        "authorId": { "type": "string", "maxLength": 128, "description": "UID of author" },
+        "authorUsername": { "type": "string", "maxLength": 50, "description": "Username handle" },
+        "content": { "type": "string", "maxLength": 5000, "description": "Post text and analysis" },
+        "tickers": { "type": "array", "description": "Associated ticker tags" },
+        "sentiment": { "type": "string", "enum": ["BULLISH", "BEARISH", "NEUTRAL"], "description": "Directional sentiment bias" },
+        "status": { "type": "string", "enum": ["PUBLISHED", "HIDDEN", "REMOVED"], "description": "Moderation status" },
+        "createdAt": { "type": "string", "maxLength": 50, "description": "Publication timestamp" }
+      },
+      "required": ["id", "authorId", "authorUsername", "content", "status", "createdAt"]
+    },
+    "CommunityReport": {
+      "title": "CommunityReport",
+      "description": "User flagged content or compliance report",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string", "maxLength": 128, "description": "Unique report ID" },
+        "reporterId": { "type": "string", "maxLength": 128, "description": "Reporting user UID" },
+        "targetType": { "type": "string", "enum": ["POST", "COMMENT", "PROFILE"], "description": "Target entity type" },
+        "targetId": { "type": "string", "maxLength": 128, "description": "Target entity ID" },
+        "category": { "type": "string", "maxLength": 50, "description": "Violation category" },
+        "status": { "type": "string", "enum": ["PENDING", "ACTION_TAKEN", "DISMISSED"], "description": "Resolution status" },
+        "createdAt": { "type": "string", "maxLength": 50, "description": "Creation timestamp" }
+      },
+      "required": ["id", "reporterId", "targetType", "targetId", "category", "status", "createdAt"]
+    }
+  },
+  "firestore": {
+    "/users/{userId}": {
+      "schema": "UserProfile",
+      "description": "User profile with plan entitlements and settings"
+    },
+    "/users/{userId}/watchlists/{watchlistId}": {
+      "schema": "Watchlist",
+      "description": "Custom user stock watchlists"
+    },
+    "/users/{userId}/alerts/{alertId}": {
+      "schema": "SavedAlert",
+      "description": "User price and technical indicator alert rules"
+    },
+    "/users/{userId}/predictions/{predictionId}": {
+      "schema": "HistoricalPrediction",
+      "description": "User saved and verified market predictions"
+    },
+    "/supportTickets/{ticketId}": {
+      "schema": "SupportTicket",
+      "description": "Customer support tickets"
+    },
+    "/community_posts/{postId}": {
+      "schema": "CommunityPost",
+      "description": "Public and follower financial research posts"
+    },
+    "/community_reports/{reportId}": {
+      "schema": "CommunityReport",
+      "description": "Compliance and user reports for moderation audit"
+    }
+  }
+}

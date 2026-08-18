@@ -446,7 +446,20 @@ export const RealTimeStockChart: React.FC<RealTimeStockChartProps> = ({
     try {
       setConnectionMessage(null);
       const res = await fetchCandles(ticker, timeframe, extendedHours);
-      if (res && res.candles && res.candles.length > 0) {
+
+      const isValidCandlePayload =
+        res &&
+        Array.isArray(res.candles) &&
+        res.candles.length > 0 &&
+        typeof res.price === 'number' &&
+        Number.isFinite(res.price) &&
+        res.price > 0 &&
+        typeof res.change === 'number' &&
+        Number.isFinite(res.change) &&
+        typeof res.changePercent === 'number' &&
+        Number.isFinite(res.changePercent);
+
+      if (isValidCandlePayload) {
         setCandles(res.candles);
         setLevels(res.levels || {});
         setLivePrice(res.price);
@@ -456,11 +469,20 @@ export const RealTimeStockChart: React.FC<RealTimeStockChartProps> = ({
         setMarketStatus('LIVE');
         setLastUpdateStr(res.lastSyncTime || new Date().toLocaleTimeString('en-US', { timeZone: 'America/New_York' }) + ' ET');
       } else {
-        setMarketStatus('DELAYED');
+        setCandles([]);
+        setLivePrice(null);
+        setLiveChange(null);
+        setLiveChangePercent(null);
+        setMarketStatus('LIVE DATA UNAVAILABLE');
+        setConnectionMessage('Live Market Data Unavailable');
       }
     } catch (err) {
       console.warn('Candle fetch error:', err);
-      setMarketStatus('DELAYED');
+      setCandles([]);
+      setLivePrice(null);
+      setLiveChange(null);
+      setLiveChangePercent(null);
+      setMarketStatus('LIVE DATA UNAVAILABLE');
       setConnectionMessage('Reconnecting to market data...');
     } finally {
       setIsLoading(false);
@@ -923,7 +945,7 @@ export const RealTimeStockChart: React.FC<RealTimeStockChartProps> = ({
             <span className="text-xl md:text-2xl font-black font-mono text-white tracking-tight">
               {ticker}
             </span>
-            {livePrice !== null ? (
+            {typeof livePrice === 'number' && Number.isFinite(livePrice) && livePrice > 0 ? (
               <>
                 <span
                   className={`text-base md:text-lg font-black font-mono transition-colors duration-200 px-1.5 py-0.5 rounded ${
@@ -938,7 +960,7 @@ export const RealTimeStockChart: React.FC<RealTimeStockChartProps> = ({
                 >
                   ${livePrice.toFixed(2)}
                 </span>
-                {liveChange !== null && liveChangePercent !== null && (
+                {typeof liveChange === 'number' && Number.isFinite(liveChange) && typeof liveChangePercent === 'number' && Number.isFinite(liveChangePercent) && (
                   <span
                     className={`text-xs font-bold font-mono ${
                       isPos ? 'text-emerald-400' : 'text-rose-400'
@@ -951,7 +973,7 @@ export const RealTimeStockChart: React.FC<RealTimeStockChartProps> = ({
                 )}
               </>
             ) : (
-              <span className="text-base font-mono text-[#6B7280]">--</span>
+              <span className="text-base font-mono text-[#6B7280]">DATA UNAVAILABLE</span>
             )}
           </div>
 

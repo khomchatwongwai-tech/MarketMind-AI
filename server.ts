@@ -269,26 +269,6 @@ app.get('/api/market/quote/:symbol', async (req, res) => {
   }
 });
 
-app.get('/api/market/candles/:symbol', (req, res) => {
-  const symbol = req.params.symbol;
-  const timeframe = (req.query.timeframe as string) || '5m';
-  const count = parseInt((req.query.count as string) || '60', 10);
-  const instrument =
-    InstrumentDirectoryService.getBySymbol(symbol) ||
-    InstrumentDirectoryService.getById(symbol);
-
-  if (!instrument) {
-    return res.status(404).json({ error: 'Instrument not found', symbol });
-  }
-  const candles = DataProviderRouter.generateMultiAssetCandles(instrument, timeframe, count);
-  res.json({
-    symbol: instrument.symbol,
-    instrumentId: instrument.instrumentId,
-    timeframe,
-    candles,
-  });
-});
-
 // 5. Multi-Asset Market Status & Session Schedule
 app.get('/api/instruments/:instrumentId/market-status', (req, res) => {
   const idOrSymbol = req.params.instrumentId;

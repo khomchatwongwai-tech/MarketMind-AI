@@ -43,8 +43,8 @@ export class StripeBillingProvider implements IBillingProvider {
         planId: 'pro',
         billingInterval: 'monthly',
         storeProductId: process.env.STRIPE_PRICE_PRO_MONTHLY || 'price_pro_monthly',
-        priceUsd: 19.99,
-        formattedPrice: '$19.99/mo',
+        priceUsd: 29.99,
+        formattedPrice: '$29.99/mo',
         title: 'MarketMind Pro Monthly',
       },
       {
@@ -59,8 +59,8 @@ export class StripeBillingProvider implements IBillingProvider {
         planId: 'premium',
         billingInterval: 'monthly',
         storeProductId: process.env.STRIPE_PRICE_PREMIUM_MONTHLY || 'price_premium_monthly',
-        priceUsd: 29.99,
-        formattedPrice: '$29.99/mo',
+        priceUsd: 69.99,
+        formattedPrice: '$69.99/mo',
         title: 'MarketMind Premium Monthly',
       },
       {
@@ -75,8 +75,8 @@ export class StripeBillingProvider implements IBillingProvider {
         planId: 'ultra',
         billingInterval: 'monthly',
         storeProductId: process.env.STRIPE_PRICE_ULTRA_MONTHLY || 'price_ultra_monthly',
-        priceUsd: 49.99,
-        formattedPrice: '$49.99/mo',
+        priceUsd: 99.99,
+        formattedPrice: '$99.99/mo',
         title: 'MarketMind Ultra Monthly',
       },
       {

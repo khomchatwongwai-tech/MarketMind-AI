@@ -13,10 +13,10 @@ MarketMind AI offers modular subscription plans tailored for retail, quantitativ
 | Plan | Monthly Price | Annual Price (Save ~17-20%) | Trial Eligibility | Primary Focus |
 | :--- | :--- | :--- | :--- | :--- |
 | **Free Starter** | $0.00 | $0.00 | Always Available | 15m Delayed Data, 5 AI Qs/Day, 3 Saved Reports |
-| **Basic** | **$9.99 / mo** | **$99.00 / yr** | Standard | Full Dashboard, Core Indicators, 25 AI Qs/Day |
-| **Pro** *(Most Popular)* | **$19.99 / mo** | **$199.00 / yr** | **15-Day Free Trial** | Sub-50ms Realtime Feed, Options AI, 10 Deep Research/Mo |
-| **Premium** *(Best Research)*| **$29.99 / mo** | **$299.00 / yr** | **15-Day Free Trial** | SEC Parser, Unlimited PDF Exports, 30 Deep Research/Mo |
-| **Ultra** *(Maximum Access)* | **$49.99 / mo** | **$499.00 / yr** | Contact Support | Priority GPU Queue, Darkpool Tracker, 100 Deep Research/Mo |
+| **Basic** | **$9.99 / mo** | **$99.00 / yr** | Standard | Full Dashboard, Core Indicators, 20 AI Qs/Day |
+| **Pro** *(Most Popular)* | **$29.99 / mo** | **$199.00 / yr** | **15-Day Free Trial** | Sub-50ms Realtime Feed, Options AI, Why Is It Moving, 15 Deep Research/Mo |
+| **Premium** *(Best Research)*| **$69.99 / mo** | **$299.00 / yr** | **15-Day Free Trial** | SEC Parser, Institutional Intelligence, Unlimited PDF Exports, 40 Deep Research/Mo |
+| **Ultra** *(Maximum Access)* | **$99.99 / mo** | **$499.00 / yr** | Contact Support | Priority GPU Queue, Darkpool Tracker, 2,000 AI Qs/Day, 100 Deep Research/Mo |
 
 ---
 

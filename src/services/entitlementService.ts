@@ -272,24 +272,24 @@ export class EntitlementService {
       case 'ultra_ai':
       case 'darkpool':
       case 'early_access':
-        return { plan: 'ultra', planName: 'Ultra', price: 49.99 };
+        return { plan: 'ultra', planName: 'Ultra', price: SUBSCRIPTION_PLANS.ultra.monthlyPrice };
       case 'sec_filings':
       case 'pdf_export':
       case 'what_changed':
       case 'advanced_options':
       case 'unusual_options':
-        return { plan: 'premium', planName: 'Premium', price: 29.99 };
+        return { plan: 'premium', planName: 'Premium', price: SUBSCRIPTION_PLANS.premium.monthlyPrice };
       case 'backtest':
       case 'realtime':
       case 'advanced_ai':
       case 'why_moving':
       case 'earnings_transcripts':
-        return { plan: 'pro', planName: 'Pro', price: 19.99 };
+        return { plan: 'pro', planName: 'Pro', price: SUBSCRIPTION_PLANS.pro.monthlyPrice };
       case 'technical_indicators':
       case 'scanner':
-        return { plan: 'basic', planName: 'Basic', price: 9.99 };
+        return { plan: 'basic', planName: 'Basic', price: SUBSCRIPTION_PLANS.basic.monthlyPrice };
       default:
-        return { plan: 'pro', planName: 'Pro', price: 19.99 };
+        return { plan: 'pro', planName: 'Pro', price: SUBSCRIPTION_PLANS.pro.monthlyPrice };
     }
   }
 }

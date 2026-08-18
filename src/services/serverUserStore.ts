@@ -345,16 +345,16 @@ export class ServerUserStore {
         activeSubscribers++;
         if (acc.plan === 'basic') {
           basicSubscribers++;
-          mrr += 9.99;
+          mrr += SUBSCRIPTION_PLANS.basic.monthlyPrice;
         } else if (acc.plan === 'pro') {
           proSubscribers++;
-          mrr += 19.99;
+          mrr += SUBSCRIPTION_PLANS.pro.monthlyPrice;
         } else if (acc.plan === 'premium' || (acc.plan as string) === 'institutional') {
           premiumSubscribers++;
-          mrr += 29.99;
+          mrr += SUBSCRIPTION_PLANS.premium.monthlyPrice;
         } else if (acc.plan === 'ultra' || (acc.plan as string) === 'enterprise') {
           ultraSubscribers++;
-          mrr += 49.99;
+          mrr += SUBSCRIPTION_PLANS.ultra.monthlyPrice;
         }
       } else if (acc.subscriptionStatus === 'canceled' || acc.cancelAtPeriodEnd) {
         canceledSubscribers++;

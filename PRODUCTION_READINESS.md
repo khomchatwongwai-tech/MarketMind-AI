@@ -14,7 +14,7 @@ This document details the operational readiness of MarketMind AI across web, iOS
 
 ## 2. Server-Enforced Entitlements & 15-Day Free Trial
 
-- **5 Canonical Tiers:** Free Starter ($0), Basic ($9.99/mo, $99/yr), Pro ($19.99/mo, $199/yr), Premium ($29.99/mo, $299/yr), Ultra ($49.99/mo, $499/yr).
+- **5 Canonical Tiers:** Free Starter ($0), Basic ($9.99/mo, $99/yr), Pro ($29.99/mo, $199/yr), Premium ($69.99/mo, $299/yr), Ultra ($99.99/mo, $499/yr).
 - **Trial Protection:** Strictly 1 trial per user account, enforced by server timestamps.
 - **Fail-Closed Trial Expiration:** When trial expires, account automatically downgrades to Free Starter tier without destroying customer watchlists, alerts, or saved research reports.
 - **Cost Controls:** Deep research job limits, source fetch caps (`RESEARCH_MAX_SOURCES = 12`), AI step limits (`RESEARCH_MAX_AI_STEPS = 8`), and token limits (`RESEARCH_MAX_TOKENS = 8192`) strictly enforced per tier.

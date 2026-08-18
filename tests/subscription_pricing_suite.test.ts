@@ -51,14 +51,14 @@ describe('MarketMind AI - Subscription & Monetization Suite', () => {
       assert.equal(SUBSCRIPTION_PLANS.basic.monthlyPrice, 9.99);
       assert.equal(SUBSCRIPTION_PLANS.basic.annualBilledTotal, 99.00);
 
-      assert.equal(SUBSCRIPTION_PLANS.pro.monthlyPrice, 19.99);
+      assert.equal(SUBSCRIPTION_PLANS.pro.monthlyPrice, 29.99);
       assert.equal(SUBSCRIPTION_PLANS.pro.annualBilledTotal, 199.00);
       assert.equal(SUBSCRIPTION_PLANS.pro.isPopular, true);
 
-      assert.equal(SUBSCRIPTION_PLANS.premium.monthlyPrice, 29.99);
+      assert.equal(SUBSCRIPTION_PLANS.premium.monthlyPrice, 69.99);
       assert.equal(SUBSCRIPTION_PLANS.premium.annualBilledTotal, 299.00);
 
-      assert.equal(SUBSCRIPTION_PLANS.ultra.monthlyPrice, 49.99);
+      assert.equal(SUBSCRIPTION_PLANS.ultra.monthlyPrice, 99.99);
       assert.equal(SUBSCRIPTION_PLANS.ultra.annualBilledTotal, 499.00);
     });
 
@@ -161,7 +161,7 @@ describe('MarketMind AI - Subscription & Monetization Suite', () => {
       assert.equal(ent.canUseScanner, true);
       assert.equal(ent.canExportReports, true);
       assert.equal(ent.canUseRealtimeData, false);
-      assert.equal(ent.maxAIRequestsPerDay, 25);
+      assert.equal(ent.maxAIRequestsPerDay, 20);
       assert.equal(ent.maxMonthlyDeepResearchJobs, 3);
       assert.equal(ent.maxConnectedAccounts, 1);
     });
@@ -208,7 +208,7 @@ describe('MarketMind AI - Subscription & Monetization Suite', () => {
       assert.equal(ent.canExportPdfResearch, true);
       assert.equal(ent.canUseWhatChanged, true);
       assert.equal(ent.hasPriorityResearchQueue, true);
-      assert.equal(ent.maxAIRequestsPerDay, 250);
+      assert.equal(ent.maxAIRequestsPerDay, 500);
       assert.equal(ent.maxMonthlyDeepResearchJobs, 40);
     });
 
@@ -226,7 +226,7 @@ describe('MarketMind AI - Subscription & Monetization Suite', () => {
 
       const ent = EntitlementService.getEntitlements(ultraUser);
       assert.equal(ent.planId, 'ultra');
-      assert.equal(ent.maxAIRequestsPerDay, 600);
+      assert.equal(ent.maxAIRequestsPerDay, 2000);
       assert.equal(ent.maxMonthlyDeepResearchJobs, 100);
       assert.equal(ent.maxDeepResearchSourcesPerJob, 50);
       assert.equal(ent.maxDeepResearchAiSteps, 25);
@@ -306,9 +306,9 @@ describe('MarketMind AI - Subscription & Monetization Suite', () => {
       ServerUserStore.updateSubscriptionByUid('acc_ultra_1', { plan: 'ultra', subscriptionStatus: 'active' });
 
       const metrics = ServerUserStore.getAdminMetrics();
-      // Expected MRR: 9.99 + 19.99 + 29.99 + 49.99 = 109.96
-      assert.ok(metrics.monthlyRecurringRevenue >= 109.96, `MRR should include all tiers, got ${metrics.monthlyRecurringRevenue}`);
-      assert.ok(metrics.annualRecurringRevenue >= 109.96 * 12);
+      // Expected MRR: 9.99 + 29.99 + 69.99 + 99.99 = 209.96
+      assert.ok(metrics.monthlyRecurringRevenue >= 209.96, `MRR should include all tiers, got ${metrics.monthlyRecurringRevenue}`);
+      assert.ok(metrics.annualRecurringRevenue >= 209.96 * 12);
       assert.ok(metrics.basicSubscribers >= 1);
       assert.ok(metrics.proSubscribers >= 1);
       assert.ok(metrics.premiumSubscribers >= 1);

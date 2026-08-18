@@ -98,7 +98,7 @@ export const SubscriptionModal: React.FC<SubscriptionModalProps> = ({
       id: 'free',
       name: 'Free Explorer',
       icon: Shield,
-      priceMonthly: 0,
+      priceMonthly: SUBSCRIPTION_PLANS.free.monthlyPrice,
       priceAnnualMonthly: 0,
       priceAnnualTotal: 0,
       tierTag: 'Free Forever',
@@ -120,21 +120,21 @@ export const SubscriptionModal: React.FC<SubscriptionModalProps> = ({
       id: 'basic',
       name: 'Basic',
       icon: Activity,
-      priceMonthly: 9.99,
+      priceMonthly: SUBSCRIPTION_PLANS.basic.monthlyPrice,
       priceAnnualMonthly: 8.25,
       priceAnnualTotal: 99.0,
-      tierTag: '$9.99 / mo',
+      tierTag: `$${SUBSCRIPTION_PLANS.basic.monthlyPrice} / mo`,
       description: 'Affordable toolkit for beginning and casual investors starting their journey.',
       deepResearchLimit: '3 reports / month (max 6 sources)',
-      aiLimit: '25 requests / day',
+      aiLimit: '20 requests / day',
       features: [
         'Everything in Free',
         '1 Connected Brokerage Account (Read-Only)',
-        'Ask MarketMind AI (25 requests/day)',
+        'Ask MarketMind AI (20 requests/day)',
         'Deep Research (3 reports/mo, 6 sources)',
         'Basic stock scanner & sector heatmaps',
         'AI News sentiment & driver summaries',
-        '3 Watchlists (15 tickers each)',
+        '3 Watchlists (up to 25 tickers each)',
         '10 Active market price alerts',
         '10 Saved research reports',
         'CSV export of market data',
@@ -145,10 +145,10 @@ export const SubscriptionModal: React.FC<SubscriptionModalProps> = ({
       name: 'Pro',
       badge: 'MOST POPULAR',
       icon: Zap,
-      priceMonthly: 19.99,
+      priceMonthly: SUBSCRIPTION_PLANS.pro.monthlyPrice,
       priceAnnualMonthly: 16.58,
       priceAnnualTotal: 199.0,
-      tierTag: '$19.99 / mo',
+      tierTag: `$${SUBSCRIPTION_PLANS.pro.monthlyPrice} / mo`,
       highlight: true,
       description: 'Designed for active retail investors who need real-time streams and advanced analytics.',
       deepResearchLimit: '15 reports / month (max 12 sources)',
@@ -158,12 +158,13 @@ export const SubscriptionModal: React.FC<SubscriptionModalProps> = ({
         'Real-time tick-by-tick WebSocket market feed',
         'Up to 5 Connected Brokerages with Risk Guardian™',
         'Ask MarketMind AI (100 requests/day)',
+        'Why Is It Moving analysis',
         'Deep Research (15 reports/mo, 12 sources)',
         'Earnings call intelligence & transcripts',
         'Macro trends & Fed rate sensitivity',
         'Multi-timeframe technical overlays',
         'Options chain flow & Put/Call ratios',
-        '10 Watchlists (50 tickers each)',
+        '10 Watchlists (up to 150 tickers each)',
         '50 Active technical alerts',
         '50 Saved research reports',
       ],
@@ -173,15 +174,17 @@ export const SubscriptionModal: React.FC<SubscriptionModalProps> = ({
       name: 'Premium',
       badge: 'BEST FOR DEEP RESEARCH',
       icon: Sparkles,
-      priceMonthly: 29.99,
+      priceMonthly: SUBSCRIPTION_PLANS.premium.monthlyPrice,
       priceAnnualMonthly: 24.92,
       priceAnnualTotal: 299.0,
-      tierTag: '$29.99 / mo',
+      tierTag: `$${SUBSCRIPTION_PLANS.premium.monthlyPrice} / mo`,
       description: 'Built for serious investors requiring comprehensive institutional research.',
       deepResearchLimit: '40 reports / month (max 25 sources)',
-      aiLimit: '250 requests / day',
+      aiLimit: '500 requests / day',
       features: [
         'Everything in Pro',
+        'Institutional MarketMind Intelligence Engine',
+        'Advanced portfolio risk & concentration analysis',
         'Full Deep Research suite (40 reports/mo, 25 sources)',
         'Official SEC 10-K / 10-Q filing analysis',
         'Tone analysis & beat/miss probability',
@@ -190,9 +193,9 @@ export const SubscriptionModal: React.FC<SubscriptionModalProps> = ({
         '"What Changed?" delta research tracking',
         'Unusual Options Flow & Gamma Exposure',
         'Professional PDF research reports export',
-        'Ask MarketMind AI (250 requests/day)',
-        '25 Watchlists (100 tickers each)',
-        '100 Active multi-channel alerts',
+        'Ask MarketMind AI (500 requests/day)',
+        '25 Watchlists (up to 500 tickers each)',
+        '200 Active multi-channel alerts',
         'Priority research queue processing',
       ],
     },
@@ -201,24 +204,26 @@ export const SubscriptionModal: React.FC<SubscriptionModalProps> = ({
       name: 'Ultra',
       badge: 'MAXIMUM ACCESS',
       icon: Crown,
-      priceMonthly: 49.99,
+      priceMonthly: SUBSCRIPTION_PLANS.ultra.monthlyPrice,
       priceAnnualMonthly: 41.58,
       priceAnnualTotal: 499.0,
-      tierTag: '$49.99 / mo',
+      tierTag: `$${SUBSCRIPTION_PLANS.ultra.monthlyPrice} / mo`,
       description: 'Highest usage allowances and priority compute for power investors & wealth managers.',
       deepResearchLimit: '100 reports / month (max 50 sources)',
-      aiLimit: '600 requests / day',
+      aiLimit: '2,000 requests / day',
       features: [
         'Everything in Premium',
-        'Highest AI usage allowance (600 requests/day)',
+        'Maximum MarketMind AI access (2,000 requests/day)',
+        'Highest available realtime-data priority',
+        'Full institutional intelligence suite',
         'Ultra Deep Research (100 reports/mo, 50 sources)',
         'Deep multi-step reasoning (up to 25 steps, 80k tokens)',
         'Dark pool liquidity radar & catalyst timelines',
         'Full options Greeks surface & volatility smiles',
         'Custom branded PDF report generation',
         '250 Saved research reports',
-        '50 Watchlists (200 tickers each)',
-        '250 Active multi-channel alerts',
+        'Unlimited watchlists (up to 2,000 tickers each)',
+        '500 Active multi-channel alerts',
         'Top-priority instant research queue',
         'Direct developer API keys with max rate limits',
         'Early access to new experimental AI models',
@@ -697,20 +702,20 @@ export const SubscriptionModal: React.FC<SubscriptionModalProps> = ({
                       <th className="p-3 text-center min-w-[110px]">Free Explorer</th>
                       <th className="p-3 text-center min-w-[110px]">Basic ($9.99)</th>
                       <th className="p-3 text-center min-w-[110px] text-[#F2D675] bg-[#181504]/50">
-                        Pro ($19.99)
+                        Pro ($29.99)
                       </th>
-                      <th className="p-3 text-center min-w-[110px]">Premium ($29.99)</th>
-                      <th className="p-3 text-center min-w-[110px]">Ultra ($49.99)</th>
+                      <th className="p-3 text-center min-w-[110px]">Premium ($69.99)</th>
+                      <th className="p-3 text-center min-w-[110px]">Ultra ($99.99)</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-[#1A1A1A] text-[#D1D5DB]">
                     <tr>
                       <td className="p-3 font-semibold text-white">Ask MarketMind AI Queries</td>
                       <td className="p-3 text-center">5 / day</td>
-                      <td className="p-3 text-center">25 / day</td>
+                      <td className="p-3 text-center">20 / day</td>
                       <td className="p-3 text-center font-bold text-white bg-[#181504]/30">100 / day</td>
-                      <td className="p-3 text-center font-bold text-white">250 / day</td>
-                      <td className="p-3 text-center font-bold text-[#F2D675]">600 / day</td>
+                      <td className="p-3 text-center font-bold text-white">500 / day</td>
+                      <td className="p-3 text-center font-bold text-[#F2D675]">2,000 / day</td>
                     </tr>
                     <tr>
                       <td className="p-3 font-semibold text-white">Deep Research Reports</td>
@@ -787,18 +792,18 @@ export const SubscriptionModal: React.FC<SubscriptionModalProps> = ({
                     <tr>
                       <td className="p-3 font-semibold text-white">Watchlists &amp; Tickers</td>
                       <td className="p-3 text-center">1 (5 tickers)</td>
-                      <td className="p-3 text-center">3 (15 tickers)</td>
-                      <td className="p-3 text-center bg-[#181504]/30">10 (50 tickers)</td>
-                      <td className="p-3 text-center">25 (100 tickers)</td>
-                      <td className="p-3 text-center font-bold text-[#F2D675]">50 (200 tickers)</td>
+                      <td className="p-3 text-center">3 (25 tickers)</td>
+                      <td className="p-3 text-center bg-[#181504]/30">10 (150 tickers)</td>
+                      <td className="p-3 text-center">25 (500 tickers)</td>
+                      <td className="p-3 text-center font-bold text-[#F2D675]">Unlimited (2,000 tickers)</td>
                     </tr>
                     <tr>
                       <td className="p-3 font-semibold text-white">Active Alerts (Push/Webhook)</td>
                       <td className="p-3 text-center">3</td>
                       <td className="p-3 text-center">10</td>
                       <td className="p-3 text-center bg-[#181504]/30">50</td>
-                      <td className="p-3 text-center">100</td>
-                      <td className="p-3 text-center font-bold text-[#F2D675]">250</td>
+                      <td className="p-3 text-center">200</td>
+                      <td className="p-3 text-center font-bold text-[#F2D675]">500</td>
                     </tr>
                     <tr>
                       <td className="p-3 font-semibold text-white">PDF Research Export</td>

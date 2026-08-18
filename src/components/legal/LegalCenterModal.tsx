@@ -250,9 +250,9 @@ export const LegalCenterModal: React.FC<LegalCenterModalProps> = ({
                 <ul className="list-disc pl-5 space-y-1">
                   <li><strong>Free Starter:</strong> $0.00 / month (15m delayed data, 5 AI queries/day)</li>
                   <li><strong>Basic:</strong> $9.99 / month or $99.00 / year</li>
-                  <li><strong>Pro:</strong> $19.99 / month or $199.00 / year (Sub-50ms live feed, Options AI)</li>
-                  <li><strong>Premium:</strong> $29.99 / month or $299.00 / year (SEC Parser, Unlimited PDF Exports)</li>
-                  <li><strong>Ultra:</strong> $49.99 / month or $499.00 / year (Priority AI Queue, Darkpool Tracker)</li>
+                  <li><strong>Pro:</strong> $29.99 / month or $199.00 / year (Sub-50ms live feed, Options AI)</li>
+                  <li><strong>Premium:</strong> $69.99 / month or $299.00 / year (SEC Parser, Unlimited PDF Exports)</li>
+                  <li><strong>Ultra:</strong> $99.99 / month or $499.00 / year (Priority AI Queue, Darkpool Tracker)</li>
                 </ul>
 
                 <h4 className="font-bold text-[var(--text-primary)]">2. 15-Day Free Trial Rules</h4>

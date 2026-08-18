@@ -1,0 +1,2 @@
+import { createOrchestrator } from './orchestrator'; import { OpenAIProvider } from './providers/openaiProvider'; import { GeminiProvider } from './providers/geminiProvider'; import { AnthropicProvider } from './providers/anthropicProvider'; import { PerplexityProvider } from './providers/perplexityProvider';
+export const multiAIOrchestrator = createOrchestrator([new OpenAIProvider(), new GeminiProvider(), new AnthropicProvider(), new PerplexityProvider()]);

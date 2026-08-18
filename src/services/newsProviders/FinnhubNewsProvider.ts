@@ -166,11 +166,11 @@ export class FinnhubNewsProvider implements NewsProvider {
       }
     } catch (err) {
       this.errorsCount++;
-      console.warn('FinnhubNewsProvider error:', err);
+      console.warn('[FinnhubNewsProvider] API fetch error, failing closed:', err);
     }
 
-    const items = this.getFallbackFinnhubNews();
-    return MarketMindNewsEngine.filterByRelevance(items, options);
+    // Fail closed: Never return fabricated financial news
+    return [];
   }
 
   async getTickerNews(ticker: string, options?: ProviderQueryOptions): Promise<NewsArticle[]> {

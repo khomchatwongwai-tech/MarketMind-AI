@@ -1,4 +1,4 @@
-import { createClient, SupabaseClient } from '@supabase/supabase-js';
+import { createClient, SupabaseClient } from '../server/supabaseAdmin';
 import { auth } from './firebase';
 
 const env = (import.meta as any).env || {};

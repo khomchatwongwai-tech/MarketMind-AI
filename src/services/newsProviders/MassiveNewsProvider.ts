@@ -188,21 +188,11 @@ export class MassiveNewsProvider implements NewsProvider {
       }
     } catch (err) {
       this.errorsCount++;
-      console.warn('MassiveNewsProvider error:', err);
+      console.warn('[MassiveNewsProvider] API fetch error, failing closed:', err);
     }
 
-    let items = this.getFallbackMassiveNews();
-    if (options?.ticker) {
-      const t = options.ticker.toUpperCase();
-      items = items.filter((i) => i.tickers.includes(t) || i.affectedAssets.includes(t));
-    }
-    if (options?.category && options.category !== 'ALL') {
-      items = items.filter((i) => i.category === options.category);
-    }
-    if (options?.limit) {
-      items = items.slice(0, options.limit);
-    }
-    return items;
+    // Fail closed: Never return fabricated financial news
+    return [];
   }
 
   async getTickerNews(ticker: string, options?: ProviderQueryOptions): Promise<NewsItem[]> {

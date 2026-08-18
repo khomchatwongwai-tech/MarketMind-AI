@@ -19,19 +19,19 @@ export function getStripe(): Stripe | null {
 export const SERVER_PRICE_ALLOWLIST: Record<SubscriptionPlanId, { monthly?: string; annual?: string }> = {
   free: {},
   basic: {
-    monthly: process.env.STRIPE_PRICE_BASIC_MONTHLY || process.env.STRIPE_PRICE_BASIC || undefined,
+    monthly: process.env.STRIPE_PRICE_BASIC_MONTHLY || undefined,
     annual: process.env.STRIPE_PRICE_BASIC_ANNUAL || undefined,
   },
   pro: {
-    monthly: process.env.STRIPE_PRICE_PRO_MONTHLY || process.env.STRIPE_PRICE_PRO || undefined,
+    monthly: process.env.STRIPE_PRICE_PRO_MONTHLY || undefined,
     annual: process.env.STRIPE_PRICE_PRO_ANNUAL || undefined,
   },
   premium: {
-    monthly: process.env.STRIPE_PRICE_PREMIUM_MONTHLY || process.env.STRIPE_PRICE_PREMIUM || undefined,
+    monthly: process.env.STRIPE_PRICE_PREMIUM_MONTHLY || undefined,
     annual: process.env.STRIPE_PRICE_PREMIUM_ANNUAL || undefined,
   },
   ultra: {
-    monthly: process.env.STRIPE_PRICE_ULTRA_MONTHLY || process.env.STRIPE_PRICE_ULTRA || undefined,
+    monthly: process.env.STRIPE_PRICE_ULTRA_MONTHLY || undefined,
     annual: process.env.STRIPE_PRICE_ULTRA_ANNUAL || undefined,
   },
 };
@@ -41,15 +41,20 @@ export function getStripePriceId(
   billingCycle: 'monthly' | 'annual' = 'monthly'
 ): string | null {
   const normalized = normalizePlanId(planId);
-  const mapping = SERVER_PRICE_ALLOWLIST[normalized];
-  if (!mapping) return null;
-  return mapping[billingCycle] || mapping.monthly || null;
+  if (normalized === 'free') return null;
+  const upper = normalized.toUpperCase();
+  if (billingCycle === 'annual') {
+    return process.env[`STRIPE_PRICE_${upper}_ANNUAL`] || null;
+  }
+  return process.env[`STRIPE_PRICE_${upper}_MONTHLY`] || process.env[`STRIPE_PRICE_${upper}`] || null;
 }
 
 export function isAllowedPriceId(priceId: string): boolean {
   if (!priceId) return false;
-  for (const plan of Object.values(SERVER_PRICE_ALLOWLIST)) {
-    if (plan.monthly === priceId || plan.annual === priceId) {
+  for (const plan of ['basic', 'pro', 'premium', 'ultra'] as SubscriptionPlanId[]) {
+    const monthly = getStripePriceId(plan, 'monthly');
+    const annual = getStripePriceId(plan, 'annual');
+    if (monthly === priceId || annual === priceId) {
       return true;
     }
   }
@@ -58,6 +63,121 @@ export function isAllowedPriceId(priceId: string): boolean {
 
 // Idempotency tracking set for processed webhook event IDs
 const processedWebhookEvents = new Set<string>();
+
+export function verifyStripeWebhookEvent(
+  payload: string | Buffer,
+  signature: string,
+  secret: string,
+  stripeClient?: Stripe
+): Stripe.Event {
+  const stripe = stripeClient || getStripe() || new Stripe(process.env.STRIPE_SECRET_KEY || 'sk_dummy');
+  return stripe.webhooks.constructEvent(payload, signature, secret);
+}
+
+export async function persistVerifiedStripeEvent(
+  event: Stripe.Event,
+  customDb?: any
+): Promise<'processed' | 'duplicate'> {
+  const db = customDb || getFirebaseFirestore();
+
+  if (db && typeof db.runTransaction === 'function') {
+    return await db.runTransaction(async (transaction: any) => {
+      const processedRef = db.collection('processed_webhooks').doc(event.id);
+      const processedSnap = await transaction.get(processedRef);
+      if (processedSnap.exists) {
+        return 'duplicate';
+      }
+
+      switch (event.type) {
+        case 'checkout.session.completed': {
+          const session = event.data.object as Stripe.Checkout.Session;
+          const uid = session.client_reference_id || session.metadata?.firebaseUid;
+          const rawPlan = session.metadata?.planId as string;
+          const planId = normalizePlanId(rawPlan || 'pro');
+
+          if (uid) {
+            const userRef = db.collection('users').doc(uid);
+            transaction.set(userRef, {
+              plan: planId,
+              planTier: planId.toUpperCase(),
+              subscriptionStatus: 'active',
+              paymentProvider: 'stripe',
+              paymentCustomerId: session.customer as string,
+              paymentSubscriptionId: session.subscription as string,
+              updatedAt: new Date().toISOString(),
+            });
+            ServerUserStore.updateSubscriptionByUid(uid, {
+              plan: planId,
+              subscriptionStatus: 'active',
+              paymentProvider: 'stripe',
+              paymentCustomerId: session.customer as string,
+              paymentSubscriptionId: session.subscription as string,
+            });
+          }
+          break;
+        }
+
+        case 'customer.subscription.created':
+        case 'customer.subscription.updated': {
+          const sub = event.data.object as Stripe.Subscription;
+          const uid = sub.metadata?.firebaseUid;
+          if (uid) {
+            const status = sub.status === 'active' ? 'active' : sub.status === 'past_due' ? 'past_due' : 'canceled';
+            const rawPlan = sub.metadata?.planId as string;
+            const planId = rawPlan ? normalizePlanId(rawPlan) : undefined;
+            const userRef = db.collection('users').doc(uid);
+            transaction.set(userRef, {
+              subscriptionStatus: status,
+              cancelAtPeriodEnd: sub.cancel_at_period_end,
+              ...(planId ? { plan: planId, planTier: planId.toUpperCase() } : {}),
+              updatedAt: new Date().toISOString(),
+            });
+            ServerUserStore.updateSubscriptionByUid(uid, {
+              subscriptionStatus: status,
+              cancelAtPeriodEnd: sub.cancel_at_period_end,
+              ...(planId ? { plan: planId } : {}),
+            });
+          }
+          break;
+        }
+
+        case 'customer.subscription.deleted': {
+          const sub = event.data.object as Stripe.Subscription;
+          const uid = sub.metadata?.firebaseUid;
+          if (uid) {
+            const userRef = db.collection('users').doc(uid);
+            transaction.set(userRef, {
+              subscriptionStatus: 'canceled',
+              cancelAtPeriodEnd: true,
+              plan: 'free',
+              planTier: 'FREE',
+              updatedAt: new Date().toISOString(),
+            });
+            ServerUserStore.updateSubscriptionByUid(uid, {
+              subscriptionStatus: 'canceled',
+              cancelAtPeriodEnd: true,
+              plan: 'free',
+            });
+          }
+          break;
+        }
+
+        default:
+          break;
+      }
+
+      transaction.create(processedRef, {
+        eventId: event.id,
+        type: event.type,
+        processedAt: new Date().toISOString(),
+      });
+
+      return 'processed';
+    });
+  }
+
+  return 'processed';
+}
 
 export class StripeService {
   static isConfigured(): boolean {
@@ -196,7 +316,7 @@ export class StripeService {
       event = stripe.webhooks.constructEvent(rawBody, signature, webhookSecret);
     } catch (err: any) {
       console.error('[Stripe Webhook] Signature verification failed:', err?.message);
-      return { error: `Webhook signature verification failed: ${err?.message}`, received: false };
+      return { error: 'Webhook signature verification failed.', received: false };
     }
 
     // Idempotency check: in-memory and durable database check

@@ -217,8 +217,8 @@ export class InstrumentStore {
         continue;
       }
 
-      // 5. Fuzzy Match (Score: 20)
-      if (cleanQuery.length >= 3 && name.includes(queryLower.slice(0, 3))) {
+      // 5. Fuzzy / Prefix Match (Score: 20)
+      if (cleanQuery.length >= 3 && name.startsWith(queryLower)) {
         scored.push({ instrument: inst, score: 20, matchType: 'FUZZY' });
       }
     }

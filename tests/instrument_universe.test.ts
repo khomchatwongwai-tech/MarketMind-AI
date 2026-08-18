@@ -160,8 +160,8 @@ test('8. Fail-Closed Data Integrity on 401/403/429/500 Provider Responses', asyn
 
   // 401 Unauthorized
   const authFailService = new AlpacaMarketDataService(
-    'bad-key',
-    'bad-secret',
+    'invalid-alpaca-key',
+    'invalid-alpaca-secret',
     async () => mockResponse(401, { message: 'Unauthorized' })
   );
   await assert.rejects(

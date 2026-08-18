@@ -198,6 +198,40 @@ app.get('/api/instruments/:instrumentId/chart', (req, res) => {
   });
 });
 
+// Market Route Aliases for Shared Web, iOS, and Android Compatibility
+app.get('/api/market/quote/:symbol', async (req, res) => {
+  try {
+    const symbol = req.params.symbol;
+    const quoteResponse = await DataProviderRouter.getQuote(symbol);
+    if (!quoteResponse) {
+      return res.status(404).json({ error: 'Quote unavailable for symbol', symbol });
+    }
+    res.json(quoteResponse);
+  } catch (err: any) {
+    res.status(500).json({ error: 'Failed to retrieve quote', message: err.message });
+  }
+});
+
+app.get('/api/market/candles/:symbol', (req, res) => {
+  const symbol = req.params.symbol;
+  const timeframe = (req.query.timeframe as string) || '5m';
+  const count = parseInt((req.query.count as string) || '60', 10);
+  const instrument =
+    InstrumentDirectoryService.getBySymbol(symbol) ||
+    InstrumentDirectoryService.getById(symbol);
+
+  if (!instrument) {
+    return res.status(404).json({ error: 'Instrument not found', symbol });
+  }
+  const candles = DataProviderRouter.generateMultiAssetCandles(instrument, timeframe, count);
+  res.json({
+    symbol: instrument.symbol,
+    instrumentId: instrument.instrumentId,
+    timeframe,
+    candles,
+  });
+});
+
 // 5. Multi-Asset Market Status & Session Schedule
 app.get('/api/instruments/:instrumentId/market-status', (req, res) => {
   const idOrSymbol = req.params.instrumentId;

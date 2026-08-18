@@ -27,9 +27,46 @@ export interface ClassifiedIntent {
   requiresEarnings: boolean;
   requiresMacro: boolean;
   confidence: number;
+  requiresLiveMarketData: boolean;
+  requiresCurrentWebResearch: boolean;
+  requiresDeepReasoning: boolean;
+  requiresLongContext: boolean;
+  requiresCitations: boolean;
+  latencyPriority: 'high' | 'normal' | 'low';
+  costPriority: 'low' | 'balanced' | 'quality';
+  preferredProvider: 'openai' | 'gemini' | 'anthropic' | 'perplexity';
+  allowedFallbackProviders: Array<'openai' | 'gemini' | 'anthropic' | 'perplexity'>;
 }
 
 export class IntentRouter {
+  private static enrich(intent: Omit<ClassifiedIntent,
+    'requiresLiveMarketData' | 'requiresCurrentWebResearch' | 'requiresDeepReasoning' |
+    'requiresLongContext' | 'requiresCitations' | 'latencyPriority' | 'costPriority' |
+    'preferredProvider' | 'allowedFallbackProviders'>): ClassifiedIntent {
+    type RoutingMetadata = Pick<ClassifiedIntent, 'requiresLiveMarketData' | 'requiresCurrentWebResearch' | 'requiresDeepReasoning' | 'requiresLongContext' | 'requiresCitations' | 'latencyPriority' | 'costPriority' | 'preferredProvider' | 'allowedFallbackProviders'>;
+    const defaults: RoutingMetadata = {
+      requiresLiveMarketData: false,
+      requiresCurrentWebResearch: false,
+      requiresDeepReasoning: false,
+      requiresLongContext: false,
+      requiresCitations: false,
+      latencyPriority: 'normal',
+      costPriority: 'balanced',
+      preferredProvider: 'gemini',
+      allowedFallbackProviders: ['openai', 'anthropic'],
+    };
+    const byIntent: Partial<Record<UserIntentType, Partial<typeof defaults>>> = {
+      WHY_MOVING: { requiresLiveMarketData: true, requiresCurrentWebResearch: true, requiresCitations: true, latencyPriority: 'high', preferredProvider: 'perplexity', allowedFallbackProviders: ['openai', 'gemini', 'anthropic'] },
+      TECHNICAL_ANALYSIS: { requiresLiveMarketData: true, requiresDeepReasoning: true, preferredProvider: 'openai', allowedFallbackProviders: ['gemini', 'anthropic'] },
+      SEC_FILINGS: { requiresLongContext: true, requiresDeepReasoning: true, requiresCitations: true, preferredProvider: 'anthropic', allowedFallbackProviders: ['openai', 'gemini'] },
+      GENERAL_EDUCATION: { costPriority: 'low', preferredProvider: 'gemini', allowedFallbackProviders: ['openai', 'anthropic'] },
+      PORTFOLIO_ANALYSIS: { requiresDeepReasoning: true, preferredProvider: 'openai', allowedFallbackProviders: ['anthropic', 'gemini'] },
+      PORTFOLIO_RISK: { requiresDeepReasoning: true, preferredProvider: 'openai', allowedFallbackProviders: ['anthropic', 'gemini'] },
+      TICKER_ANALYSIS: { requiresLiveMarketData: true, preferredProvider: 'openai', allowedFallbackProviders: ['gemini', 'anthropic'] },
+      NEWS_CATALYST: { requiresCurrentWebResearch: true, requiresCitations: true, preferredProvider: 'perplexity', allowedFallbackProviders: ['openai', 'gemini'] },
+    };
+    return { ...intent, ...defaults, ...byIntent[intent.intent] };
+  }
   /**
    * Classify user query into precise intent and extracted entities
    */
@@ -71,7 +108,7 @@ export class IntentRouter {
       q.includes('what am i holding')
     ) {
       if (q.includes('risk') || q.includes('exposure') || q.includes('concentrated') || q.includes('beta') || q.includes('drawdown')) {
-        return {
+        return this.enrich({
           intent: 'PORTFOLIO_RISK',
           primarySymbol,
           requiresPortfolio: true,
@@ -80,9 +117,9 @@ export class IntentRouter {
           requiresEarnings: true,
           requiresMacro: false,
           confidence: 0.95,
-        };
+        });
       }
-      return {
+      return this.enrich({
         intent: 'PORTFOLIO_ANALYSIS',
         primarySymbol,
         requiresPortfolio: true,
@@ -91,7 +128,7 @@ export class IntentRouter {
         requiresEarnings: true,
         requiresMacro: false,
         confidence: 0.95,
-      };
+      });
     }
 
     // 2. Watchlist Questions
@@ -100,7 +137,7 @@ export class IntentRouter {
       q.includes('on my watchlist') ||
       q.includes('watchlist')
     ) {
-      return {
+      return this.enrich({
         intent: 'WATCHLIST_ANALYSIS',
         primarySymbol,
         requiresPortfolio: false,
@@ -109,7 +146,7 @@ export class IntentRouter {
         requiresEarnings: true,
         requiresMacro: false,
         confidence: 0.92,
-      };
+      });
     }
 
     // 3. Why is it moving?
@@ -120,7 +157,7 @@ export class IntentRouter {
       q.includes('what is moving') ||
       q.includes('why moving')
     ) {
-      return {
+      return this.enrich({
         intent: 'WHY_MOVING',
         primarySymbol,
         requiresPortfolio: false,
@@ -129,7 +166,7 @@ export class IntentRouter {
         requiresEarnings: true,
         requiresMacro: true,
         confidence: 0.95,
-      };
+      });
     }
 
     // 4. Cross-Asset Comparison
@@ -138,7 +175,7 @@ export class IntentRouter {
       comparisonSymbols.length >= 2 &&
       (q.includes(' or ') || q.includes(' vs ') || q.includes('versus') || q.includes('compare') || q.includes('better'))
     ) {
-      return {
+      return this.enrich({
         intent: 'CROSS_ASSET_COMPARISON',
         primarySymbol: comparisonSymbols[0],
         comparisonSymbols,
@@ -148,7 +185,7 @@ export class IntentRouter {
         requiresEarnings: true,
         requiresMacro: false,
         confidence: 0.9,
-      };
+      });
     }
 
     // 5. Earnings Questions
@@ -159,7 +196,7 @@ export class IntentRouter {
       q.includes('report date') ||
       q.includes('quarterly results')
     ) {
-      return {
+      return this.enrich({
         intent: 'EARNINGS',
         primarySymbol,
         requiresPortfolio: q.includes('my') || q.includes('holdings'),
@@ -168,7 +205,7 @@ export class IntentRouter {
         requiresEarnings: true,
         requiresMacro: false,
         confidence: 0.92,
-      };
+      });
     }
 
     // 6. SEC Filings
@@ -181,7 +218,7 @@ export class IntentRouter {
       q.includes('insider buying') ||
       q.includes('sec filing')
     ) {
-      return {
+      return this.enrich({
         intent: 'SEC_FILINGS',
         primarySymbol,
         requiresPortfolio: false,
@@ -190,7 +227,7 @@ export class IntentRouter {
         requiresEarnings: false,
         requiresMacro: false,
         confidence: 0.94,
-      };
+      });
     }
 
     // 7. Macro Economic Events
@@ -204,7 +241,7 @@ export class IntentRouter {
       q.includes('jobless claims') ||
       q.includes('economic calendar')
     ) {
-      return {
+      return this.enrich({
         intent: 'MACRO_CALENDAR',
         primarySymbol,
         requiresPortfolio: false,
@@ -213,7 +250,7 @@ export class IntentRouter {
         requiresEarnings: false,
         requiresMacro: true,
         confidence: 0.9,
-      };
+      });
     }
 
     // 8. Technical Questions
@@ -227,7 +264,7 @@ export class IntentRouter {
       q.includes('breakdown') ||
       q.includes('levels')
     ) {
-      return {
+      return this.enrich({
         intent: 'TECHNICAL_ANALYSIS',
         primarySymbol,
         requiresPortfolio: false,
@@ -236,12 +273,12 @@ export class IntentRouter {
         requiresEarnings: false,
         requiresMacro: false,
         confidence: 0.88,
-      };
+      });
     }
 
     // Default to Ticker Analysis if symbol present, else General Education
     if (primarySymbol) {
-      return {
+      return this.enrich({
         intent: 'TICKER_ANALYSIS',
         primarySymbol,
         requiresPortfolio: false,
@@ -250,10 +287,10 @@ export class IntentRouter {
         requiresEarnings: true,
         requiresMacro: true,
         confidence: 0.8,
-      };
+      });
     }
 
-    return {
+    return this.enrich({
       intent: 'GENERAL_EDUCATION',
       requiresPortfolio: false,
       requiresWatchlist: false,
@@ -261,6 +298,6 @@ export class IntentRouter {
       requiresEarnings: false,
       requiresMacro: true,
       confidence: 0.75,
-    };
+    });
   }
 }

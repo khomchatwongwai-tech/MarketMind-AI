@@ -1,0 +1,2 @@
+import type { Citation } from './types';
+export function verifyCitations(citations: Citation[]): { citations: Citation[]; warnings: string[] } { const seen = new Set<string>(); const valid: Citation[] = []; for (const citation of citations) { try { const url = new URL(citation.url); if (!['http:', 'https:'].includes(url.protocol) || seen.has(url.href)) continue; seen.add(url.href); valid.push({ ...citation, url: url.href }); } catch {} } return { citations: valid, warnings: citations.length && !valid.length ? ['No verified web citations were available.'] : [] }; }

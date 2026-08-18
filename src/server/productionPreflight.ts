@@ -105,12 +105,17 @@ export function validateProductionEnvironment(
     }
   }
 
-  // 3. AI / Gemini Intelligence
-  if (!env.GEMINI_API_KEY || env.GEMINI_API_KEY.trim() === '') {
-    if (isProduction) {
-      errors.push('Missing required production environment variable: GEMINI_API_KEY');
-    } else {
-      warnings.push('GEMINI_API_KEY is not set; server-side AI intelligence will run in offline mode.');
+  // 3. AI providers. Only explicitly enabled providers are mandatory.
+  const providerSecrets: Record<string, string> = {
+    openai: 'OPENAI_API_KEY', gemini: 'GEMINI_API_KEY', anthropic: 'ANTHROPIC_API_KEY', perplexity: 'PERPLEXITY_API_KEY',
+  };
+  const enabledProviders = (env.AI_ENABLED_PROVIDERS || 'gemini').split(',').map(value => value.trim().toLowerCase()).filter(Boolean);
+  for (const provider of enabledProviders) {
+    const secretName = providerSecrets[provider];
+    if (!secretName) { errors.push(`AI_ENABLED_PROVIDERS contains unsupported provider: ${provider}`); continue; }
+    if (!env[secretName] || env[secretName]?.trim() === '') {
+      if (isProduction) errors.push(`Missing required production environment variable: ${secretName}`);
+      else warnings.push(`${secretName} is not set; enabled ${provider} requests will fail closed.`);
     }
   }
 

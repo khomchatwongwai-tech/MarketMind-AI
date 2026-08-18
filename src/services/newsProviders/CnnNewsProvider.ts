@@ -148,51 +148,10 @@ export class CnnNewsProvider implements NewsProvider {
       }
     }
 
-    // High-fidelity fallback items
+    // Fail closed: Never return fabricated news if feed is unavailable
     this.latencyMs = Date.now() - startTime;
     this.lastSyncedAt = new Date().toISOString();
-
-    return [
-      {
-        id: 'cnn_live_1_consumer_sentiment',
-        provider: 'CNN Business',
-        providerId: 'cnn_consumer_desk',
-        source: 'CNN Business',
-        sourceType: 'OFFICIAL_FEED',
-        sourceTier: 'TIER_2_FINANCIAL',
-        sourcePriority: 2,
-        headline: 'Consumer sentiment demonstrates resilience as wage gains and disinflation trends support household balance sheets',
-        summary: 'Retail transaction velocity and real income metrics illustrate sustained consumer purchasing power across omni-channel retailers heading into the back-to-school and holiday quarters.',
-        permittedSummary: 'Retail transaction velocity and real income metrics illustrate sustained consumer purchasing power.',
-        url: 'https://www.cnn.com/business',
-        originalUrl: 'https://www.cnn.com/business',
-        author: 'CNN Business Consumer Desk',
-        tickers: ['WMT', 'AMZN', 'COST', 'TGT', 'XLY'],
-        companies: ['Walmart Inc', 'Amazon.com Inc', 'Costco Wholesale'],
-        sectors: ['Retail', 'Consumer Staples'],
-        category: 'ECONOMY',
-        country: 'US',
-        region: 'US',
-        publishedAt: new Date(Date.now() - 42 * 60000).toISOString(),
-        retrievedAt: new Date().toISOString(),
-        receivedAt: new Date().toISOString(),
-        sentiment: 'BULLISH',
-        sentimentScore: 0.32,
-        urgency: 'MEDIUM',
-        impact: 'MEDIUM',
-        marketImpact: 'MEDIUM',
-        impactScore: 74,
-        accessLevel: 'PUBLIC',
-        feedDelay: 'NEAR_REAL_TIME',
-        contentRights: 'Attributed to CNN Business. Direct original article link preserved.',
-        language: 'en',
-        verificationStatus: 'CONFIRMED',
-        isBreaking: false,
-        affectedAssets: ['XLY', 'WMT', 'AMZN'],
-        sectorsAffected: ['Consumer Sector'],
-        primaryOfficialSource: 'CNN Business / University of Michigan Surveys',
-      },
-    ];
+    return [];
   }
 
   async getTickerNews(ticker: string, options?: ProviderQueryOptions): Promise<NewsItem[]> {

@@ -25,7 +25,6 @@ export class AlpacaNewsProvider implements NewsProvider {
   }
 
   private checkConfiguration() {
-    // Check if running on server or client with proxy
     if (typeof process !== 'undefined' && process.env) {
       this.apiKey = process.env.ALPACA_API_KEY || '';
       this.apiSecret = process.env.ALPACA_API_SECRET || '';
@@ -63,77 +62,6 @@ export class AlpacaNewsProvider implements NewsProvider {
       missingCredentialHelp: 'Add ALPACA_API_KEY & ALPACA_API_SECRET to .env or AI Studio Settings to enable live Alpaca streaming.',
       description: this.description,
     };
-  }
-
-  private getFallbackAlpacaNews(): NewsArticle[] {
-    const now = Date.now();
-    const timeAgo = (m: number) => new Date(now - m * 60000).toISOString();
-
-    const rawFallbacks = [
-      {
-        id: 'alpaca_nvda_smci_datacenter_surge',
-        headline: 'Nvidia and AI Server Suppliers Experience Heavy Order Flow Ahead of Global Compute Summit',
-        summary: 'Alpaca order book intelligence and syndicated wire reports cite surging enterprise hardware commitments across hyperscalers, driving sustained intraday momentum in NVDA, SMCI, and AVGO.',
-        url: 'https://alpaca.markets/data',
-        tickers: ['NVDA', 'SMCI', 'AVGO', 'MSFT', 'QQQ'],
-        category: 'STOCKS',
-        publishedAt: timeAgo(12),
-        isBreaking: true,
-        sentiment: 'BULLISH',
-        impactScore: 84,
-        marketReaction: {
-          observedPriceChange: 2.35,
-          volumeSurgeRatio: 1.85,
-          optionsFlowConfirmation: 'Bullish Flow',
-        },
-      },
-      {
-        id: 'alpaca_btc_etf_inflow_surge',
-        headline: 'Spot Bitcoin ETFs Register Net Inflows Surpassing $420M in Single Trading Session',
-        summary: 'Institutional custodial flows accelerate as spot BTC exchange-traded products see steady retail and advisory allocations, lifting spot Bitcoin, Ethereum, and crypto-exposed equities COIN and MSTR.',
-        url: 'https://alpaca.markets/data',
-        tickers: ['BTC', 'ETH', 'COIN', 'MSTR', 'IBIT'],
-        category: 'CRYPTO',
-        publishedAt: timeAgo(28),
-        sentiment: 'BULLISH',
-        impactScore: 78,
-        marketReaction: {
-          observedPriceChange: 3.12,
-          volumeSurgeRatio: 2.1,
-        },
-      },
-      {
-        id: 'alpaca_tsla_energy_storage_deployments',
-        headline: 'Tesla Energy Megapack Installations Hit Record Megawatt-Hour Run-Rate Across Utility Projects',
-        summary: 'Grid-scale battery deployments expand in California, Texas, and Australia, providing high-margin recurring energy infrastructure revenue that diversifies automotive margin cycles.',
-        url: 'https://alpaca.markets/data',
-        tickers: ['TSLA', 'NEE', 'XLU'],
-        category: 'ENERGY',
-        publishedAt: timeAgo(55),
-        sentiment: 'BULLISH',
-        impactScore: 68,
-      },
-      {
-        id: 'alpaca_aapl_services_expansion_india',
-        headline: 'Apple Expands Direct Retail and Cloud Services In India as Manufacturing Hub Transitions',
-        summary: 'Supply chain shifts and localized retail flagships drive double-digit year-over-year revenue expansion in emerging Asian markets for Cupertino-based Apple Inc.',
-        url: 'https://alpaca.markets/data',
-        tickers: ['AAPL', 'SPY', 'QQQ'],
-        category: 'COMPANIES',
-        publishedAt: timeAgo(85),
-        sentiment: 'BULLISH',
-        impactScore: 64,
-      },
-    ];
-
-    return rawFallbacks.map((item) =>
-      MarketMindNewsEngine.normalizeArticle(item, {
-        providerId: this.id,
-        providerName: 'Alpaca News',
-        tier: this.tier,
-        sourceType: 'LICENSED_API',
-      })
-    );
   }
 
   async getLatestNews(options?: ProviderQueryOptions): Promise<NewsArticle[]> {

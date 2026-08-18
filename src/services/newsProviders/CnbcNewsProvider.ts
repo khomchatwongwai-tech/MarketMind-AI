@@ -176,92 +176,10 @@ export class CnbcNewsProvider implements NewsProvider {
       }
     }
 
-    // 2. High-fidelity compliant verified live items
+    // Fail closed: Never return fabricated news if feed is unavailable
     this.latencyMs = Date.now() - startTime;
     this.lastSyncedAt = new Date().toISOString();
-
-    const fallbackItems: NewsItem[] = [
-      {
-        id: 'cnbc_live_1_treasury_yields',
-        provider: 'CNBC',
-        providerId: 'cnbc_markets',
-        source: 'CNBC Markets',
-        sourceType: 'OFFICIAL_FEED',
-        sourceTier: 'TIER_2_FINANCIAL',
-        sourcePriority: 2,
-        headline: 'Treasury yields consolidate as bond traders evaluate economic data and FOMC trajectory',
-        summary: 'U.S. benchmark 10-year Treasury yields stabilized near 4.22% following constructive inflation metrics, providing sustained momentum for rate-sensitive equities and technology indices.',
-        permittedSummary: 'U.S. benchmark 10-year Treasury yields stabilized near 4.22% following constructive inflation metrics.',
-        url: 'https://www.cnbc.com/bonds/',
-        originalUrl: 'https://www.cnbc.com/bonds/',
-        author: 'CNBC Bond Desk',
-        tickers: ['TLT', 'SPY', 'QQQ', 'TNX'],
-        companies: ['U.S. Department of the Treasury'],
-        sectors: ['Fixed Income', 'Equities'],
-        category: 'ECONOMY',
-        country: 'US',
-        region: 'US',
-        publishedAt: new Date(Date.now() - 12 * 60000).toISOString(),
-        retrievedAt: new Date().toISOString(),
-        receivedAt: new Date().toISOString(),
-        sentiment: 'BULLISH',
-        sentimentScore: 0.35,
-        urgency: 'HIGH',
-        impact: 'HIGH',
-        marketImpact: 'HIGH',
-        impactScore: 82,
-        accessLevel: 'PUBLIC',
-        feedDelay: 'NEAR_REAL_TIME',
-        contentRights: 'Attributed to CNBC. Direct original link provided.',
-        language: 'en',
-        verificationStatus: 'CONFIRMED',
-        isBreaking: true,
-        affectedAssets: ['TLT', 'SPY', 'QQQ'],
-        sectorsAffected: ['Fixed Income', 'Equities'],
-        primaryOfficialSource: 'U.S. Treasury / CNBC Markets',
-      },
-      {
-        id: 'cnbc_live_2_semiconductor_capex',
-        provider: 'CNBC',
-        providerId: 'cnbc_tech',
-        source: 'CNBC Technology',
-        sourceType: 'OFFICIAL_FEED',
-        sourceTier: 'TIER_2_FINANCIAL',
-        sourcePriority: 2,
-        headline: 'Cloud hyperscalers accelerate AI infrastructure spending with record hardware order volumes',
-        summary: 'Major cloud providers including Microsoft, Alphabet, and Meta reaffirmed aggressive multi-year AI capital expenditures, boosting chip equipment makers and advanced packaging foundries.',
-        permittedSummary: 'Major cloud providers reaffirmed aggressive multi-year AI capital expenditures.',
-        url: 'https://www.cnbc.com/technology/',
-        originalUrl: 'https://www.cnbc.com/technology/',
-        author: 'CNBC Tech Desk',
-        tickers: ['NVDA', 'MSFT', 'GOOGL', 'META', 'AMD', 'AVGO'],
-        companies: ['NVIDIA Corp', 'Microsoft Corp', 'Alphabet Inc', 'Meta Platforms'],
-        sectors: ['Semiconductors', 'Cloud Computing', 'AI Infrastructure'],
-        category: 'TECHNOLOGY',
-        country: 'US',
-        region: 'US',
-        publishedAt: new Date(Date.now() - 28 * 60000).toISOString(),
-        retrievedAt: new Date().toISOString(),
-        receivedAt: new Date().toISOString(),
-        sentiment: 'VERY_BULLISH',
-        sentimentScore: 0.65,
-        urgency: 'HIGH',
-        impact: 'HIGH',
-        marketImpact: 'HIGH',
-        impactScore: 88,
-        accessLevel: 'PUBLIC',
-        feedDelay: 'NEAR_REAL_TIME',
-        contentRights: 'Attributed to CNBC. Direct original link provided.',
-        language: 'en',
-        verificationStatus: 'CONFIRMED',
-        isBreaking: false,
-        affectedAssets: ['NVDA', 'MSFT', 'GOOGL', 'META'],
-        sectorsAffected: ['Semiconductors', 'Cloud'],
-        primaryOfficialSource: 'Corporate Investor Relations / CNBC',
-      },
-    ];
-
-    return fallbackItems;
+    return [];
   }
 
   async getTickerNews(ticker: string, options?: ProviderQueryOptions): Promise<NewsItem[]> {

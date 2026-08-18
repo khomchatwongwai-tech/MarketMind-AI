@@ -62,71 +62,11 @@ export class FinnhubNewsProvider implements NewsProvider {
     };
   }
 
-  private getFallbackFinnhubNews(): NewsArticle[] {
-    const now = Date.now();
-    const timeAgo = (m: number) => new Date(now - m * 60000).toISOString();
-
-    const rawFallbacks = [
-      {
-        id: 'finnhub_ai_hyperscalers_clean_energy',
-        headline: 'Big Tech Giants Ink Long-Term Nuclear Power Purchase Agreements for AI Datacenter Clusters',
-        summary: 'Constellation Energy, Vistra, and Talen Energy see multi-gigawatt sovereign commitments from enterprise cloud platforms seeking 24/7 carbon-free baseload electricity.',
-        url: 'https://finnhub.io',
-        tickers: ['CEG', 'VST', 'TLN', 'MSFT', 'AMZN', 'GOOGL'],
-        category: 'ENERGY',
-        publishedAt: timeAgo(30),
-        isBreaking: true,
-        sentiment: 'BULLISH',
-        impactScore: 86,
-        marketReaction: {
-          observedPriceChange: 4.8,
-          volumeSurgeRatio: 2.9,
-        },
-      },
-      {
-        id: 'finnhub_ecb_monetary_policy_stance',
-        headline: 'European Central Bank Signals Steady Disinflation Trajectory Supporting Growth Outlook',
-        summary: 'Governing Council commentary indicates headline eurozone inflation is converging toward the 2% medium-term target, lifting European equity indices DAX and CAC 40.',
-        url: 'https://finnhub.io',
-        tickers: ['EZU', 'VGK', 'EURUSD'],
-        category: 'CENTRAL_BANKS',
-        region: 'EUROPE',
-        publishedAt: timeAgo(60),
-        sentiment: 'BULLISH',
-        impactScore: 70,
-      },
-      {
-        id: 'finnhub_semiconductor_supply_capex',
-        headline: 'Global Foundry Utilization Exceeds 92% as Advanced Packaging Demands Surge',
-        summary: 'Semiconductor manufacturers report record backlogs for CoWoS and High-Bandwidth Memory (HBM3e) integration across enterprise AI chipsets.',
-        url: 'https://finnhub.io',
-        tickers: ['TSM', 'ASML', 'NVDA', 'MU', 'AMAT'],
-        category: 'STOCKS',
-        publishedAt: timeAgo(95),
-        sentiment: 'BULLISH',
-        impactScore: 82,
-      },
-    ];
-
-    return rawFallbacks.map((item) =>
-      MarketMindNewsEngine.normalizeArticle(item, {
-        providerId: this.id,
-        providerName: 'Finnhub',
-        tier: this.tier,
-        sourceType: 'LICENSED_API',
-      })
-    );
-  }
-
   async getLatestNews(options?: ProviderQueryOptions): Promise<NewsArticle[]> {
     this.requestsCount++;
     try {
       if (this.isConfigured && typeof window === 'undefined') {
-        const url = new URL(
-          options?.ticker
-            ? 'https://finnhub.io/api/v1/company-news'
-            : 'https://finnhub.io/api/v1/news'
-        );
+        const url = new URL('https://finnhub.io/api/v1/news');
         url.searchParams.set('token', this.apiKey);
         if (options?.ticker) {
           url.searchParams.set('symbol', options.ticker.toUpperCase());

@@ -106,12 +106,43 @@ app.get('/api/preflight', (req, res) => {
 // UNIVERSAL MULTI-ASSET API ENDPOINTS
 // ==========================================
 
-// 1. Universal Search across all asset classes
+// 1. Universal Search across all asset classes & 5,000+ US Stock Universe
 app.get('/api/instruments/search', (req, res) => {
   const query = (req.query.q as string) || '';
-  const assetClass = req.query.assetClass as UniversalAssetClass | undefined;
-  const result = InstrumentDirectoryService.search(query, assetClass);
+  const assetClass = (req.query.assetClass as UniversalAssetClass) || (req.query.asset_type as UniversalAssetClass) || undefined;
+  const limit = req.query.limit ? parseInt(req.query.limit as string, 10) : 20;
+  const result = InstrumentDirectoryService.search(query, assetClass, limit);
   res.json(result);
+});
+
+// 1b. Admin Synchronize 5,000+ US Stock and ETF universe from Alpaca
+app.post('/api/admin/instruments/sync', requireAuth, requireRole('admin'), async (req: AuthenticatedRequest, res) => {
+  try {
+    const { AlpacaInstrumentSyncService } = await import('./src/server/alpacaInstrumentSync');
+    const stats = await AlpacaInstrumentSyncService.syncFromAlpaca();
+    res.json({
+      success: true,
+      message: `Successfully synchronized ${stats.totalProcessed} instruments (${stats.activeStocks} stocks, ${stats.activeEtfs} ETFs).`,
+      stats,
+    });
+  } catch (err: any) {
+    console.error('[Admin Instrument Sync Error]:', err);
+    res.status(500).json({ error: 'Instrument synchronization failed', message: err.message });
+  }
+});
+
+// 1c. Alpaca Free rate-limit & stream status
+app.get('/api/alpaca/stats', (req, res) => {
+  try {
+    const { AlpacaRateLimiter } = require('./src/server/alpacaRateLimiter');
+    const { StreamSubscriptionManager } = require('./src/server/streamSubscriptionManager');
+    res.json({
+      rateLimit: AlpacaRateLimiter.getInstance().getStats(),
+      streaming: StreamSubscriptionManager.getInstance().getStats(),
+    });
+  } catch (err: any) {
+    res.status(500).json({ error: 'Failed to retrieve Alpaca stats', message: err.message });
+  }
 });
 
 // 2. Get Instrument by ID or Symbol

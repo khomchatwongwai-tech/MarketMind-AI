@@ -11,9 +11,10 @@ import {
   CheckCircle2,
   Clock,
   ShieldAlert,
+  Loader2,
 } from 'lucide-react';
 import { NormalizedInstrument, UniversalAssetClass, InstrumentSearchResultGroup } from '../../types/instrument';
-import { AssetClassBadge, RealTimeBadge } from '../common/AssetClassBadge';
+import { AssetClassBadge } from '../common/AssetClassBadge';
 import { InstrumentDirectoryService } from '../../services/marketProviders/InstrumentDirectoryService';
 
 interface UniversalSearchModalProps {
@@ -34,11 +35,13 @@ export const UniversalSearchModal: React.FC<UniversalSearchModalProps> = ({
   const [groupedResults, setGroupedResults] = useState<InstrumentSearchResultGroup[]>([]);
   const [totalMatches, setTotalMatches] = useState<number>(0);
   const [selectedIndex, setSelectedIndex] = useState<number>(0);
+  const [isLoading, setIsLoading] = useState<boolean>(false);
   const inputRef = useRef<HTMLInputElement>(null);
+  const searchTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
   const filterTabs: Array<{ id: UniversalAssetClass | 'ALL'; label: string }> = [
     { id: 'ALL', label: 'All Instruments' },
-    { id: 'STOCK', label: 'Stocks & ADRs' },
+    { id: 'STOCK', label: '5,000+ Stocks & ADRs' },
     { id: 'ETF', label: 'ETFs & Funds' },
     { id: 'OPTION', label: 'Options' },
     { id: 'FOREX', label: 'Forex (24/5)' },
@@ -56,13 +59,47 @@ export const UniversalSearchModal: React.FC<UniversalSearchModalProps> = ({
     }
   }, [isOpen]);
 
-  // Execute search
+  // Execute debounced server search with immediate fallback to local index
   useEffect(() => {
+    if (searchTimeoutRef.current) {
+      clearTimeout(searchTimeoutRef.current);
+    }
+
     const filter = activeAssetFilter === 'ALL' ? undefined : activeAssetFilter;
-    const { groupedResults: groups, totalCount } = InstrumentDirectoryService.search(query, filter);
-    setGroupedResults(groups);
-    setTotalMatches(totalCount);
-    setSelectedIndex(0);
+
+    // Immediate local preliminary render
+    const local = InstrumentDirectoryService.search(query, filter, 40);
+    setGroupedResults(local.groupedResults);
+    setTotalMatches(local.totalCount);
+
+    // Debounce server search
+    searchTimeoutRef.current = setTimeout(async () => {
+      setIsLoading(true);
+      try {
+        const params = new URLSearchParams();
+        if (query) params.set('q', query);
+        if (filter) params.set('assetClass', filter);
+        params.set('limit', '40');
+
+        const res = await fetch(`/api/instruments/search?${params.toString()}`);
+        if (res.ok) {
+          const json = await res.json();
+          if (json && Array.isArray(json.groupedResults)) {
+            setGroupedResults(json.groupedResults);
+            setTotalMatches(json.totalCount || json.results?.length || 0);
+            setSelectedIndex(0);
+          }
+        }
+      } catch {
+        // Fallback already rendered
+      } finally {
+        setIsLoading(false);
+      }
+    }, 150);
+
+    return () => {
+      if (searchTimeoutRef.current) clearTimeout(searchTimeoutRef.current);
+    };
   }, [query, activeAssetFilter]);
 
   if (!isOpen) return null;
@@ -100,13 +137,17 @@ export const UniversalSearchModal: React.FC<UniversalSearchModalProps> = ({
       >
         {/* Search Bar Input Header */}
         <div className="p-3.5 border-b border-[#24272e] flex items-center gap-3 bg-[#13151a]">
-          <Search className="w-5 h-5 text-[#D4AF37] shrink-0" />
+          {isLoading ? (
+            <Loader2 className="w-5 h-5 text-[#D4AF37] animate-spin shrink-0" />
+          ) : (
+            <Search className="w-5 h-5 text-[#D4AF37] shrink-0" />
+          )}
           <input
             ref={inputRef}
             type="text"
             value={query}
             onChange={(e) => setQuery(e.target.value)}
-            placeholder="Search stocks, ETFs, options, forex, crypto, futures, commodities, bonds, yields (e.g. NVDA, EUR/USD, BTC, /ES, SPY 515C, US10Y)..."
+            placeholder="Search 5,000+ US stocks, ETFs, crypto, forex, options (e.g. NVDA, Apple, SPY, MSFT, TSLA, BTC/USD)..."
             className="flex-1 bg-transparent text-sm text-white placeholder-slate-500 focus:outline-none font-medium"
           />
           {query && (
@@ -152,7 +193,7 @@ export const UniversalSearchModal: React.FC<UniversalSearchModalProps> = ({
               <Layers className="w-10 h-10 mx-auto text-slate-600 mb-2" />
               <p className="text-sm font-semibold text-slate-300">No financial instruments matched your search</p>
               <p className="text-xs text-slate-500 max-w-md mx-auto">
-                Try searching by exact symbol (e.g. AAPL, BTC/USD, EUR/USD, /ES), company name, index, or contract type.
+                Search across all 5,000+ U.S. stocks, ETFs, indices, and asset classes by ticker or company name.
               </p>
             </div>
           ) : (
@@ -160,7 +201,7 @@ export const UniversalSearchModal: React.FC<UniversalSearchModalProps> = ({
               <div key={group.title} className={gIdx > 0 ? 'pt-3' : ''}>
                 <div className="flex items-center justify-between px-2 pb-1.5 text-[11px] font-mono uppercase tracking-wider text-[#D4AF37] font-bold">
                   <span>{group.title}</span>
-                  <span className="text-slate-500 text-[10px]">{group.instruments.length} instruments</span>
+                  <span className="text-slate-500 text-[10px]">{group.instruments.length} matches</span>
                 </div>
 
                 <div className="space-y-1">
@@ -247,11 +288,11 @@ export const UniversalSearchModal: React.FC<UniversalSearchModalProps> = ({
         <div className="p-2.5 px-4 bg-[#111317] border-t border-[#20232b] flex items-center justify-between text-[11px] text-slate-400 font-mono">
           <div className="flex items-center gap-3">
             <span>
-              <strong>{totalMatches}</strong> total instruments indexed
+              <strong>{totalMatches}</strong> instruments searchable
             </span>
             <span className="text-slate-600">&bull;</span>
             <span className="text-emerald-400 flex items-center gap-1">
-              <CheckCircle2 className="w-3 h-3" /> Licensed Multi-Asset Gateway
+              <CheckCircle2 className="w-3 h-3" /> Alpaca Free 5,000+ Universe
             </span>
           </div>
 

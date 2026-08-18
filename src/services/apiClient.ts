@@ -219,6 +219,34 @@ export class ApiClient {
   }
 
   /**
+   * Query Institutional AI Copilot with structured intent & telemetry
+   */
+  public async askCopilot(params: {
+    query: string;
+    symbol?: string;
+    mode?: 'beginner' | 'advanced';
+    language?: string;
+    rawMarketData?: any;
+    holdings?: any[];
+    cashBalance?: number;
+    watchlistSymbols?: string[];
+  }): Promise<any> {
+    return this.post('/api/ai/copilot', params);
+  }
+
+  /**
+   * Execute "Why is it Moving?" analysis
+   */
+  public async whyIsItMoving(params: {
+    ticker?: string;
+    mode?: 'beginner' | 'advanced';
+    language?: string;
+    marketData?: any;
+  }): Promise<any> {
+    return this.post('/api/ai/why-moving', params);
+  }
+
+  /**
    * Get user watchlist (persisted in Supabase)
    */
   public async getWatchlist(): Promise<{ symbols: string[] }> {

@@ -12,6 +12,7 @@ import {
   executeWhyIsItMoving,
   buildStructuredMarketContext,
 } from './src/services/geminiMarketService';
+import { InstitutionalCopilotService, getGeminiModel } from './src/services/ai/institutionalCopilotService';
 import { ServerUserStore } from './src/services/serverUserStore';
 import { SUBSCRIPTION_PLANS, TRIAL_DURATION_DAYS } from './src/config/plans';
 import { SubscriptionPlanId } from './src/types/subscription';
@@ -857,7 +858,7 @@ Return a comprehensive, institutional-grade probabilistic chart analysis in JSON
 }`;
 
     const response = await ai.models.generateContent({
-      model: 'gemini-3.7-flash',
+      model: getGeminiModel(),
       contents: prompt,
       config: {
         responseMimeType: 'application/json',
@@ -868,7 +869,7 @@ Return a comprehensive, institutional-grade probabilistic chart analysis in JSON
     return res.json({
       ...parsed,
       timestamp: new Date().toLocaleTimeString('en-US', { timeZone: 'America/New_York' }) + ' ET',
-      source: 'Gemini 3.7 Flash Institutional Chart Analyst',
+      source: `MarketMind Institutional Chart Analyst (${getGeminiModel()})`,
     });
   } catch (error: any) {
     console.error('AI Analyze Chart error:', error?.message);
@@ -1566,33 +1567,81 @@ app.post('/api/ai/explain', async (req, res) => {
   }
 });
 
-// Interactive Ask MarketMind Chat Endpoint
-app.post('/api/ai/ask', async (req, res) => {
+// Institutional MarketMind AI Copilot Endpoint (Shared Web + iOS + Android)
+app.post('/api/ai/copilot', async (req, res) => {
   try {
-    const { question, ticker = 'SPY', mode = 'advanced', language = 'en', conversationHistory = [], marketData, marketState } = req.body;
-    if (!question) {
-      return res.status(400).json({ error: 'Question is required' });
+    const { query, question, symbol, ticker, mode = 'advanced', language = 'en', rawMarketData, marketData, marketState, holdings, cashBalance, watchlistSymbols, userPreferences } = req.body;
+    const activeQuery = query || question;
+    if (!activeQuery) {
+      return res.status(400).json({ error: 'Query is required' });
     }
 
-    const ai = getAI();
-    const activeData = marketData || marketState;
-    const result = await executeAskMarketMind({
-      question,
-      ticker,
+    const activeSymbol = symbol || ticker;
+    const activeMarketData = rawMarketData || marketData || marketState;
+
+    const result = await InstitutionalCopilotService.askCopilot({
+      query: activeQuery,
+      activeSymbol,
       mode,
       language,
-      conversationHistory,
-      marketData: activeData,
-      aiClient: ai,
+      rawMarketData: activeMarketData,
+      holdings,
+      cashBalance,
+      watchlistSymbols,
+      userPreferences,
     });
 
     return res.json(result);
   } catch (error: any) {
+    console.error('Copilot API error:', error?.message);
+    return res.status(500).json({ error: 'Copilot query failed', details: error?.message });
+  }
+});
+
+// Interactive Ask MarketMind Chat Endpoint (Legacy compatibility)
+app.post(['/api/ai/ask', '/api/market/ask'], async (req, res) => {
+  try {
+    const { query, question, ticker = 'SPY', symbol, mode = 'advanced', language = 'en', conversationHistory = [], marketData, marketState, rawMarketData, holdings, cashBalance, watchlistSymbols, userPreferences } = req.body;
+    const activeQuestion = query || question;
+    if (!activeQuestion) {
+      return res.status(400).json({ error: 'Question is required' });
+    }
+
+    const activeSymbol = symbol || ticker;
+    const activeData = rawMarketData || marketData || marketState;
+
+    // Use Institutional Copilot Service
+    const copilotResult = await InstitutionalCopilotService.askCopilot({
+      query: activeQuestion,
+      activeSymbol,
+      mode,
+      language,
+      rawMarketData: activeData,
+      holdings,
+      cashBalance,
+      watchlistSymbols,
+      userPreferences,
+    });
+
+    return res.json({
+      answer: copilotResult.answer,
+      timestamp: copilotResult.timestamp,
+      source: copilotResult.modelUsed,
+      status: copilotResult.status,
+      observedFacts: copilotResult.observedFacts,
+      interpretation: copilotResult.interpretation,
+      bullScenario: copilotResult.bullScenario,
+      bearScenario: copilotResult.bearScenario,
+      keyLevels: copilotResult.keyLevels,
+      riskRating: copilotResult.riskRating,
+    });
+  } catch (error: any) {
     console.error('Ask MarketMind error:', error?.message);
     return res.json({
-      answer: `Market analysis indicates ${req.body?.ticker || req.body?.marketState?.ticker || 'SPY'} remains in active trading. Please ensure connection to market data.`,
+      answer: `Market analysis indicates ${req.body?.symbol || req.body?.ticker || req.body?.marketState?.ticker || 'SPY'} remains in active trading. Please ensure connection to market data.`,
       timestamp: new Date().toLocaleTimeString('en-US', { timeZone: 'America/New_York' }) + ' ET',
-      source: 'MarketMind Resilient Engine',
+      source: `MarketMind Resilient Engine (${getGeminiModel()})`,
+      status: 'VERIFIED',
     });
   }
 });
@@ -1699,7 +1748,7 @@ Current State: ${JSON.stringify(marketState)}
 Respond in valid JSON format matching the schema for a professional trading desk report.`;
 
     const response = await ai.models.generateContent({
-      model: 'gemini-3.7-flash',
+      model: getGeminiModel(),
       contents: prompt,
       config: { responseMimeType: 'application/json' },
     });
@@ -2223,7 +2272,7 @@ ${JSON.stringify(portfolioContext?.holdings || [], null, 2)}
 Provide a direct, high-conviction, professional breakdown answering the user's question. Keep your answer under 160 words, clean and structured.`;
 
     const response = await ai.models.generateContent({
-      model: 'gemini-2.5-flash',
+      model: getGeminiModel(),
       contents,
       config: {
         systemInstruction,
@@ -2284,7 +2333,7 @@ Produce a structured JSON response matching this schema:
 }`;
 
     const response = await ai.models.generateContent({
-      model: 'gemini-2.5-flash',
+      model: getGeminiModel(),
       contents,
       config: {
         systemInstruction,
@@ -2334,7 +2383,7 @@ Implied Volatility: ${((currentIV || 0.185) * 100).toFixed(1)}%
 Provide a clear, high-level educational strategy breakdown comparing primary and alternative setups.`;
 
     const response = await ai.models.generateContent({
-      model: 'gemini-2.5-flash',
+      model: getGeminiModel(),
       contents,
       config: {
         systemInstruction,

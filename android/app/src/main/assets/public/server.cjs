@@ -1868,7 +1868,7 @@ var import_http = __toESM(require("http"), 1);
 var import_path = __toESM(require("path"), 1);
 var import_dotenv = __toESM(require("dotenv"), 1);
 var import_vite = require("vite");
-var import_genai = require("@google/genai");
+var import_genai2 = require("@google/genai");
 
 // src/services/massiveWsManager.ts
 var import_ws = require("ws");
@@ -5724,129 +5724,6 @@ CRITICAL DATA INTEGRITY MANDATES:
 
 ${modeGuidance}`;
 }
-async function executeAskMarketMind({
-  question,
-  ticker = "SPY",
-  mode = "advanced",
-  language = "en",
-  conversationHistory = [],
-  marketData,
-  aiClient: aiClient2
-}) {
-  const cleanQuestion = (question || "").trim().slice(0, 500);
-  if (!cleanQuestion) {
-    return {
-      answer: "Please enter a question about the market.",
-      timestamp: (/* @__PURE__ */ new Date()).toLocaleTimeString("en-US", { timeZone: "America/New_York" }) + " ET",
-      source: "MarketMind Assistant"
-    };
-  }
-  const structuredContext = buildStructuredMarketContext(marketData, ticker);
-  const cacheKey = `ask_${ticker}_${mode}_${language}_${cleanQuestion.toLowerCase()}_${structuredContext.currentPrice}`;
-  const cached = getFromCache(cacheKey);
-  if (cached) return cached;
-  const timestamp = structuredContext.timestampET || (/* @__PURE__ */ new Date()).toLocaleTimeString("en-US", { timeZone: "America/New_York" }) + " ET";
-  if (structuredContext.currentPrice === null && (!aiClient2 || !marketData)) {
-    return {
-      answer: `Verified current market data for ${ticker} is unavailable.`,
-      timestamp,
-      source: "MarketMind Data Guard",
-      status: "UNAVAILABLE"
-    };
-  }
-  if (!aiClient2) {
-    const cp = structuredContext.currentPrice;
-    if (cp === null) {
-      return {
-        answer: `Verified current market price for ${ticker} is unavailable.`,
-        timestamp,
-        source: "MarketMind Data Guard",
-        status: "UNAVAILABLE"
-      };
-    }
-    const vwapVal = structuredContext.indicators?.vwap;
-    const isAboveVwap = vwapVal !== null ? cp >= vwapVal : null;
-    const r1 = structuredContext.supportResistance?.r1;
-    const s1 = structuredContext.supportResistance?.s1;
-    const bullProb = structuredContext.probabilities?.bullish;
-    const bearProb = structuredContext.probabilities?.bearish;
-    const q = cleanQuestion.toLowerCase();
-    let fallbackText = "";
-    if (q.includes("why") && (q.includes("move") || q.includes("dropping") || q.includes("rising") || q.includes("up") || q.includes("down"))) {
-      fallbackText = `${ticker} ($${cp}) is trading ${isAboveVwap !== null ? isAboveVwap ? "above" : "below" : "near"} session VWAP (${vwapVal !== null ? `$${vwapVal}` : "unavailable"})${bullProb !== null ? ` with a ${bullProb}% bullish probability` : ""}. ${structuredContext.probabilities?.primaryDriver ? `Primary driver: ${structuredContext.probabilities.primaryDriver}.` : ""} ${r1 !== null ? `Overhead resistance sits at $${r1}.` : ""} ${s1 !== null ? `Support holds at $${s1}.` : ""}`;
-    } else if (q.includes("support") || q.includes("resistance") || q.includes("level")) {
-      fallbackText = `Key verified levels for **${ticker}**:
-- **Primary Resistance (R1)**: ${r1 !== null ? `$${r1}` : "Unavailable"}
-- **Intraday VWAP**: ${vwapVal !== null ? `$${vwapVal}` : "Unavailable"}
-- **Primary Support (S1)**: ${s1 !== null ? `$${s1}` : "Unavailable"}`;
-    } else if (q.includes("vwap")) {
-      fallbackText = vwapVal !== null ? `**${ticker}** is currently trading **${isAboveVwap ? "ABOVE" : "BELOW"} VWAP** ($${vwapVal}) at **$${cp}**.` : `Verified VWAP data for **${ticker}** is currently unavailable.`;
-    } else {
-      fallbackText = `Market summary for **${ticker}**: Currently at **$${cp}** (${structuredContext.dollarChange != null ? (structuredContext.dollarChange >= 0 ? "+" : "") + structuredContext.dollarChange : ""} / ${structuredContext.percentChange != null ? (structuredContext.percentChange >= 0 ? "+" : "") + structuredContext.percentChange + "%" : ""}). ${bullProb !== null && bearProb !== null ? `Calculated bias is ${bullProb >= bearProb ? "Bullish" : "Bearish"} (${bullProb}% prob).` : ""}`;
-    }
-    const responsePayload = {
-      answer: fallbackText.trim(),
-      timestamp,
-      source: "MarketMind Quantitative Verified Facts",
-      status: "VERIFIED"
-    };
-    setInCache(cacheKey, responsePayload, 15e3);
-    return responsePayload;
-  }
-  try {
-    const systemInstruction = getGeminiSystemInstruction(mode);
-    const langInstruction = `
-${getLanguageInstruction(language)}`;
-    const recentHistoryText = (conversationHistory || []).slice(-6).map((m) => `${m.role === "user" ? "User" : "Assistant"}: ${m.content}`).join("\n\n");
-    const prompt = `${systemInstruction}${langInstruction}
-
-CURRENT APPLICATION MARKET DATA:
-${JSON.stringify(structuredContext, null, 2)}
-
-RECENT CONVERSATION HISTORY:
-${recentHistoryText || "No prior messages in this session."}
-
-USER QUESTION: "${cleanQuestion}"
-
-INSTRUCTIONS FOR ANSWERING:
-1. Address the question directly and concisely (2-4 clear paragraphs).
-2. If the user refers to "it", "the stock", or asks without a ticker, they are referring to ${ticker}.
-3. Bold specific verified price levels ($${structuredContext.currentPrice ?? "Unavailable"}, VWAP $${structuredContext.indicators?.vwap ?? "Unavailable"}), indicator values, and probabilities when verified.
-4. If a requested value is null or unavailable, explicitly state that verified data is unavailable.
-5. State confirmation and invalidation triggers clearly.
-6. Emphasize both opportunities and downside risks.`;
-    const response = await aiClient2.models.generateContent({
-      model: getGeminiModel(),
-      contents: prompt
-    });
-    const resultText = response.text || "AI ANALYSIS TEMPORARILY UNAVAILABLE";
-    const payload = {
-      answer: resultText,
-      timestamp,
-      source: `Gemini 3.7 Flash MarketMind AI (${mode === "beginner" ? "Beginner" : "Advanced"})`,
-      status: "VERIFIED"
-    };
-    setInCache(cacheKey, payload, 2e4);
-    return payload;
-  } catch (error) {
-    const errMsg = error?.message || String(error);
-    console.log("[GeminiMarketService] AI query encountered error:", errMsg.slice(0, 100));
-    if (structuredContext.currentPrice !== null) {
-      return {
-        answer: `MarketMind analysis for ${ticker}: Current price is $${structuredContext.currentPrice}.${structuredContext.indicators?.vwap !== null ? ` Session VWAP is $${structuredContext.indicators?.vwap}.` : ""}${structuredContext.supportResistance?.s1 !== null ? ` Primary support holds at $${structuredContext.supportResistance?.s1}.` : ""}${structuredContext.supportResistance?.r1 !== null ? ` Primary resistance sits at $${structuredContext.supportResistance?.r1}.` : ""}`,
-        timestamp,
-        source: "MarketMind Verified Data",
-        status: "VERIFIED"
-      };
-    }
-    return {
-      answer: "AI ANALYSIS TEMPORARILY UNAVAILABLE",
-      timestamp,
-      source: "MarketMind Data Guard",
-      status: "UNAVAILABLE"
-    };
-  }
-}
 async function executeAnalyzeMarket({
   ticker = "SPY",
   mode = "advanced",
@@ -5955,7 +5832,7 @@ Return a strict JSON object matching this schema:
       risk: ["low", "moderate", "high", "extreme"].includes(parsed.risk) ? parsed.risk : "moderate",
       watchNext: parsed.watchNext || `Monitor price action around verified levels.`,
       timestamp,
-      source: `Gemini 3.7 Flash Institutional Analysis (${mode === "beginner" ? "Beginner" : "Advanced"})`,
+      source: `MarketMind Institutional Analysis (${getGeminiModel()}) [${mode === "beginner" ? "Beginner" : "Advanced"}]`,
       status: "VERIFIED"
     };
     setInCache(cacheKey, result, 2e4);
@@ -6087,7 +5964,7 @@ Return a strict JSON object matching this schema:
         vwap: parsed.keyLevels?.vwap || (vwapVal !== null ? `$${vwapVal}` : "Unavailable")
       },
       timestamp,
-      source: `Gemini 3.7 Flash Driver Synthesis (${mode === "beginner" ? "Beginner" : "Advanced"})`,
+      source: `MarketMind Catalyst Synthesis (${getGeminiModel()}) [${mode === "beginner" ? "Beginner" : "Advanced"}]`,
       status: "VERIFIED"
     };
     setInCache(cacheKey, result, 2e4);
@@ -6116,6 +5993,943 @@ Return a strict JSON object matching this schema:
     };
   }
 }
+
+// src/services/ai/institutionalCopilotService.ts
+var import_genai = require("@google/genai");
+
+// src/services/ai/portfolioRiskEngine.ts
+var PortfolioRiskEngine = class {
+  /**
+   * Calculate comprehensive deterministic risk metrics for a user's portfolio
+   */
+  static computeRiskMetrics(holdings = [], cashBalance = 0) {
+    if (!holdings || holdings.length === 0) {
+      return {
+        totalPortfolioValue: Math.max(0, cashBalance),
+        totalCostBasis: 0,
+        totalUnrealizedPnl: 0,
+        totalUnrealizedPnlPercent: 0,
+        cashBalance: Math.max(0, cashBalance),
+        cashAllocationPercent: 100,
+        largestPosition: null,
+        top3ConcentrationPercent: 0,
+        top3Holdings: [],
+        sectorAllocations: [],
+        weightedBeta: null,
+        diversificationScore: cashBalance > 0 ? 50 : 0,
+        riskLevel: "LOW",
+        identifiedRiskFactors: ["Portfolio is 100% in cash or has no active equity holdings."],
+        earningsExposureCount: 0,
+        holdingsCount: 0
+      };
+    }
+    let totalHoldingsValue = 0;
+    let totalCostBasis = 0;
+    let totalWeightedBeta = 0;
+    let betaEligibleWeight = 0;
+    let earningsCount = 0;
+    const sectorMap = /* @__PURE__ */ new Map();
+    const enriched = holdings.map((h) => {
+      const value = h.marketValue || h.quantity * (h.currentPrice || h.averageCost);
+      const cost = h.costBasis || h.quantity * h.averageCost;
+      totalHoldingsValue += value;
+      totalCostBasis += cost;
+      const sector = h.sector || "Unassigned";
+      sectorMap.set(sector, (sectorMap.get(sector) || 0) + value);
+      if (typeof h.beta === "number" && !isNaN(h.beta) && h.beta > 0) {
+        totalWeightedBeta += h.beta * value;
+        betaEligibleWeight += value;
+      }
+      if (h.nextEarningsDate) {
+        earningsCount++;
+      }
+      return {
+        ...h,
+        calculatedValue: value
+      };
+    });
+    const totalPortfolioValue = totalHoldingsValue + Math.max(0, cashBalance);
+    const totalUnrealizedPnl = totalHoldingsValue - totalCostBasis;
+    const totalUnrealizedPnlPercent = totalCostBasis > 0 ? totalUnrealizedPnl / totalCostBasis * 100 : 0;
+    const cashAllocationPercent = totalPortfolioValue > 0 ? cashBalance / totalPortfolioValue * 100 : 0;
+    const sorted = [...enriched].sort((a, b) => b.calculatedValue - a.calculatedValue);
+    const top1 = sorted[0];
+    const largestWeight = totalPortfolioValue > 0 ? top1.calculatedValue / totalPortfolioValue * 100 : 0;
+    const largestPosition = top1 ? {
+      symbol: top1.symbol,
+      companyName: top1.companyName || top1.symbol,
+      marketValue: top1.calculatedValue,
+      weightPercent: Number(largestWeight.toFixed(2))
+    } : null;
+    const top3 = sorted.slice(0, 3);
+    const top3Val = top3.reduce((acc, curr) => acc + curr.calculatedValue, 0);
+    const top3ConcentrationPercent = totalPortfolioValue > 0 ? Number((top3Val / totalPortfolioValue * 100).toFixed(2)) : 0;
+    const top3Holdings = top3.map((h) => ({
+      symbol: h.symbol,
+      weightPercent: totalPortfolioValue > 0 ? Number((h.calculatedValue / totalPortfolioValue * 100).toFixed(2)) : 0
+    }));
+    const sectorAllocations = [];
+    for (const [sector, value] of sectorMap.entries()) {
+      const weightPercent = totalPortfolioValue > 0 ? Number((value / totalPortfolioValue * 100).toFixed(2)) : 0;
+      sectorAllocations.push({
+        sector,
+        marketValue: value,
+        weightPercent
+      });
+    }
+    sectorAllocations.sort((a, b) => b.weightPercent - a.weightPercent);
+    const weightedBeta = betaEligibleWeight > 0 ? Number((totalWeightedBeta / betaEligibleWeight).toFixed(2)) : null;
+    let divScore = 100;
+    if (largestWeight > 30) divScore -= (largestWeight - 30) * 1.5;
+    if (top3ConcentrationPercent > 60) divScore -= (top3ConcentrationPercent - 60) * 0.8;
+    if (sectorAllocations[0] && sectorAllocations[0].weightPercent > 40) {
+      divScore -= (sectorAllocations[0].weightPercent - 40) * 0.7;
+    }
+    if (holdings.length < 5) divScore -= (5 - holdings.length) * 6;
+    divScore = Math.max(10, Math.min(100, Math.round(divScore)));
+    const riskFactors = [];
+    if (largestWeight >= 35) {
+      riskFactors.push(`High single-stock concentration: ${top1.symbol} represents ${largestWeight.toFixed(1)}% of total portfolio value.`);
+    }
+    if (top3ConcentrationPercent >= 65) {
+      riskFactors.push(`Top 3 positions represent ${top3ConcentrationPercent.toFixed(1)}% of total assets.`);
+    }
+    if (sectorAllocations[0] && sectorAllocations[0].weightPercent >= 45) {
+      riskFactors.push(`Sector overweight: ${sectorAllocations[0].sector} comprises ${sectorAllocations[0].weightPercent.toFixed(1)}% of portfolio allocation.`);
+    }
+    if (weightedBeta && weightedBeta > 1.35) {
+      riskFactors.push(`Elevated market volatility sensitivity: Portfolio beta is ${weightedBeta}x relative to S&P 500.`);
+    }
+    if (holdings.length <= 3) {
+      riskFactors.push(`Limited holdings count (${holdings.length}): Portfolio lacks broad asset diversification.`);
+    }
+    let riskLevel = "MODERATE";
+    if (riskFactors.length === 0 && divScore >= 75) {
+      riskLevel = "LOW";
+    } else if (riskFactors.length >= 2 || largestWeight >= 45 || top3ConcentrationPercent >= 75) {
+      riskLevel = "HIGH";
+    } else if (riskFactors.length === 1 || largestWeight >= 30) {
+      riskLevel = "ELEVATED";
+    }
+    return {
+      totalPortfolioValue: Number(totalPortfolioValue.toFixed(2)),
+      totalCostBasis: Number(totalCostBasis.toFixed(2)),
+      totalUnrealizedPnl: Number(totalUnrealizedPnl.toFixed(2)),
+      totalUnrealizedPnlPercent: Number(totalUnrealizedPnlPercent.toFixed(2)),
+      cashBalance: Number(cashBalance.toFixed(2)),
+      cashAllocationPercent: Number(cashAllocationPercent.toFixed(2)),
+      largestPosition,
+      top3ConcentrationPercent,
+      top3Holdings,
+      sectorAllocations,
+      weightedBeta,
+      diversificationScore: divScore,
+      riskLevel,
+      identifiedRiskFactors: riskFactors.length > 0 ? riskFactors : ["Portfolio risk is balanced across evaluated metrics."],
+      earningsExposureCount: earningsCount,
+      holdingsCount: holdings.length
+    };
+  }
+};
+
+// src/services/ai/marketRegimeEngine.ts
+var MarketRegimeEngine = class {
+  /**
+   * Deterministically classifies the market regime from verified market telemetry
+   */
+  static evaluateRegime(params) {
+    const timestamp = (/* @__PURE__ */ new Date()).toISOString();
+    const vix = params.vix ?? null;
+    const spyChg = params.spyChangePercent ?? 0;
+    const qqqChg = params.qqqChangePercent ?? 0;
+    let vixState = "UNAVAILABLE";
+    if (vix !== null) {
+      if (vix >= 24) vixState = "ELEVATED";
+      else if (vix <= 14) vixState = "COMPRESSED";
+      else vixState = "NORMAL";
+    }
+    let breadthRatio = null;
+    if (params.advancersCount !== void 0 && params.declinersCount !== void 0 && params.declinersCount > 0) {
+      breadthRatio = Number((params.advancersCount / params.declinersCount).toFixed(2));
+    }
+    if (vix !== null && vix >= 26) {
+      return {
+        regime: "HIGH_VOLATILITY_COMPRESSION",
+        label: "High Volatility Defensive Regime",
+        summary: `VIX at ${vix.toFixed(1)} indicates elevated macro risk premiums and widened intraday ranges.`,
+        vixLevel: vix,
+        vixState,
+        breadthRatio,
+        dominantTheme: "Macro Risk & Capital Preservation",
+        actionableContext: "Favor defined-risk structures, tighter position sizes, and respect critical support zones.",
+        timestamp
+      };
+    }
+    if (spyChg > 0.8 && qqqChg > 1 && (breadthRatio === null || breadthRatio > 1.5)) {
+      return {
+        regime: "RISK_ON_EXPANSION",
+        label: "Risk-On Growth Expansion",
+        summary: `Broad market indices advancing with strong tech leadership (QQQ ${qqqChg > 0 ? "+" : ""}${qqqChg.toFixed(2)}%) and positive participation.`,
+        vixLevel: vix,
+        vixState,
+        breadthRatio,
+        dominantTheme: "Growth Leadership & Momentum Continuation",
+        actionableContext: "Trend-following setups above intraday VWAP offer favorable risk/reward on pullbacks.",
+        timestamp
+      };
+    }
+    if (spyChg < -0.8 && qqqChg < -1) {
+      return {
+        regime: "RISK_OFF_DEFENSIVE",
+        label: "Risk-Off Market Distribution",
+        summary: `Institutional selling pressure across major index benchmarks with negative breadth.`,
+        vixLevel: vix,
+        vixState,
+        breadthRatio,
+        dominantTheme: "Broad Liquidity Withdrawal",
+        actionableContext: "Avoid chasing oversold bounces without structural volume confirmation at major support.",
+        timestamp
+      };
+    }
+    if (spyChg >= 0.2 && spyChg <= 0.8) {
+      return {
+        regime: "TRENDING_BULLISH",
+        label: "Constructive Bullish Trend",
+        summary: "Market holding positive territory with steady intraday structure and controlled volatility.",
+        vixLevel: vix,
+        vixState,
+        breadthRatio,
+        dominantTheme: "Orderly Uptrend Progression",
+        actionableContext: "Focus on leading relative strength sectors holding above key moving averages.",
+        timestamp
+      };
+    }
+    if (spyChg <= -0.2 && spyChg >= -0.8) {
+      return {
+        regime: "TRENDING_BEARISH",
+        label: "Orderly Pullback / Consolidation",
+        summary: "Market digesting recent gains with mild profit taking across index weights.",
+        vixLevel: vix,
+        vixState,
+        breadthRatio,
+        dominantTheme: "Consolidation & Range Retest",
+        actionableContext: "Monitor whether key indices hold above their 20-day moving average and prior swing lows.",
+        timestamp
+      };
+    }
+    return {
+      regime: "RANGE_BOUND_CONSOLIDATION",
+      label: "Range-Bound Rotational Market",
+      summary: "Indices oscillating within established trading bounds with selective stock picking and sector rotation.",
+      vixLevel: vix,
+      vixState,
+      breadthRatio,
+      dominantTheme: "Sector Rotation & Level-to-Level Trading",
+      actionableContext: "Buy support, sell resistance, and avoid expecting sustained breakouts without volume catalysts.",
+      timestamp
+    };
+  }
+};
+
+// src/services/ai/MarketMindIntelligenceContext.ts
+var MarketMindIntelligenceContextBuilder = class {
+  /**
+   * Builds the comprehensive UnifiedIntelligenceContext
+   */
+  static build(params) {
+    const data = params.rawMarketData || {};
+    const sym = params.symbol ? params.symbol.toUpperCase().trim() : void 0;
+    const now = (/* @__PURE__ */ new Date()).toISOString();
+    let quote;
+    const q = data.quote || {};
+    const price = typeof q.price === "number" && Number.isFinite(q.price) ? q.price : typeof data.price === "number" ? data.price : null;
+    if (sym || price !== null) {
+      quote = {
+        symbol: sym || q.symbol || "SPY",
+        price,
+        bid: typeof q.bid === "number" ? q.bid : null,
+        ask: typeof q.ask === "number" ? q.ask : null,
+        spread: typeof q.spread === "number" ? q.spread : q.ask && q.bid ? Number((q.ask - q.bid).toFixed(2)) : null,
+        dollarChange: typeof q.change === "number" ? q.change : null,
+        percentChange: typeof q.changePercent === "number" ? q.changePercent : null,
+        volume: typeof q.volume === "number" ? q.volume : null,
+        dayHigh: typeof q.dayHigh === "number" ? q.dayHigh : null,
+        dayLow: typeof q.dayLow === "number" ? q.dayLow : null,
+        openPrice: typeof q.openPrice === "number" ? q.openPrice : null,
+        previousClose: typeof q.previousClose === "number" ? q.previousClose : null,
+        fiftyTwoWeekHigh: typeof q.fiftyTwoWeekHigh === "number" ? q.fiftyTwoWeekHigh : null,
+        fiftyTwoWeekLow: typeof q.fiftyTwoWeekLow === "number" ? q.fiftyTwoWeekLow : null,
+        exchange: q.exchange || data.exchange || "US Markets",
+        currency: q.currency || "USD",
+        sessionState: q.marketState || "REGULAR",
+        dataSource: q.dataSource || "Alpaca Free IEX",
+        feedTier: price !== null ? "IEX_FREE" : "UNAVAILABLE",
+        timestamp: q.timestamp || now,
+        isStale: Boolean(q.isStale)
+      };
+    }
+    let technicals;
+    const tech = data.technicals || {};
+    const sr = data.supportResistance || {};
+    if (quote) {
+      technicals = {
+        vwap: typeof tech.vwap === "number" ? tech.vwap : null,
+        ema9: typeof tech.ema9 === "number" ? tech.ema9 : null,
+        ema20: typeof tech.ema20 === "number" ? tech.ema20 : null,
+        ema50: typeof tech.ema50 === "number" ? tech.ema50 : null,
+        ema200: typeof tech.ema200 === "number" ? tech.ema200 : null,
+        sma20: typeof tech.sma20 === "number" ? tech.sma20 : null,
+        sma50: typeof tech.sma50 === "number" ? tech.sma50 : null,
+        sma200: typeof tech.sma200 === "number" ? tech.sma200 : null,
+        rsi14: typeof tech.rsi === "number" ? tech.rsi : null,
+        macd: tech.macd ? { macdLine: tech.macd.macd || 0, signalLine: tech.macd.signal || 0, histogram: tech.macd.histogram || 0 } : null,
+        atr14: typeof tech.atr === "number" ? tech.atr : null,
+        adx14: typeof tech.adx === "number" ? tech.adx : null,
+        bollingerBands: tech.bollingerBands ? {
+          upper: tech.bollingerBands.upper || 0,
+          middle: tech.bollingerBands.middle || 0,
+          lower: tech.bollingerBands.lower || 0,
+          bandwidth: tech.bollingerBands.bandwidth || 0
+        } : null,
+        pivotLevels: sr.pivot ? {
+          pivot: sr.pivot || 0,
+          s1: sr.s1 || 0,
+          s2: sr.s2 || 0,
+          r1: sr.r1 || 0,
+          r2: sr.r2 || 0
+        } : null,
+        primarySupport: typeof sr.s1 === "number" ? sr.s1 : null,
+        primaryResistance: typeof sr.r1 === "number" ? sr.r1 : null,
+        multiTimeframeTrend: tech.trend || (quote.price && technicals?.vwap ? quote.price >= technicals.vwap ? "BULLISH" : "BEARISH" : "NEUTRAL")
+      };
+    }
+    const breadth = data.breadth || {};
+    const macroRegime = MarketRegimeEngine.evaluateRegime({
+      spyPrice: data.intermarket?.find((i) => i.symbol === "SPY")?.price,
+      spyChangePercent: data.intermarket?.find((i) => i.symbol === "SPY")?.changePercent,
+      qqqChangePercent: data.intermarket?.find((i) => i.symbol === "QQQ")?.changePercent,
+      vix: data.intermarket?.find((i) => i.symbol === "VIX" || i.symbol === "^VIX")?.price,
+      advancersCount: breadth.advancers,
+      declinersCount: breadth.decliners,
+      yield10Year: data.intermarket?.find((i) => i.symbol === "US10Y" || i.symbol === "^TNX")?.price
+    });
+    const sectors = Array.isArray(data.sectors) ? data.sectors : [];
+    const sortedSectors = [...sectors].sort((a, b) => (b.changePercent || 0) - (a.changePercent || 0));
+    const macro = {
+      spyChangePercent: data.intermarket?.find((i) => i.symbol === "SPY")?.changePercent ?? null,
+      qqqChangePercent: data.intermarket?.find((i) => i.symbol === "QQQ")?.changePercent ?? null,
+      iwmChangePercent: data.intermarket?.find((i) => i.symbol === "IWM")?.changePercent ?? null,
+      vixLevel: macroRegime.vixLevel,
+      tenYearTreasuryYield: data.intermarket?.find((i) => i.symbol === "US10Y" || i.symbol === "^TNX")?.price ?? null,
+      marketBreadth: breadth.advancers ? { advancers: breadth.advancers, decliners: breadth.decliners || 0, ratio: macroRegime.breadthRatio } : null,
+      topLeadingSectors: sortedSectors.slice(0, 2).map((s) => `${s.name || s.sector} (${s.changePercent > 0 ? "+" : ""}${s.changePercent}%)`),
+      topLaggingSectors: sortedSectors.slice(-2).map((s) => `${s.name || s.sector} (${s.changePercent > 0 ? "+" : ""}${s.changePercent}%)`),
+      marketRegime: macroRegime
+    };
+    let portfolioContext;
+    if (params.holdings !== void 0) {
+      const riskMetrics = PortfolioRiskEngine.computeRiskMetrics(params.holdings, params.cashBalance || 0);
+      portfolioContext = {
+        holdings: params.holdings.map((h) => ({
+          symbol: h.symbol,
+          quantity: h.quantity,
+          marketValue: h.marketValue || h.quantity * (h.currentPrice || h.averageCost),
+          averageCost: h.averageCost,
+          unrealizedPnlPercent: h.unrealizedGainPercent || 0,
+          weightPercent: h.portfolioWeight ? h.portfolioWeight * 100 : 0,
+          sector: h.sector || "Unassigned"
+        })),
+        riskMetrics
+      };
+    }
+    let watchlistContext;
+    if (params.watchlistSymbols && params.watchlistSymbols.length > 0) {
+      watchlistContext = {
+        symbols: params.watchlistSymbols
+      };
+    }
+    const catalysts = Array.isArray(data.news) ? data.news.slice(0, 8).map((n, idx) => ({
+      id: n.id || `news-${idx}`,
+      category: n.category || "GENERAL",
+      title: n.title || n.headline || "Market News",
+      source: n.source || "Verified Feed",
+      publishedAt: n.publishedAt || n.datetime || now,
+      sentiment: n.sentiment || "NEUTRAL",
+      impactLevel: n.impactLevel || "MEDIUM",
+      keyTakeaway: n.summary || n.keyTakeaway
+    })) : [];
+    const economicEvents = Array.isArray(data.economicEvents) ? data.economicEvents.slice(0, 5).map((e) => ({
+      event: e.event || e.name || "Economic Release",
+      scheduledTime: e.time || e.date || now,
+      importance: e.importance || "HIGH",
+      consensus: e.consensus,
+      previous: e.previous,
+      actual: e.actual
+    })) : [];
+    return {
+      symbol: sym,
+      intent: params.intent,
+      quote,
+      technicals,
+      macro,
+      catalysts,
+      economicEvents,
+      portfolio: portfolioContext,
+      watchlist: watchlistContext,
+      userPreferences: params.userPreferences ? {
+        experienceLevel: params.userPreferences.experienceLevel || "advanced",
+        tradingStyle: params.userPreferences.tradingStyle || "swing_trader"
+      } : void 0,
+      assembledAt: now,
+      freshnessStatus: quote?.price !== null && quote !== void 0 ? "REALTIME" : "UNAVAILABLE"
+    };
+  }
+};
+
+// src/services/ai/intentRouter.ts
+var IntentRouter = class {
+  /**
+   * Classify user query into precise intent and extracted entities
+   */
+  static classify(query, activeSymbolFallback, contextSymbol) {
+    const q = (query || "").trim().toLowerCase();
+    const upperText = (query || "").toUpperCase();
+    const tickerMatches = Array.from(
+      new Set(
+        (upperText.match(/\b[A-Z]{1,5}\b/g) || []).filter(
+          (sym) => ![
+            "A",
+            "I",
+            "IN",
+            "ON",
+            "AT",
+            "TO",
+            "THE",
+            "IS",
+            "ARE",
+            "WAS",
+            "BE",
+            "OR",
+            "AND",
+            "MY",
+            "ME",
+            "YOU",
+            "HE",
+            "SHE",
+            "IT",
+            "WE",
+            "THEY",
+            "WHAT",
+            "WHY",
+            "HOW",
+            "WHEN",
+            "WHO",
+            "WHERE",
+            "DO",
+            "DOES",
+            "DID",
+            "HAS",
+            "HAVE",
+            "HAD",
+            "CAN",
+            "COULD",
+            "WILL",
+            "WOULD",
+            "SHOULD",
+            "BUY",
+            "SELL",
+            "HOLD",
+            "CALL",
+            "PUT",
+            "ETF",
+            "SEC",
+            "FED",
+            "CPI",
+            "PCE",
+            "PPI",
+            "GDP",
+            "FOMC",
+            "NFP",
+            "ATH",
+            "VWAP",
+            "RSI",
+            "MACD",
+            "EMA",
+            "SMA",
+            "ATR",
+            "RISK",
+            "RISKS",
+            "PORT",
+            "NEWS",
+            "GAIN",
+            "LOSS",
+            "COST",
+            "RATE",
+            "CASH",
+            "BOND",
+            "TODAY",
+            "NOW",
+            "NEXT",
+            "WEEK",
+            "YEAR",
+            "VIEW",
+            "OPEN",
+            "HIGH",
+            "LOW",
+            "DATA"
+          ].includes(sym)
+        )
+      )
+    );
+    const primarySymbol = tickerMatches[0] || contextSymbol || activeSymbolFallback || void 0;
+    const comparisonSymbols = tickerMatches.length > 1 ? tickerMatches : void 0;
+    if (q.includes("portfolio") || q.includes("my holdings") || q.includes("my positions") || q.includes("my account") || q.includes("what am i holding")) {
+      if (q.includes("risk") || q.includes("exposure") || q.includes("concentrated") || q.includes("beta") || q.includes("drawdown")) {
+        return {
+          intent: "PORTFOLIO_RISK",
+          primarySymbol,
+          requiresPortfolio: true,
+          requiresWatchlist: false,
+          requiresFilings: false,
+          requiresEarnings: true,
+          requiresMacro: false,
+          confidence: 0.95
+        };
+      }
+      return {
+        intent: "PORTFOLIO_ANALYSIS",
+        primarySymbol,
+        requiresPortfolio: true,
+        requiresWatchlist: false,
+        requiresFilings: false,
+        requiresEarnings: true,
+        requiresMacro: false,
+        confidence: 0.95
+      };
+    }
+    if (q.includes("my watchlist") || q.includes("on my watchlist") || q.includes("watchlist")) {
+      return {
+        intent: "WATCHLIST_ANALYSIS",
+        primarySymbol,
+        requiresPortfolio: false,
+        requiresWatchlist: true,
+        requiresFilings: false,
+        requiresEarnings: true,
+        requiresMacro: false,
+        confidence: 0.92
+      };
+    }
+    if (q.includes("why is") || q.includes("why did") || q.includes("what moved") || q.includes("what is moving") || q.includes("why moving")) {
+      return {
+        intent: "WHY_MOVING",
+        primarySymbol,
+        requiresPortfolio: false,
+        requiresWatchlist: false,
+        requiresFilings: true,
+        requiresEarnings: true,
+        requiresMacro: true,
+        confidence: 0.95
+      };
+    }
+    if (comparisonSymbols && comparisonSymbols.length >= 2 && (q.includes(" or ") || q.includes(" vs ") || q.includes("versus") || q.includes("compare") || q.includes("better"))) {
+      return {
+        intent: "CROSS_ASSET_COMPARISON",
+        primarySymbol: comparisonSymbols[0],
+        comparisonSymbols,
+        requiresPortfolio: false,
+        requiresWatchlist: false,
+        requiresFilings: false,
+        requiresEarnings: true,
+        requiresMacro: false,
+        confidence: 0.9
+      };
+    }
+    if (q.includes("earnings") || q.includes("eps") || q.includes("revenue report") || q.includes("report date") || q.includes("quarterly results")) {
+      return {
+        intent: "EARNINGS",
+        primarySymbol,
+        requiresPortfolio: q.includes("my") || q.includes("holdings"),
+        requiresWatchlist: q.includes("watchlist"),
+        requiresFilings: false,
+        requiresEarnings: true,
+        requiresMacro: false,
+        confidence: 0.92
+      };
+    }
+    if (q.includes("10-k") || q.includes("10-q") || q.includes("8-k") || q.includes("form 4") || q.includes("insider selling") || q.includes("insider buying") || q.includes("sec filing")) {
+      return {
+        intent: "SEC_FILINGS",
+        primarySymbol,
+        requiresPortfolio: false,
+        requiresWatchlist: false,
+        requiresFilings: true,
+        requiresEarnings: false,
+        requiresMacro: false,
+        confidence: 0.94
+      };
+    }
+    if (q.includes("cpi") || q.includes("fomc") || q.includes("fed") || q.includes("interest rate") || q.includes("inflation") || q.includes("nfp") || q.includes("jobless claims") || q.includes("economic calendar")) {
+      return {
+        intent: "MACRO_CALENDAR",
+        primarySymbol,
+        requiresPortfolio: false,
+        requiresWatchlist: false,
+        requiresFilings: false,
+        requiresEarnings: false,
+        requiresMacro: true,
+        confidence: 0.9
+      };
+    }
+    if (q.includes("vwap") || q.includes("support") || q.includes("resistance") || q.includes("rsi") || q.includes("moving average") || q.includes("breakout") || q.includes("breakdown") || q.includes("levels")) {
+      return {
+        intent: "TECHNICAL_ANALYSIS",
+        primarySymbol,
+        requiresPortfolio: false,
+        requiresWatchlist: false,
+        requiresFilings: false,
+        requiresEarnings: false,
+        requiresMacro: false,
+        confidence: 0.88
+      };
+    }
+    if (primarySymbol) {
+      return {
+        intent: "TICKER_ANALYSIS",
+        primarySymbol,
+        requiresPortfolio: false,
+        requiresWatchlist: false,
+        requiresFilings: false,
+        requiresEarnings: true,
+        requiresMacro: true,
+        confidence: 0.8
+      };
+    }
+    return {
+      intent: "GENERAL_EDUCATION",
+      requiresPortfolio: false,
+      requiresWatchlist: false,
+      requiresFilings: false,
+      requiresEarnings: false,
+      requiresMacro: true,
+      confidence: 0.75
+    };
+  }
+};
+
+// src/services/ai/conversationMemory.ts
+var ConversationMemoryManager = class {
+  static {
+    this.sessions = /* @__PURE__ */ new Map();
+  }
+  static {
+    this.MAX_TURNS_PER_SESSION = 8;
+  }
+  static {
+    this.SESSION_TTL_MS = 60 * 60 * 1e3;
+  }
+  // 1 hour
+  /**
+   * Get or create a session for a user or anonymous ID
+   */
+  static getSession(sessionId, userId) {
+    this.cleanExpiredSessions();
+    let session = this.sessions.get(sessionId);
+    if (!session) {
+      session = {
+        sessionId,
+        userId,
+        turns: [],
+        lastUpdated: Date.now()
+      };
+      this.sessions.set(sessionId, session);
+    }
+    return session;
+  }
+  /**
+   * Record a new turn in conversational memory
+   */
+  static recordTurn(sessionId, role, content, meta = {}) {
+    const session = this.getSession(sessionId, meta.userId);
+    if (meta.focusedSymbol) {
+      session.focusedSymbol = meta.focusedSymbol.toUpperCase().trim();
+    }
+    const turn = {
+      id: `turn_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`,
+      role,
+      content,
+      timestamp: Date.now(),
+      focusedSymbol: meta.focusedSymbol,
+      intent: meta.intent
+    };
+    session.turns.push(turn);
+    if (session.turns.length > this.MAX_TURNS_PER_SESSION) {
+      session.turns.shift();
+    }
+    session.lastUpdated = Date.now();
+  }
+  /**
+   * Get conversational history formatted for Gemini context injection
+   */
+  static getFormattedHistory(sessionId) {
+    const session = this.sessions.get(sessionId);
+    if (!session || session.turns.length === 0) return [];
+    return session.turns.map((t) => ({
+      role: t.role === "user" ? "user" : "model",
+      parts: [{ text: t.content }]
+    }));
+  }
+  /**
+   * Clear session on reset or logout
+   */
+  static clearSession(sessionId) {
+    this.sessions.delete(sessionId);
+  }
+  static cleanExpiredSessions() {
+    const now = Date.now();
+    for (const [id, s] of this.sessions.entries()) {
+      if (now - s.lastUpdated > this.SESSION_TTL_MS) {
+        this.sessions.delete(id);
+      }
+    }
+  }
+};
+
+// src/services/ai/institutionalCopilotService.ts
+var copilotResponseCache = /* @__PURE__ */ new Map();
+function getGeminiModel2() {
+  return process.env.GEMINI_MODEL || "gemini-2.5-flash";
+}
+var InstitutionalCopilotService = class {
+  static {
+    this.aiClient = null;
+  }
+  static getAiClient() {
+    if (this.aiClient) return this.aiClient;
+    const apiKey = process.env.GEMINI_API_KEY;
+    if (apiKey && apiKey.trim().length > 0) {
+      try {
+        this.aiClient = new import_genai.GoogleGenAI({ apiKey });
+        return this.aiClient;
+      } catch {
+        return null;
+      }
+    }
+    return null;
+  }
+  static setAiClientForTests(client2) {
+    this.aiClient = client2;
+  }
+  /**
+   * Execute intelligent multi-factor market & portfolio query
+   */
+  static async askCopilot(params) {
+    const query = (params.query || "").trim();
+    const sessionId = params.sessionId || params.userId || "session_default";
+    const now = (/* @__PURE__ */ new Date()).toISOString();
+    const lang = params.language || "en";
+    const classifiedIntent = IntentRouter.classify(query, params.activeSymbol, params.activeSymbol);
+    const experienceLevel = params.mode || params.userPreferences?.experienceLevel || "advanced";
+    const context = MarketMindIntelligenceContextBuilder.build({
+      symbol: classifiedIntent.primarySymbol || params.activeSymbol,
+      intent: classifiedIntent.intent,
+      rawMarketData: params.rawMarketData,
+      holdings: classifiedIntent.requiresPortfolio ? params.holdings : void 0,
+      cashBalance: classifiedIntent.requiresPortfolio ? params.cashBalance : void 0,
+      watchlistSymbols: classifiedIntent.requiresWatchlist ? params.watchlistSymbols : void 0,
+      userPreferences: {
+        experienceLevel,
+        tradingStyle: params.userPreferences?.tradingStyle || "swing_trader"
+      }
+    });
+    const cacheKey = `copilot_${sessionId}_${classifiedIntent.intent}_${context.symbol || "gen"}_${query.toLowerCase()}`;
+    const cached = copilotResponseCache.get(cacheKey);
+    if (cached && Date.now() < cached.expiresAt) {
+      return cached.data;
+    }
+    const ai = this.getAiClient();
+    const model = getGeminiModel2();
+    if (!ai) {
+      const deterministicResponse = this.buildDeterministicBaseline(query, classifiedIntent, context);
+      copilotResponseCache.set(cacheKey, { data: deterministicResponse, expiresAt: Date.now() + 15e3 });
+      ConversationMemoryManager.recordTurn(sessionId, "user", query, { focusedSymbol: context.symbol, intent: classifiedIntent.intent, userId: params.userId });
+      ConversationMemoryManager.recordTurn(sessionId, "assistant", deterministicResponse.answer, { focusedSymbol: context.symbol, intent: classifiedIntent.intent, userId: params.userId });
+      return deterministicResponse;
+    }
+    try {
+      const history = ConversationMemoryManager.getFormattedHistory(sessionId);
+      const prompt = this.buildPrompt(query, classifiedIntent, context, lang);
+      const response = await ai.models.generateContent({
+        model,
+        contents: prompt,
+        config: {
+          responseMimeType: "application/json",
+          temperature: 0.2
+        }
+      });
+      const parsed = JSON.parse(response.text || "{}");
+      const formattedResponse = {
+        answer: parsed.answer || parsed.summary || "Analysis computed from verified market data.",
+        intent: classifiedIntent.intent,
+        observedFacts: Array.isArray(parsed.observedFacts) && parsed.observedFacts.length > 0 ? parsed.observedFacts : this.extractObservedFacts(context),
+        interpretation: parsed.interpretation || parsed.answer || "Analytical interpretation of verified telemetry.",
+        bullScenario: parsed.bullScenario ? {
+          thesis: parsed.bullScenario.thesis || "Bullish continuation setup.",
+          confirmationLevel: parsed.bullScenario.confirmationLevel || (context.technicals?.primaryResistance ? `$${context.technicals.primaryResistance}` : "Volume confirmation")
+        } : void 0,
+        bearScenario: parsed.bearScenario ? {
+          thesis: parsed.bearScenario.thesis || "Downside invalidation risk.",
+          invalidationLevel: parsed.bearScenario.invalidationLevel || (context.technicals?.primarySupport ? `$${context.technicals.primarySupport}` : "Support breakdown")
+        } : void 0,
+        keyLevels: parsed.keyLevels || {
+          support: context.technicals?.primarySupport ? `$${context.technicals.primarySupport}` : void 0,
+          resistance: context.technicals?.primaryResistance ? `$${context.technicals.primaryResistance}` : void 0,
+          vwap: context.technicals?.vwap ? `$${context.technicals.vwap}` : void 0
+        },
+        portfolioRiskSummary: context.portfolio ? {
+          riskLevel: context.portfolio.riskMetrics.riskLevel,
+          diversificationScore: context.portfolio.riskMetrics.diversificationScore,
+          primaryRisk: context.portfolio.riskMetrics.identifiedRiskFactors[0] || "Risk is balanced."
+        } : void 0,
+        catalysts: context.catalysts?.map((c) => ({ title: c.title, impact: c.sentiment, category: c.category })),
+        riskRating: ["LOW", "MODERATE", "ELEVATED", "HIGH"].includes(parsed.riskRating?.toUpperCase()) ? parsed.riskRating.toUpperCase() : context.portfolio?.riskMetrics.riskLevel || "MODERATE",
+        dataFreshness: context.freshnessStatus,
+        modelUsed: model,
+        timestamp: now,
+        status: "VERIFIED"
+      };
+      ConversationMemoryManager.recordTurn(sessionId, "user", query, { focusedSymbol: context.symbol, intent: classifiedIntent.intent, userId: params.userId });
+      ConversationMemoryManager.recordTurn(sessionId, "assistant", formattedResponse.answer, { focusedSymbol: context.symbol, intent: classifiedIntent.intent, userId: params.userId });
+      copilotResponseCache.set(cacheKey, { data: formattedResponse, expiresAt: Date.now() + 2e4 });
+      return formattedResponse;
+    } catch (err) {
+      console.log("[Copilot] Fallback to deterministic engine:", err?.message?.slice(0, 100));
+      const fallback = this.buildDeterministicBaseline(query, classifiedIntent, context);
+      return fallback;
+    }
+  }
+  static buildPrompt(query, intent, context, language) {
+    const langDirective = getLanguageInstruction(language);
+    return `You are MarketMind AI Institutional Copilot. You provide objective, non-fabricated, evidence-based market and portfolio intelligence.
+${langDirective}
+
+CRITICAL RULES:
+1. Ground all answers strictly in the verified numbers in the context below. Never invent price targets, earnings numbers, or fake news.
+2. If specific data is missing or unavailable, explicitly state that it is unavailable.
+3. Distinguish between OBSERVED FACTS and AI INTERPRETATION.
+4. Do NOT give guaranteed buy/sell recommendations; provide scenario-based analysis with confirmation & invalidation levels.
+
+USER QUESTION: "${query}"
+INTENT: ${intent.intent}
+
+STRUCTURED VERIFIED CONTEXT:
+${JSON.stringify(context, null, 2)}
+
+Return a strict JSON object matching this schema:
+{
+  "answer": "Comprehensive, concise, high-conviction answer directly addressing the user question (2-4 paragraphs)",
+  "observedFacts": ["Fact 1 with verified numbers", "Fact 2 with verified metrics"],
+  "interpretation": "Analytical synthesis explaining what the data means",
+  "bullScenario": {
+    "thesis": "Upside thesis",
+    "confirmationLevel": "Exact price or volume condition to confirm"
+  },
+  "bearScenario": {
+    "thesis": "Downside thesis",
+    "invalidationLevel": "Exact support level breakdown that invalidates"
+  },
+  "keyLevels": {
+    "support": "$Price or 'Unavailable'",
+    "resistance": "$Price or 'Unavailable'",
+    "vwap": "$Price or 'Unavailable'"
+  },
+  "riskRating": "LOW" | "MODERATE" | "ELEVATED" | "HIGH"
+}`;
+  }
+  static extractObservedFacts(context) {
+    const facts = [];
+    if (context.quote?.price !== null && context.quote?.price !== void 0) {
+      facts.push(`${context.quote.symbol} is trading at $${context.quote.price} (${context.quote.percentChange !== null && context.quote.percentChange >= 0 ? "+" : ""}${context.quote.percentChange ?? 0}%) on ${context.quote.dataSource}.`);
+    }
+    if (context.technicals?.vwap) {
+      facts.push(`Session VWAP is $${context.technicals.vwap}.`);
+    }
+    if (context.macro?.marketRegime) {
+      facts.push(`Market Regime: ${context.macro.marketRegime.label} (VIX: ${context.macro.marketRegime.vixLevel ?? "N/A"}).`);
+    }
+    if (context.portfolio) {
+      facts.push(`Portfolio Total Value: $${context.portfolio.riskMetrics.totalPortfolioValue.toLocaleString()}, Diversification Score: ${context.portfolio.riskMetrics.diversificationScore}/100.`);
+    }
+    return facts.length > 0 ? facts : ["Verified telemetry evaluated."];
+  }
+  static buildDeterministicBaseline(query, intent, context) {
+    const model = getGeminiModel2();
+    const now = (/* @__PURE__ */ new Date()).toISOString();
+    const facts = this.extractObservedFacts(context);
+    if (intent.intent === "PORTFOLIO_RISK" && context.portfolio) {
+      const pm = context.portfolio.riskMetrics;
+      const topPos = pm.largestPosition ? `${pm.largestPosition.symbol} (${pm.largestPosition.weightPercent}%)` : "None";
+      const answer2 = `Your portfolio has a total verified value of $${pm.totalPortfolioValue.toLocaleString()} with a ${pm.riskLevel} risk profile (Diversification Score: ${pm.diversificationScore}/100). Largest single position is ${topPos}. Top 3 holdings represent ${pm.top3ConcentrationPercent}% of total assets. ${pm.identifiedRiskFactors.join(" ")}`;
+      return {
+        answer: answer2,
+        intent: intent.intent,
+        observedFacts: facts,
+        interpretation: `Portfolio risk is currently classified as ${pm.riskLevel} based on holding concentration and beta sensitivity.`,
+        portfolioRiskSummary: {
+          riskLevel: pm.riskLevel,
+          diversificationScore: pm.diversificationScore,
+          primaryRisk: pm.identifiedRiskFactors[0] || "Balanced portfolio structure."
+        },
+        riskRating: pm.riskLevel,
+        dataFreshness: "REALTIME",
+        modelUsed: `${model} (Deterministic Quantitative Engine)`,
+        timestamp: now,
+        status: "VERIFIED"
+      };
+    }
+    if (intent.intent === "WHY_MOVING" && context.quote?.price !== null) {
+      const cp2 = context.quote?.price;
+      const sym2 = context.quote?.symbol || "Asset";
+      const vwap = context.technicals?.vwap;
+      const chg = context.quote?.percentChange ?? 0;
+      const answer2 = `${sym2} is trading at $${cp2} (${chg >= 0 ? "+" : ""}${chg.toFixed(2)}%). ${vwap ? `Price is holding ${cp2 >= vwap ? "above" : "below"} session VWAP ($${vwap}).` : ""} Market regime is evaluated as ${context.macro?.marketRegime.label || "Standard"}.`;
+      return {
+        answer: answer2,
+        intent: intent.intent,
+        observedFacts: facts,
+        interpretation: `Intraday technical momentum and volume flow driving price action at verified levels.`,
+        keyLevels: {
+          support: context.technicals?.primarySupport ? `$${context.technicals.primarySupport}` : void 0,
+          resistance: context.technicals?.primaryResistance ? `$${context.technicals.primaryResistance}` : void 0,
+          vwap: vwap ? `$${vwap}` : void 0
+        },
+        riskRating: "MODERATE",
+        dataFreshness: context.freshnessStatus,
+        modelUsed: `${model} (Deterministic Baseline)`,
+        timestamp: now,
+        status: "VERIFIED"
+      };
+    }
+    const cp = context.quote?.price;
+    const sym = context.quote?.symbol || "SPY";
+    const answer = cp !== null && cp !== void 0 ? `${sym} is trading at $${cp}. Key verified support is at $${context.technicals?.primarySupport || "N/A"} and resistance is at $${context.technicals?.primaryResistance || "N/A"}. Session trend is ${context.technicals?.multiTimeframeTrend || "NEUTRAL"}.` : `Verified market data for ${sym} is currently unavailable. No synthetic quotes will be generated.`;
+    return {
+      answer,
+      intent: intent.intent,
+      observedFacts: facts,
+      interpretation: "Quantitative baseline calculation from active feeds.",
+      keyLevels: {
+        support: context.technicals?.primarySupport ? `$${context.technicals.primarySupport}` : void 0,
+        resistance: context.technicals?.primaryResistance ? `$${context.technicals.primaryResistance}` : void 0,
+        vwap: context.technicals?.vwap ? `$${context.technicals.vwap}` : void 0
+      },
+      riskRating: "MODERATE",
+      dataFreshness: context.freshnessStatus,
+      modelUsed: `${model} (Verified Guard Engine)`,
+      timestamp: now,
+      status: cp !== null ? "VERIFIED" : "UNAVAILABLE"
+    };
+  }
+};
 
 // src/config/plans.ts
 var TRIAL_DURATION_DAYS = 15;
@@ -15888,7 +16702,7 @@ var aiClient = null;
 function getAI() {
   if (!process.env.GEMINI_API_KEY) return null;
   if (!aiClient) {
-    aiClient = new import_genai.GoogleGenAI({
+    aiClient = new import_genai2.GoogleGenAI({
       apiKey: process.env.GEMINI_API_KEY,
       httpOptions: {
         headers: {
@@ -16543,7 +17357,7 @@ Return a comprehensive, institutional-grade probabilistic chart analysis in JSON
   "aiExplanation": "3-4 concise sentences detailing the institutional trade context, key pivot behavior, and exact confirmation triggers."
 }`;
     const response = await ai.models.generateContent({
-      model: "gemini-3.7-flash",
+      model: getGeminiModel2(),
       contents: prompt,
       config: {
         responseMimeType: "application/json"
@@ -16553,7 +17367,7 @@ Return a comprehensive, institutional-grade probabilistic chart analysis in JSON
     return res.json({
       ...parsed,
       timestamp: (/* @__PURE__ */ new Date()).toLocaleTimeString("en-US", { timeZone: "America/New_York" }) + " ET",
-      source: "Gemini 3.7 Flash Institutional Chart Analyst"
+      source: `MarketMind Institutional Chart Analyst (${getGeminiModel2()})`
     });
   } catch (error) {
     console.error("AI Analyze Chart error:", error?.message);
@@ -17158,30 +17972,71 @@ app.post("/api/ai/explain", async (req, res) => {
     });
   }
 });
-app.post("/api/ai/ask", async (req, res) => {
+app.post("/api/ai/copilot", async (req, res) => {
   try {
-    const { question, ticker = "SPY", mode = "advanced", language = "en", conversationHistory = [], marketData, marketState } = req.body;
-    if (!question) {
-      return res.status(400).json({ error: "Question is required" });
+    const { query, question, symbol, ticker, mode = "advanced", language = "en", rawMarketData, marketData, marketState, holdings, cashBalance, watchlistSymbols, userPreferences } = req.body;
+    const activeQuery = query || question;
+    if (!activeQuery) {
+      return res.status(400).json({ error: "Query is required" });
     }
-    const ai = getAI();
-    const activeData = marketData || marketState;
-    const result = await executeAskMarketMind({
-      question,
-      ticker,
+    const activeSymbol = symbol || ticker;
+    const activeMarketData = rawMarketData || marketData || marketState;
+    const result = await InstitutionalCopilotService.askCopilot({
+      query: activeQuery,
+      activeSymbol,
       mode,
       language,
-      conversationHistory,
-      marketData: activeData,
-      aiClient: ai
+      rawMarketData: activeMarketData,
+      holdings,
+      cashBalance,
+      watchlistSymbols,
+      userPreferences
     });
     return res.json(result);
   } catch (error) {
+    console.error("Copilot API error:", error?.message);
+    return res.status(500).json({ error: "Copilot query failed", details: error?.message });
+  }
+});
+app.post(["/api/ai/ask", "/api/market/ask"], async (req, res) => {
+  try {
+    const { query, question, ticker = "SPY", symbol, mode = "advanced", language = "en", conversationHistory = [], marketData, marketState, rawMarketData, holdings, cashBalance, watchlistSymbols, userPreferences } = req.body;
+    const activeQuestion = query || question;
+    if (!activeQuestion) {
+      return res.status(400).json({ error: "Question is required" });
+    }
+    const activeSymbol = symbol || ticker;
+    const activeData = rawMarketData || marketData || marketState;
+    const copilotResult = await InstitutionalCopilotService.askCopilot({
+      query: activeQuestion,
+      activeSymbol,
+      mode,
+      language,
+      rawMarketData: activeData,
+      holdings,
+      cashBalance,
+      watchlistSymbols,
+      userPreferences
+    });
+    return res.json({
+      answer: copilotResult.answer,
+      timestamp: copilotResult.timestamp,
+      source: copilotResult.modelUsed,
+      status: copilotResult.status,
+      observedFacts: copilotResult.observedFacts,
+      interpretation: copilotResult.interpretation,
+      bullScenario: copilotResult.bullScenario,
+      bearScenario: copilotResult.bearScenario,
+      keyLevels: copilotResult.keyLevels,
+      riskRating: copilotResult.riskRating
+    });
+  } catch (error) {
     console.error("Ask MarketMind error:", error?.message);
     return res.json({
-      answer: `Market analysis indicates ${req.body?.ticker || req.body?.marketState?.ticker || "SPY"} remains in active trading. Please ensure connection to market data.`,
+      answer: `Market analysis indicates ${req.body?.symbol || req.body?.ticker || req.body?.marketState?.ticker || "SPY"} remains in active trading. Please ensure connection to market data.`,
       timestamp: (/* @__PURE__ */ new Date()).toLocaleTimeString("en-US", { timeZone: "America/New_York" }) + " ET",
-      source: "MarketMind Resilient Engine"
+      source: `MarketMind Resilient Engine (${getGeminiModel2()})`,
+      status: "VERIFIED"
     });
   }
 });
@@ -17279,7 +18134,7 @@ Current State: ${JSON.stringify(marketState)}
 
 Respond in valid JSON format matching the schema for a professional trading desk report.`;
     const response = await ai.models.generateContent({
-      model: "gemini-3.7-flash",
+      model: getGeminiModel2(),
       contents: prompt,
       config: { responseMimeType: "application/json" }
     });
@@ -17705,7 +18560,7 @@ ${JSON.stringify(portfolioContext?.holdings || [], null, 2)}
 
 Provide a direct, high-conviction, professional breakdown answering the user's question. Keep your answer under 160 words, clean and structured.`;
     const response = await ai.models.generateContent({
-      model: "gemini-2.5-flash",
+      model: getGeminiModel2(),
       contents,
       config: {
         systemInstruction,
@@ -17759,7 +18614,7 @@ Produce a structured JSON response matching this schema:
   "interpretation": "string"
 }`;
     const response = await ai.models.generateContent({
-      model: "gemini-2.5-flash",
+      model: getGeminiModel2(),
       contents,
       config: {
         systemInstruction,
@@ -17802,7 +18657,7 @@ Implied Volatility: ${((currentIV || 0.185) * 100).toFixed(1)}%
 
 Provide a clear, high-level educational strategy breakdown comparing primary and alternative setups.`;
     const response = await ai.models.generateContent({
-      model: "gemini-2.5-flash",
+      model: getGeminiModel2(),
       contents,
       config: {
         systemInstruction,

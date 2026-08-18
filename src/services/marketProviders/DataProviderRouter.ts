@@ -7,6 +7,7 @@ import {
 import { MarketDataMetadata, MarketDataMode } from '../../types/market';
 import { InstrumentDirectoryService } from './InstrumentDirectoryService';
 import { InstrumentResolver } from './InstrumentResolver';
+import { AppConfig } from '../../config/environment';
 
 // ==========================================
 // MarketMind AI — Provider Architecture & Neutral Data Router
@@ -730,7 +731,13 @@ export class DataProviderRouter {
     timeframe: string = '5m',
     count: number = 60
   ): MultiAssetChartCandle[] {
-    const basePrice = instrument.price || instrument.previousClose || 100;
+    const basePrice = instrument.price || instrument.previousClose;
+    if (!basePrice || basePrice <= 0) {
+      if (!AppConfig.allowSimulatedMarketData) {
+        return [];
+      }
+    }
+    const safePrice = basePrice && basePrice > 0 ? basePrice : 100;
     const now = Date.now();
     const stepMs =
       timeframe === '1m'
@@ -746,7 +753,7 @@ export class DataProviderRouter {
         : 5 * 60 * 1000;
 
     const candles: MultiAssetChartCandle[] = [];
-    let currentClose = basePrice;
+    let currentClose = safePrice;
     let cumVolume = 0;
     let cumPV = 0;
 

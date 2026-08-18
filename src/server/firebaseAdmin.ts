@@ -4,6 +4,19 @@ import { getFirestore, Firestore } from 'firebase-admin/firestore';
 
 let appInstance: App | null = null;
 
+export function parseFirebaseServiceAccount(rawKey: string, expectedProjectId?: string): any {
+  let credentials: any;
+  try {
+    credentials = JSON.parse(rawKey);
+  } catch (err: any) {
+    throw new Error(`Firebase service account must be valid JSON: ${err?.message}`);
+  }
+  if (expectedProjectId && credentials.project_id && credentials.project_id !== expectedProjectId) {
+    throw new Error(`Firebase service account project_id "${credentials.project_id}" does not match configured project "${expectedProjectId}"`);
+  }
+  return credentials;
+}
+
 export function getFirebaseApp(): App {
   if (!appInstance) {
     const existing = getApps();

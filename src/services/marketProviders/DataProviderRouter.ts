@@ -370,9 +370,12 @@ export class DataProviderRouter {
           const marketState = this.determineMarketState(instrument);
           const mode: MarketDataMode = instrument.realTimeStatus === 'REAL_TIME' ? 'REAL_TIME' : 'DELAYED';
 
+          const activeProviderId = (liveData as any).providerId || provider.providerId;
+          const activeProviderName = activeProviderId === 'alpaca' ? 'Alpaca IEX' : provider.name;
+
           const metadata: MarketDataMetadata = {
-            provider: provider.name,
-            source: provider.providerId,
+            provider: activeProviderName,
+            source: activeProviderId,
             timestamp: liveData.timestamp || now,
             receivedAt: now,
             mode,
@@ -521,6 +524,7 @@ export class DataProviderRouter {
     ask?: number;
     spread?: number;
     timestamp?: number;
+    providerId?: string;
   } | null> {
     const symbol = instrument.symbol;
     const providerSymbol = instrument.providerSymbols?.[provider.providerId as keyof typeof instrument.providerSymbols] || symbol;
@@ -528,12 +532,15 @@ export class DataProviderRouter {
     // 1. Massive / Polygon
     if (provider.providerId === 'massive') {
       const apiKey = process.env.MASSIVE_API_KEY || process.env.POLYGON_API_KEY;
-      if (apiKey) {
-        const snapRes = await fetch(
-          `https://api.polygon.io/v2/snapshot/locale/us/markets/stocks/tickers/${encodeURIComponent(
-            providerSymbol
-          )}?apiKey=${encodeURIComponent(apiKey)}`
-        );
+      try {
+        const url = apiKey
+          ? `https://api.polygon.io/v2/snapshot/locale/us/markets/stocks/tickers/${encodeURIComponent(
+              providerSymbol
+            )}?apiKey=${encodeURIComponent(apiKey)}`
+          : `https://api.polygon.io/v2/snapshot/locale/us/markets/stocks/tickers/${encodeURIComponent(
+              providerSymbol
+            )}`;
+        const snapRes = await fetch(url);
         if (snapRes.ok) {
           const json = await snapRes.json();
           const t = json.ticker;
@@ -555,13 +562,82 @@ export class DataProviderRouter {
               bid: t.lastQuote?.p,
               ask: t.lastQuote?.P,
               timestamp: t.updated ? Math.floor(t.updated / 1000000) : Date.now(),
+              providerId: 'massive',
             };
           }
+        }
+      } catch (massiveErr) {
+        // Massive failed, proceed to verified Alpaca fallback
+      }
+
+      // Fallback from Massive to Alpaca if Alpaca credentials are configured
+      if (process.env.ALPACA_API_KEY && process.env.ALPACA_API_SECRET) {
+        try {
+          const { AlpacaMarketDataService } = await import('../../server/alpacaMarketDataService');
+          const alpacaService = new AlpacaMarketDataService(
+            process.env.ALPACA_API_KEY,
+            process.env.ALPACA_API_SECRET
+          );
+          const alpacaQuote = await alpacaService.getSnapshot(providerSymbol || symbol);
+          if (alpacaQuote && alpacaQuote.price > 0) {
+            const prevClose = alpacaQuote.previousClose || alpacaQuote.price;
+            const change = Number((alpacaQuote.price - prevClose).toFixed(2));
+            const changePercent = prevClose > 0 ? Number(((change / prevClose) * 100).toFixed(2)) : 0;
+            return {
+              price: alpacaQuote.price,
+              change,
+              changePercent,
+              dayHigh: alpacaQuote.high || alpacaQuote.price,
+              dayLow: alpacaQuote.low || alpacaQuote.price,
+              openPrice: alpacaQuote.open || alpacaQuote.price,
+              previousClose: prevClose,
+              volume: alpacaQuote.volume || 0,
+              bid: alpacaQuote.bid,
+              ask: alpacaQuote.ask,
+              timestamp: alpacaQuote.timestamp || Date.now(),
+              providerId: 'alpaca',
+            };
+          }
+        } catch (alpacaErr) {
+          // Alpaca fallback error
         }
       }
     }
 
-    // 2. Finnhub
+    // 2. Alpaca Direct
+    if (provider.providerId === 'alpaca') {
+      if (process.env.ALPACA_API_KEY && process.env.ALPACA_API_SECRET) {
+        try {
+          const { AlpacaMarketDataService } = await import('../../server/alpacaMarketDataService');
+          const alpacaService = new AlpacaMarketDataService(
+            process.env.ALPACA_API_KEY,
+            process.env.ALPACA_API_SECRET
+          );
+          const alpacaQuote = await alpacaService.getSnapshot(providerSymbol || symbol);
+          if (alpacaQuote && alpacaQuote.price > 0) {
+            const prevClose = alpacaQuote.previousClose || alpacaQuote.price;
+            const change = Number((alpacaQuote.price - prevClose).toFixed(2));
+            const changePercent = prevClose > 0 ? Number(((change / prevClose) * 100).toFixed(2)) : 0;
+            return {
+              price: alpacaQuote.price,
+              change,
+              changePercent,
+              dayHigh: alpacaQuote.high || alpacaQuote.price,
+              dayLow: alpacaQuote.low || alpacaQuote.price,
+              openPrice: alpacaQuote.open || alpacaQuote.price,
+              previousClose: prevClose,
+              volume: alpacaQuote.volume || 0,
+              bid: alpacaQuote.bid,
+              ask: alpacaQuote.ask,
+              timestamp: alpacaQuote.timestamp || Date.now(),
+              providerId: 'alpaca',
+            };
+          }
+        } catch (alpacaErr) {}
+      }
+    }
+
+    // 3. Finnhub
     if (provider.providerId === 'finnhub') {
       const apiKey = process.env.FINNHUB_API_KEY;
       if (apiKey) {
@@ -581,13 +657,14 @@ export class DataProviderRouter {
               previousClose: q.pc,
               volume: 0,
               timestamp: q.t ? q.t * 1000 : Date.now(),
+              providerId: 'finnhub',
             };
           }
         }
       }
     }
 
-    // 3. Fallback catalog known state (if available in directory)
+    // 4. Fallback catalog known state (if available in directory)
     const catalog = InstrumentDirectoryService.getBySymbol(symbol);
     if (catalog && catalog.price && catalog.price > 0) {
       return {

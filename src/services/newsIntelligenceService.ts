@@ -57,30 +57,7 @@ export class NewsIntelligenceService {
   public socialProvider: SocialSentimentProvider;
 
   // Bookmarks
-  private savedArticles: SavedArticle[] = [
-    {
-      id: 'saved_1',
-      articleId: 'sec_filing_nvda_form8k',
-      headline: 'NVIDIA Corp Form 8-K: Material Definitive Agreement & Multi-Year Foundry Expansion',
-      publisher: 'U.S. SEC EDGAR',
-      publishedAt: new Date(Date.now() - 30 * 60000).toISOString(),
-      url: 'https://www.sec.gov/edgar/browse/?CIK=0001045810',
-      tickers: ['NVDA', 'TSM'],
-      savedAt: new Date(Date.now() - 15 * 60000).toISOString(),
-      notes: 'Key hardware capex expansion and capacity allocation.',
-    },
-    {
-      id: 'saved_2',
-      articleId: 'fomc_statement_rate_decision',
-      headline: 'Federal Reserve Board: FOMC Statement on Monetary Policy & Rate Trajectory',
-      publisher: 'Federal Reserve Board of Governors',
-      publishedAt: new Date(Date.now() - 50 * 60000).toISOString(),
-      url: 'https://www.federalreserve.gov/monetarypolicy/fomccalendars.htm',
-      tickers: ['SPY', 'QQQ', 'TLT'],
-      savedAt: new Date(Date.now() - 20 * 60000).toISOString(),
-      notes: 'Rate trajectory confirmation.',
-    },
-  ];
+  private savedArticles: SavedArticle[] = [];
 
   // In-memory Short-TTL cache
   private cache = new Map<string, { data: any; expiresAt: number }>();
@@ -96,8 +73,7 @@ export class NewsIntelligenceService {
       notifySound: true,
       enabled: true,
       createdAt: new Date(Date.now() - 86400000).toISOString(),
-      triggerCount: 4,
-      lastTriggeredAt: new Date(Date.now() - 15 * 60000).toISOString(),
+      triggerCount: 0,
     },
     {
       id: 'rule_fed_decisions',
@@ -109,8 +85,7 @@ export class NewsIntelligenceService {
       notifySound: false,
       enabled: true,
       createdAt: new Date(Date.now() - 86400000).toISOString(),
-      triggerCount: 2,
-      lastTriggeredAt: new Date(Date.now() - 25 * 60000).toISOString(),
+      triggerCount: 0,
     },
     {
       id: 'rule_sec_8k_filings',
@@ -121,8 +96,7 @@ export class NewsIntelligenceService {
       notifySound: false,
       enabled: true,
       createdAt: new Date(Date.now() - 86400000).toISOString(),
-      triggerCount: 3,
-      lastTriggeredAt: new Date(Date.now() - 40 * 60000).toISOString(),
+      triggerCount: 0,
     },
     {
       id: 'rule_watchlist_earnings',
@@ -134,55 +108,11 @@ export class NewsIntelligenceService {
       notifySound: true,
       enabled: true,
       createdAt: new Date(Date.now() - 86400000).toISOString(),
-      triggerCount: 5,
-      lastTriggeredAt: new Date(Date.now() - 10 * 60000).toISOString(),
+      triggerCount: 0,
     },
   ];
 
-  private notificationsQueue: NewsNotificationEvent[] = [
-    {
-      id: 'notif_1',
-      alertRuleId: 'rule_breaking_critical',
-      title: 'Breaking Critical Catalyst',
-      headline: 'FOMC Statement: Reaffirms Data-Dependent Stance & Progress on Inflation',
-      time: new Date(Date.now() - 20 * 60000).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
-      affectedTickers: ['SPY', 'QQQ', 'TLT'],
-      impactScore: 96,
-      impact: 'CRITICAL',
-      verificationStatus: 'CONFIRMED',
-      primarySource: 'Federal Reserve Board of Governors',
-      read: false,
-      url: 'https://www.federalreserve.gov/monetarypolicy/fomccalendars.htm',
-    },
-    {
-      id: 'notif_2',
-      alertRuleId: 'rule_sec_8k_filings',
-      title: 'SEC Regulatory Filing Verified',
-      headline: 'NVIDIA Corp Form 8-K: Material Definitive Agreement with TSMC',
-      time: new Date(Date.now() - 45 * 60000).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
-      affectedTickers: ['NVDA', 'TSM'],
-      impactScore: 94,
-      impact: 'HIGH',
-      verificationStatus: 'CONFIRMED',
-      primarySource: 'U.S. SEC EDGAR (Form 8-K)',
-      read: false,
-      url: 'https://www.sec.gov/edgar/browse/?CIK=0001045810',
-    },
-    {
-      id: 'notif_3',
-      alertRuleId: 'rule_breaking_critical',
-      title: 'High-Impact Economic Release',
-      headline: 'BLS Consumer Price Index: Core CPI Advances 0.2% MoM Matching Forecasts',
-      time: new Date(Date.now() - 65 * 60000).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
-      affectedTickers: ['SPY', 'TLT', 'DXY'],
-      impactScore: 95,
-      impact: 'HIGH',
-      verificationStatus: 'CONFIRMED',
-      primarySource: 'U.S. Bureau of Labor Statistics (BLS)',
-      read: true,
-      url: 'https://www.bls.gov/cpi/',
-    },
-  ];
+  private notificationsQueue: NewsNotificationEvent[] = [];
 
   constructor() {
     this.cnbcProvider = new CnbcNewsProvider();
@@ -421,13 +351,38 @@ export class NewsIntelligenceService {
       });
     }
 
+    const totalSentiment = bullishCount + bearishCount + neutralCount;
+    const computedScore = totalSentiment > 0
+      ? Math.round(50 + ((bullishCount - bearishCount) / totalSentiment) * 30)
+      : (priceChangePercent > 0 ? 65 : priceChangePercent < 0 ? 35 : 50);
+
+    const trend = priceChangePercent > 1
+      ? 'Intraday Uptrend'
+      : priceChangePercent < -1
+      ? 'Intraday Downtrend'
+      : 'Consolidating';
+
+    const vwapText = liveQuote?.vwap
+      ? (currentPrice >= liveQuote.vwap
+        ? `Holding +$${(currentPrice - liveQuote.vwap).toFixed(2)} Above VWAP`
+        : `Trading -$${(liveQuote.vwap - currentPrice).toFixed(2)} Below VWAP`)
+      : 'VWAP Calculation Pending Live Session';
+
+    const support = liveQuote?.dayLow && liveQuote.dayLow > 0
+      ? liveQuote.dayLow
+      : currentPrice > 0 ? Number((currentPrice * 0.985).toFixed(2)) : 0;
+
+    const resistance = liveQuote?.dayHigh && liveQuote.dayHigh > 0
+      ? liveQuote.dayHigh
+      : currentPrice > 0 ? Number((currentPrice * 1.018).toFixed(2)) : 0;
+
     return {
       ticker: sym,
       companyName: sym === 'SPY' ? 'SPDR S&P 500 ETF Trust' : sym === 'NVDA' ? 'NVIDIA Corporation' : sym === 'TSLA' ? 'Tesla, Inc.' : sym === 'AAPL' ? 'Apple Inc.' : `${sym} Equity`,
       latestPrice: currentPrice,
       priceChange,
       priceChangePercent,
-      marketMindScore: 88,
+      marketMindScore: computedScore,
       latestCatalyst: primaryNews.headline,
       breakingNews: newsItems,
       primaryCatalyst: {
@@ -440,51 +395,48 @@ export class NewsIntelligenceService {
         verificationStatus: (primaryNews.verificationStatus || 'CONFIRMED') as any,
       },
       newsSentimentSummary: {
-        bullishCount: Math.max(1, bullishCount),
+        bullishCount,
         bearishCount,
         neutralCount,
         overallSentiment: bullishCount >= bearishCount ? 'BULLISH' : 'BEARISH',
-        dominantTheme: sym === 'NVDA' ? 'Enterprise AI datacenter buildout & TSMC CoWoS packaging yields' : sym === 'TSLA' ? 'Energy Megapack utility installations & Robotaxi momentum' : 'Macro liquidity stability & index beta support',
+        dominantTheme: newsItems[0]?.headline || `Market news and regulatory disclosures for ${sym}`,
       },
       technicalCondition: {
-        trend: 'Strong Intraday Uptrend',
-        vwapStatus: `Holding +$${(currentPrice * 0.005).toFixed(2)} Above VWAP`,
-        keySupport: Number((currentPrice * 0.985).toFixed(2)),
-        keyResistance: Number((currentPrice * 1.018).toFixed(2)),
-        relativeVolume: 1.42,
+        trend,
+        vwapStatus: vwapText,
+        keySupport: support,
+        keyResistance: resistance,
+        relativeVolume: liveQuote?.volume ? 1.0 : 0,
       },
       optionsActivity: {
-        putCallRatio: 0.62,
-        unusualFlowDetected: true,
-        flowSentiment: 'Bullish',
-        dominantStrike: `$${Math.round(currentPrice * 1.02)} Call Sweep`,
+        putCallRatio: liveQuote?.optionsMetrics?.putCallRatio || 1.0,
+        unusualFlowDetected: !!liveQuote?.optionsMetrics?.unusualFlowDetected,
+        flowSentiment: (liveQuote?.optionsMetrics?.flowSentiment as any) || 'Neutral',
+        dominantStrike: liveQuote?.optionsMetrics?.dominantStrike || (currentPrice > 0 ? `$${Math.round(currentPrice * 1.02)} Strike` : 'N/A'),
       },
       upcomingEvents: [
         {
           date: matchingEarnings ? matchingEarnings.reportDate : 'Upcoming Fiscal Cycle',
-          title: matchingEarnings ? `${sym} Quarterly Earnings Release (${matchingEarnings.timing})` : `${sym} Investor Conference Presentation`,
+          title: matchingEarnings ? `${sym} Quarterly Earnings Release (${matchingEarnings.timing})` : `${sym} Investor Disclosures`,
           type: matchingEarnings ? 'EARNINGS' : 'CONFERENCE',
-        },
-        {
-          date: 'Monthly Official Release',
-          title: 'FOMC Monetary Policy & Labor Statistics Update',
-          type: 'FED_SPEECH',
         },
       ],
       marketMindOutlook: {
         verifiedFacts: [
           `Verified primary filings from ${sources[0]?.sourceName || 'SEC EDGAR'}.`,
-          `Price trading at $${currentPrice.toFixed(2)} (${priceChangePercent >= 0 ? '+' : ''}${priceChangePercent.toFixed(2)}% on session).`,
-          `Relative volume confirms institutional participation at 1.42x 30-day baseline average.`,
+          currentPrice > 0 ? `Price trading at $${currentPrice.toFixed(2)} (${priceChangePercent >= 0 ? '+' : ''}${priceChangePercent.toFixed(2)}% on session).` : 'Live quote feed pending provider connection.',
+          newsItems.length > 0 ? `Aggregated ${newsItems.length} verified news catalysts from authorized providers.` : 'No breaking news catalysts reported in current window.',
         ],
-        aiInterpretation: `Sustained positioning above key VWAP pivot indicates buyers remain in active control. Multiple independent Tier 1/2 news sources corroborate positive sector momentum.`,
-        marketDataConfirmation: `Order book liquidity depth and Call option sweep flows validate upward price discovery without immediate overhead supply resistance.`,
+        aiInterpretation: totalSentiment > 0
+          ? `${bullishCount >= bearishCount ? 'Constructive' : 'Cautious'} news sentiment observed across ${totalSentiment} analyzed wire reports.`
+          : 'Awaiting additional market intelligence and provider updates.',
+        marketDataConfirmation: currentPrice > 0 ? `Live market price discovery validated by authorized provider.` : 'Awaiting real-time market data feed.',
         risksAndAlternativeExplanations: [
-          `A break below primary support ($${(currentPrice * 0.985).toFixed(2)}) would invalidate the immediate intraday momentum setup.`,
-          `Macro headline volatility from unexpected Fed speaker remarks or bond yield shifts could trigger temporary consolidation.`,
+          support > 0 ? `A break below support ($${support.toFixed(2)}) may indicate increased selling pressure.` : 'Monitor support levels upon market open.',
+          'Macro headline volatility from official economic releases could impact asset valuations.',
         ],
-        shortTermBias: 'Bullish',
-        confidence: 'HIGH',
+        shortTermBias: bullishCount >= bearishCount ? 'Bullish' : 'Bearish',
+        confidence: totalSentiment >= 3 ? 'HIGH' : totalSentiment >= 1 ? 'MEDIUM' : 'LOW',
       },
       sources,
       timestamp: new Date().toLocaleTimeString('en-US', { timeZone: 'America/New_York' }) + ' ET',
@@ -696,77 +648,87 @@ export class NewsIntelligenceService {
       isPrimaryOfficial: n.sourceTier === 'TIER_1_PRIMARY',
     }));
 
+    const hasNews = allNews.length > 0;
+    const topArticle = allNews[0];
+
+    const movers = allNews
+      .filter((n) => n.tickers && n.tickers.length > 0)
+      .slice(0, 4)
+      .map((n) => ({
+        ticker: n.tickers[0],
+        changePercent: n.sentiment === 'BULLISH' || n.sentiment === 'VERY_BULLISH' ? 1.5 : n.sentiment === 'BEARISH' || n.sentiment === 'VERY_BEARISH' ? -1.5 : 0.0,
+        catalyst: n.headline,
+      }));
+
     const brief: AIMarketBrief = {
       id: `brief_${Date.now()}`,
       generatedAt: new Date().toISOString(),
       marketSession: 'REGULAR',
-      marketHeadline: 'Equity Markets Maintain Structural Bid as Technology Multiples and Disinflation Trends Align',
-      overallSentiment: 'BULLISH',
-      overallImpact: 'HIGH',
-      affectedIndices: ['S&P 500 (SPY)', 'Nasdaq-100 (QQQ)', 'Russell 2000 (IWM)', 'Cboe Volatility Index (VIX)'],
-      affectedSectors: ['Technology (XLK)', 'Semiconductors (SOXX)', 'Fixed Income (TLT)', 'Financials (XLF)'],
-      topMovers: [
-        { ticker: 'NVDA', changePercent: 2.85, catalyst: 'Expanded multi-year datacenter architecture agreements and supply chain ramp.' },
-        { ticker: 'MSFT', changePercent: 1.45, catalyst: 'Hyperscale enterprise AI software deployment ARR acceleration.' },
-        { ticker: 'TLT', changePercent: 0.62, catalyst: 'Disinflation trajectory confirmation from benchmark agency releases.' },
-        { ticker: 'XOM', changePercent: -0.40, catalyst: 'Crude inventory rebalancing and refining margin normalization.' },
+      marketHeadline: topArticle
+        ? topArticle.headline
+        : 'Market Intelligence Awaiting Real-Time Live Feed Ingestion',
+      overallSentiment: topArticle?.sentiment === 'BEARISH' ? 'BEARISH' : 'BULLISH',
+      overallImpact: (topArticle?.impact || 'MEDIUM') as any,
+      affectedIndices: ['S&P 500 (SPY)', 'Nasdaq-100 (QQQ)', 'Russell 2000 (IWM)'],
+      affectedSectors: ['Technology (XLK)', 'Financials (XLF)', 'Fixed Income (TLT)'],
+      topMovers: movers.length > 0 ? movers : [
+        { ticker: 'SPY', changePercent: 0.0, catalyst: 'Awaiting primary catalyst release.' },
       ],
       sections: {
         pastHour: {
           title: 'Past Hour Catalysts & Momentum Flow',
           session: 'PAST_HOUR',
-          summary: 'Institutional volume concentrated in large-cap growth indices as benchmark 10-year Treasury yields stabilized near 4.22%, easing discount rate pressures on duration assets.',
-          verifiedFacts: [
-            '10-Year Treasury Yield held support near 4.22% with 3.2 bps range compression.',
-            'S&P 500 breadth registered 68% advancing issues across primary NYSE/Nasdaq volume.',
-            'Semiconductor sector relative volume exceeded 1.35x its 20-day historical average.',
-          ],
-          aiInference: 'Sustained consolidation above intraday VWAP indicates algorithmic buy programs are absorbing overhead supply without triggering volatility surges.',
+          summary: hasNews
+            ? `Analyzed ${allNews.length} verified news reports across authorized providers in current cycle.`
+            : 'No breaking catalysts reported in current 60-minute window.',
+          verifiedFacts: hasNews
+            ? allNews.slice(0, 3).map((n) => `${n.source}: ${n.headline}`)
+            : ['Provider feeds active and monitoring verified regulatory and financial news.'],
+          aiInference: hasNews
+            ? 'Sentiment distribution indicates active price discovery around current market catalysts.'
+            : 'Monitoring institutional order flow and macro releases.',
           marketImpact: 'MEDIUM',
           affectedSectors: ['Technology', 'Fixed Income'],
-          affectedTickers: ['SPY', 'QQQ', 'NVDA', 'TLT'],
+          affectedTickers: hasNews ? (allNews[0].tickers.length > 0 ? allNews[0].tickers : ['SPY']) : ['SPY'],
           citations: citations.slice(0, 2),
         },
         premarket: {
           title: 'Premarket Setup & Overnight Developments',
           session: 'PREMARKET',
-          summary: 'Overnight index futures gained ground following European central bank commentary and steady Asian trading sessions. Early corporate filings highlighted robust order books across infrastructure providers.',
-          verifiedFacts: [
-            'S&P E-mini futures traded +0.38% higher prior to the opening bell.',
-            'SEC Form 8-K filings confirmed material semiconductor capacity commitments.',
-          ],
-          aiInference: 'Positive overnight risk tone provided constructive momentum for morning opening rotation into high-beta equities.',
-          marketImpact: 'HIGH',
-          affectedSectors: ['Semiconductors', 'Industrial Capital Goods'],
-          affectedTickers: ['NVDA', 'TSM', 'SPY'],
+          summary: 'Overnight index futures and international news feeds are monitored continuously for material developments.',
+          verifiedFacts: hasNews
+            ? allNews.slice(3, 5).map((n) => `${n.source}: ${n.headline}`)
+            : ['Primary regulatory feeds and corporate disclosures monitored.'],
+          aiInference: 'Risk tone aligns with latest verified wire releases and economic indicators.',
+          marketImpact: 'MEDIUM',
+          affectedSectors: ['Equities', 'Derivatives'],
+          affectedTickers: ['SPY', 'QQQ'],
           citations: citations.slice(2, 4),
         },
         activeSession: {
           title: 'Active Trading Session Dynamics',
           session: 'ACTIVE_SESSION',
-          summary: 'Broad market breadth is positive with cyclicals and technology co-leading index gains. Options flow displays a 0.72 put/call ratio with aggressive call buying across top weighted constituents.',
-          verifiedFacts: [
-            'Cboe Volatility Index (VIX) contracted below 14.80.',
-            'Put/Call volume ratio registered 0.72 indicating sustained upside hedging and exposure demand.',
-          ],
-          aiInference: 'Low volatility environment favors momentum breakout strategies above key resistance levels with defined stops.',
+          summary: 'Live session developments are aggregated in real-time from licensed financial providers.',
+          verifiedFacts: hasNews
+            ? allNews.slice(5, 7).map((n) => `${n.source}: ${n.headline}`)
+            : ['Continuous multi-asset monitoring active.'],
+          aiInference: 'Current market structure reflects verified fundamental and earnings reports.',
           marketImpact: 'HIGH',
-          affectedSectors: ['Technology', 'Financials', 'Consumer Discretionary'],
-          affectedTickers: ['SPY', 'QQQ', 'AAPL', 'MSFT', 'AMZN'],
+          affectedSectors: ['Technology', 'Financials'],
+          affectedTickers: ['SPY', 'QQQ'],
           citations: citations.slice(4, 6),
         },
         afterHours: {
           title: 'After-Hours Session & Scheduled Events',
           session: 'AFTER_HOURS',
-          summary: 'Market participants are positioned for upcoming Federal Reserve speaking engagements and tier-1 corporate earnings reports scheduled for the subsequent morning session.',
-          verifiedFacts: [
-            'Two Federal Reserve regional presidents scheduled to deliver economic outlook addresses tomorrow.',
-            'Key enterprise software and retail earnings releases scheduled before the opening bell.',
-          ],
-          aiInference: 'Expect heightened single-stock implied volatility into post-close earnings announcements.',
+          summary: 'Monitoring after-hours corporate filings, earnings disclosures, and central bank commentary.',
+          verifiedFacts: hasNews
+            ? allNews.slice(7, 9).map((n) => `${n.source}: ${n.headline}`)
+            : ['Scheduled economic releases and earnings events tracked on economic calendar.'],
+          aiInference: 'Maintain disciplined risk parameters into scheduled overnight releases.',
           marketImpact: 'MEDIUM',
           affectedSectors: ['Enterprise Software', 'Consumer Retail'],
-          affectedTickers: ['WMT', 'AMZN', 'COST'],
+          affectedTickers: ['SPY'],
           citations: citations.slice(6, 8),
         },
       },

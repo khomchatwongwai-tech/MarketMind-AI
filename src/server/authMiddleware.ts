@@ -2,6 +2,7 @@ import { Request, Response, NextFunction } from 'express';
 import { getFirebaseAuth } from './firebaseAdmin';
 import { UserRole, SubscriptionPlanTier } from '../types/user';
 import { ServerUserStore } from '../services/serverUserStore';
+import { FirestoreUserStore } from './firestoreUserStore';
 import { EntitlementService } from '../services/entitlementService';
 
 export interface AuthenticatedUser {
@@ -9,10 +10,20 @@ export interface AuthenticatedUser {
   email?: string;
   role: UserRole;
   emailVerified?: boolean;
+  account?: any;
 }
 
 export interface AuthenticatedRequest extends Request {
   user?: AuthenticatedUser;
+}
+
+let authProviderForTests: (() => any) | null = null;
+
+export function setAuthProviderForTests(provider: (() => any) | null): void {
+  if (process.env.NODE_ENV === 'production') {
+    throw new Error('Test auth injection is disabled in production.');
+  }
+  authProviderForTests = provider;
 }
 
 /**
@@ -41,7 +52,7 @@ export async function requireAuth(
   }
 
   try {
-    const auth = getFirebaseAuth();
+    const auth = authProviderForTests ? authProviderForTests() : getFirebaseAuth();
     let decodedToken: any;
 
     try {
@@ -75,12 +86,25 @@ export async function requireAuth(
       }
     }
 
-    const role: UserRole = (decodedToken.role as UserRole) || 'user';
+    let account: any = null;
+    try {
+      account = await FirestoreUserStore.getOrCreateUser({
+        uid: decodedToken.uid,
+        email: decodedToken.email || `${decodedToken.uid}@marketmind.ai`,
+        role: decodedToken.role,
+      });
+    } catch {}
+    if (!account) {
+      account = ServerUserStore.findById(decodedToken.uid);
+    }
+
+    const role: UserRole = (account?.role as UserRole) || (decodedToken.role as UserRole) || 'user';
     req.user = {
       uid: decodedToken.uid,
       email: decodedToken.email,
       role,
       emailVerified: decodedToken.email_verified || false,
+      account: account || undefined,
     };
 
     next();

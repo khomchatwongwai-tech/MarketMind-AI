@@ -179,12 +179,11 @@ export class AlpacaNewsProvider implements NewsProvider {
       }
     } catch (err) {
       this.errorsCount++;
-      console.warn('AlpacaNewsProvider API fetch warning, using normalized stream:', err);
+      console.warn('[AlpacaNewsProvider] API fetch error, failing closed:', err);
     }
 
-    // Return normalized fallback
-    const items = this.getFallbackAlpacaNews();
-    return MarketMindNewsEngine.filterByRelevance(items, options);
+    // Fail closed: Never return fabricated financial news
+    return [];
   }
 
   async getTickerNews(ticker: string, options?: ProviderQueryOptions): Promise<NewsArticle[]> {

@@ -20,7 +20,7 @@ export class AlpacaMarketDataService {
   constructor(
     private readonly apiKey = process.env.ALPACA_API_KEY || '',
     private readonly apiSecret = process.env.ALPACA_API_SECRET || '',
-    private readonly fetchFn: FetchLike = fetch,
+    private readonly fetchFn?: FetchLike,
     baseUrl = process.env.ALPACA_DATA_BASE_URL || 'https://data.alpaca.markets'
   ) { this.baseUrl = baseUrl.replace(/\/$/, ''); }
 
@@ -29,8 +29,9 @@ export class AlpacaMarketDataService {
   private async request(path: string): Promise<any> {
     if (!this.isConfigured()) throw new AlpacaProviderError('NOT_CONFIGURED', 'Alpaca market data is not configured.');
     let response: Response;
+    const doFetch = this.fetchFn || globalThis.fetch;
     try {
-      response = await this.fetchFn(`${this.baseUrl}${path}`, { headers: {
+      response = await doFetch(`${this.baseUrl}${path}`, { headers: {
         'APCA-API-KEY-ID': this.apiKey, 'APCA-API-SECRET-KEY': this.apiSecret, Accept: 'application/json',
       } });
     } catch { throw new AlpacaProviderError('UNAVAILABLE', 'Alpaca market data is unavailable.'); }

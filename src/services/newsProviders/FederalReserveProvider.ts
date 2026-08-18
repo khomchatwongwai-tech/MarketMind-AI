@@ -5,6 +5,7 @@ import {
   SourceTier,
 } from '../../types/newsIntelligence';
 import { MarketMindNewsEngine } from '../MarketMindNewsEngine';
+import { SafeFeedParser } from './safeFeedParser';
 
 export class FederalReserveProvider implements NewsProvider {
   readonly id = 'provider_federal_reserve';
@@ -39,71 +40,63 @@ export class FederalReserveProvider implements NewsProvider {
     };
   }
 
-  private getOfficialFedReleases(): NewsArticle[] {
-    const now = Date.now();
-    const timeAgo = (m: number) => new Date(now - m * 60000).toISOString();
-
-    const rawReleases = [
-      {
-        id: 'fed_fomc_monetary_policy_statement',
-        headline: '[OFFICIAL FEDERAL RESERVE RELEASE] FOMC Statement: Federal Reserve Reaffirms Data-Dependent Policy Stance and Balanced Employment-Inflation Mandate',
-        summary: 'The Federal Open Market Committee (FOMC) released its official policy statement emphasizing that recent economic indicators suggest economic activity has continued to expand at a solid pace, with job gains remaining steady and the unemployment rate low while inflation has made further progress toward the Committee\'s 2 percent objective.',
-        fullContent: 'For release at 2:00 p.m. EDT. Recent indicators suggest that economic activity has continued to expand at a solid pace...',
-        url: 'https://www.federalreserve.gov/monetarypolicy/fomccalendars.htm',
-        tickers: ['SPY', 'QQQ', 'TLT', 'IEF', 'DXY', 'TNX'],
-        category: 'FEDERAL_RESERVE',
-        publishedAt: timeAgo(20),
-        isBreaking: true,
-        sentiment: 'BULLISH',
-        impactScore: 96,
-        primaryOfficialSource: 'Federal Reserve Board Press Docket #FOMC-2026-STMT',
-        marketReaction: {
-          observedPriceChange: 0.85,
-          volumeSurgeRatio: 3.2,
-          vixChange: -1.2,
-          yieldChangeBps: -4.5,
-        },
-      },
-      {
-        id: 'fed_discount_rate_balance_sheet_runoff',
-        headline: '[OFFICIAL FEDERAL RESERVE RELEASE] Federal Reserve Balance Sheet (H.4.1): System Open Market Account (SOMA) Redemptions and Repurchase Operations',
-        summary: 'Weekly statistical release H.4.1 details factors affecting reserve balances of depository institutions and condition statement of Federal Reserve banks, confirming smooth orderly quantitative tightening tapering parameters.',
-        url: 'https://www.federalreserve.gov/releases/h41/',
-        tickers: ['TLT', 'SHY', 'BIL'],
-        category: 'FEDERAL_RESERVE',
-        publishedAt: timeAgo(70),
-        sentiment: 'NEUTRAL',
-        impactScore: 78,
-        primaryOfficialSource: 'Federal Reserve Statistical Release H.4.1',
-      },
-      {
-        id: 'fed_chair_economic_symposium_speech',
-        headline: '[OFFICIAL FEDERAL RESERVE RELEASE] Speech by Federal Reserve Governor on Macroeconomic Dynamics and Productivity Growth',
-        summary: 'Speech transcript delivered at the Economic Club addressing AI-driven total factor productivity gains and neutral real interest rate (R-star) equilibrium dynamics.',
-        url: 'https://www.federalreserve.gov/newsevents/speeches.htm',
-        tickers: ['SPY', 'QQQ', 'IWM'],
-        category: 'FEDERAL_RESERVE',
-        publishedAt: timeAgo(110),
-        sentiment: 'BULLISH',
-        impactScore: 83,
-        primaryOfficialSource: 'Federal Reserve Speeches & Testimony Registry',
-      },
-    ];
-
-    return rawReleases.map((item) =>
-      MarketMindNewsEngine.normalizeArticle(item, {
-        providerId: this.id,
-        providerName: 'Federal Reserve Board',
-        tier: this.tier,
-        sourceType: 'PRIMARY_REGULATORY',
-      })
-    );
-  }
-
   async getLatestNews(options?: ProviderQueryOptions): Promise<NewsArticle[]> {
     this.requestsCount++;
-    const items = this.getOfficialFedReleases();
-    return MarketMindNewsEngine.filterByRelevance(items, options);
+    const startTime = Date.now();
+
+    try {
+      const feedUrl = 'https://www.federalreserve.gov/feeds/press_all.xml';
+      const xml = await SafeFeedParser.fetchFeedWithRetry(
+        feedUrl,
+        {
+          'User-Agent': 'MarketMindAI News Aggregator/2.0 (contact@marketmind.ai)',
+          Accept: 'application/rss+xml, application/xml, text/xml, */*',
+        },
+        1,
+        4000
+      );
+
+      this.latencyMs = Date.now() - startTime;
+
+      if (xml) {
+        const parsed = SafeFeedParser.parseXmlFeed(xml, 'Federal Reserve Board');
+        if (parsed.length > 0) {
+          const articles: NewsArticle[] = parsed.map((item) =>
+            MarketMindNewsEngine.normalizeArticle(
+              {
+                id: item.id,
+                headline: `[OFFICIAL FEDERAL RESERVE RELEASE] ${item.title}`,
+                summary: item.summary,
+                fullContent: item.summary,
+                url: item.link,
+                tickers: ['SPY', 'QQQ', 'TLT', 'IEF', 'DXY', 'TNX'],
+                category: 'FEDERAL_RESERVE',
+                publishedAt: item.pubDate,
+                isBreaking: true,
+                sentiment: 'NEUTRAL',
+                impactScore: 92,
+                primaryOfficialSource: 'Federal Reserve Board of Governors',
+              },
+              {
+                providerId: this.id,
+                providerName: 'Federal Reserve Board',
+                tier: this.tier,
+                sourceType: 'PRIMARY_REGULATORY',
+              }
+            )
+          );
+
+          this.lastArticleTime = articles[0]?.publishedAt || new Date().toISOString();
+          return MarketMindNewsEngine.filterByRelevance(articles, options);
+        }
+      }
+    } catch (err: any) {
+      this.errorsCount++;
+      console.warn('[FederalReserveProvider] Fed RSS fetch notice:', err?.message);
+    }
+
+    // Fail closed: Never return fabricated central bank policy statements
+    return [];
   }
 
   async getTickerNews(ticker: string, options?: ProviderQueryOptions): Promise<NewsArticle[]> {

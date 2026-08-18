@@ -148,51 +148,10 @@ export class FoxNewsProvider implements NewsProvider {
       }
     }
 
-    // High-fidelity fallback items
+    // Fail closed: Never return fabricated news if feed is unavailable
     this.latencyMs = Date.now() - startTime;
     this.lastSyncedAt = new Date().toISOString();
-
-    return [
-      {
-        id: 'fox_live_1_energy_policy',
-        provider: 'Fox Business',
-        providerId: 'fox_energy_desk',
-        source: 'Fox Business',
-        sourceType: 'OFFICIAL_FEED',
-        sourceTier: 'TIER_2_FINANCIAL',
-        sourcePriority: 2,
-        headline: 'Energy infrastructure investments expand as domestic production and export terminal permits accelerate',
-        summary: 'U.S. energy producers report expanded capital commitments toward pipeline throughput and LNG export facilities as global demand remains robust.',
-        permittedSummary: 'U.S. energy producers report expanded capital commitments toward pipeline throughput.',
-        url: 'https://www.foxbusiness.com/energy',
-        originalUrl: 'https://www.foxbusiness.com/energy',
-        author: 'Fox Business Energy Desk',
-        tickers: ['XOM', 'CVX', 'OXY', 'XLE'],
-        companies: ['Exxon Mobil Corp', 'Chevron Corp', 'Occidental Petroleum'],
-        sectors: ['Energy', 'Commodities'],
-        category: 'ENERGY',
-        country: 'US',
-        region: 'US',
-        publishedAt: new Date(Date.now() - 35 * 60000).toISOString(),
-        retrievedAt: new Date().toISOString(),
-        receivedAt: new Date().toISOString(),
-        sentiment: 'BULLISH',
-        sentimentScore: 0.38,
-        urgency: 'MEDIUM',
-        impact: 'MEDIUM',
-        marketImpact: 'MEDIUM',
-        impactScore: 72,
-        accessLevel: 'PUBLIC',
-        feedDelay: 'NEAR_REAL_TIME',
-        contentRights: 'Attributed to Fox Business. Preserving original publisher link.',
-        language: 'en',
-        verificationStatus: 'CONFIRMED',
-        isBreaking: false,
-        affectedAssets: ['XLE', 'XOM', 'CVX'],
-        sectorsAffected: ['Energy Sector'],
-        primaryOfficialSource: 'Fox Business Desk',
-      },
-    ];
+    return [];
   }
 
   async getTickerNews(ticker: string, options?: ProviderQueryOptions): Promise<NewsItem[]> {

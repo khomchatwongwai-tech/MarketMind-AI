@@ -5,6 +5,7 @@ import {
   SourceTier,
 } from '../../types/newsIntelligence';
 import { MarketMindNewsEngine } from '../MarketMindNewsEngine';
+import { SafeFeedParser } from './safeFeedParser';
 
 export class SECProvider implements NewsProvider {
   readonly id = 'provider_sec_edgar';
@@ -47,81 +48,68 @@ export class SECProvider implements NewsProvider {
     };
   }
 
-  private getOfficialSECFillings(): NewsArticle[] {
-    const now = Date.now();
-    const timeAgo = (m: number) => new Date(now - m * 60000).toISOString();
-
-    const rawFilings = [
-      {
-        id: 'sec_nvda_form8k_capex_guidance',
-        headline: '[OFFICIAL SEC SOURCE] NVIDIA Corp Form 8-K: Material Definitive Agreement & Supply Commitment Expansion',
-        summary: 'NVIDIA Corporation files Form 8-K under Item 1.01 disclosing a multi-year wafer fabrication and packaging master supply reservation agreement with Taiwan Semiconductor Manufacturing Company (TSMC) securing advanced node allocation through 2028.',
-        fullContent: 'Item 1.01 Entry into a Material Definitive Agreement. On the reported date, NVIDIA Corporation entered into an updated master capacity reservation agreement...',
-        url: 'https://www.sec.gov/edgar/browse/?CIK=0001045810',
-        tickers: ['NVDA', 'TSM'],
-        category: 'COMPANIES',
-        publishedAt: timeAgo(15),
-        isBreaking: true,
-        sentiment: 'VERY_BULLISH',
-        impactScore: 94,
-        primaryOfficialSource: 'U.S. Securities and Exchange Commission Docket #0001045810-26-000042',
-        marketReaction: {
-          observedPriceChange: 3.1,
-          volumeSurgeRatio: 2.2,
-        },
-      },
-      {
-        id: 'sec_aapl_form10q_quarterly_report',
-        headline: '[OFFICIAL SEC SOURCE] Apple Inc. Form 10-Q: Quarterly Financial Statements & Segment Revenue Disclosures',
-        summary: 'Apple Inc. files Form 10-Q for the quarterly period. Services segment gross margin expanded to 74.8% while cash and marketable securities totaled $165.2 billion with active share repurchase authorizations.',
-        url: 'https://www.sec.gov/edgar/browse/?CIK=0000320193',
-        tickers: ['AAPL'],
-        category: 'EARNINGS',
-        publishedAt: timeAgo(45),
-        sentiment: 'BULLISH',
-        impactScore: 88,
-        primaryOfficialSource: 'SEC EDGAR CIK 0000320193',
-      },
-      {
-        id: 'sec_tsla_form4_insider_purchase',
-        headline: '[OFFICIAL SEC SOURCE] Tesla Inc. Form 4: Board Director Statement of Changes in Beneficial Ownership',
-        summary: 'Form 4 filed reporting open market acquisition of 25,000 common shares by independent board director following executive committee appointment.',
-        url: 'https://www.sec.gov/edgar/browse/?CIK=0001318605',
-        tickers: ['TSLA'],
-        category: 'STOCKS',
-        publishedAt: timeAgo(90),
-        sentiment: 'BULLISH',
-        impactScore: 74,
-        primaryOfficialSource: 'SEC Form 4 Filing Docket',
-      },
-      {
-        id: 'sec_berkshire_form13f_holdings',
-        headline: '[OFFICIAL SEC SOURCE] Berkshire Hathaway Form 13F: Institutional Investment Manager Holdings Update',
-        summary: 'Quarterly institutional holdings disclosure reveals increased positions in high-yield energy and commercial infrastructure equities with total portfolio market value exceeding $310 billion.',
-        url: 'https://www.sec.gov/edgar/browse/?CIK=0001067983',
-        tickers: ['BRK.A', 'BRK.B', 'AAPL', 'OXY', 'CVX'],
-        category: 'STOCKS',
-        publishedAt: timeAgo(130),
-        sentiment: 'BULLISH',
-        impactScore: 85,
-        primaryOfficialSource: 'SEC Form 13F-HR Institutional Report',
-      },
-    ];
-
-    return rawFilings.map((item) =>
-      MarketMindNewsEngine.normalizeArticle(item, {
-        providerId: this.id,
-        providerName: 'SEC EDGAR',
-        tier: this.tier,
-        sourceType: 'PRIMARY_REGULATORY',
-      })
-    );
-  }
-
   async getLatestNews(options?: ProviderQueryOptions): Promise<NewsArticle[]> {
     this.requestsCount++;
-    const items = this.getOfficialSECFillings();
-    return MarketMindNewsEngine.filterByRelevance(items, options);
+    const startTime = Date.now();
+
+    try {
+      const feedUrl = 'https://www.sec.gov/cgi-bin/browse-edgar?action=getcurrent&type=8-K&company=&dateb=&owner=include&start=0&count=40&output=atom';
+      const xml = await SafeFeedParser.fetchFeedWithRetry(
+        feedUrl,
+        {
+          'User-Agent': this.userAgent,
+          Accept: 'application/atom+xml, application/xml, text/xml, */*',
+        },
+        1,
+        4000
+      );
+
+      this.latencyMs = Date.now() - startTime;
+
+      if (xml) {
+        const parsed = SafeFeedParser.parseXmlFeed(xml, 'SEC EDGAR');
+        if (parsed.length > 0) {
+          const articles: NewsArticle[] = parsed.map((item) => {
+            const rawTickers = (item.title.match(/\b[A-Z]{1,5}\b/g) || []).filter(
+              (t) => !['SEC', 'FORM', 'ITEM', 'THE', 'AND', 'FOR', 'INC', 'LLC', 'LTD', 'CORP'].includes(t)
+            );
+            const tickers = rawTickers.length > 0 ? rawTickers.slice(0, 3) : options?.ticker ? [options.ticker.toUpperCase()] : [];
+
+            return MarketMindNewsEngine.normalizeArticle(
+              {
+                id: item.id,
+                headline: `[OFFICIAL SEC SOURCE] ${item.title}`,
+                summary: item.summary,
+                fullContent: item.summary,
+                url: item.link,
+                tickers,
+                category: 'COMPANIES',
+                publishedAt: item.pubDate,
+                isBreaking: true,
+                sentiment: 'NEUTRAL',
+                impactScore: 88,
+                primaryOfficialSource: 'U.S. Securities and Exchange Commission (SEC EDGAR)',
+              },
+              {
+                providerId: this.id,
+                providerName: 'SEC EDGAR',
+                tier: this.tier,
+                sourceType: 'PRIMARY_REGULATORY',
+              }
+            );
+          });
+
+          this.lastArticleTime = articles[0]?.publishedAt || new Date().toISOString();
+          return MarketMindNewsEngine.filterByRelevance(articles, options);
+        }
+      }
+    } catch (err: any) {
+      this.errorsCount++;
+      console.warn('[SECProvider] EDGAR feed fetch notice:', err?.message);
+    }
+
+    // Fail closed: Never return fabricated regulatory filings
+    return [];
   }
 
   async getTickerNews(ticker: string, options?: ProviderQueryOptions): Promise<NewsArticle[]> {

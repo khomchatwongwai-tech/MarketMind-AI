@@ -7,11 +7,7 @@ import {
   Plus,
   Download,
   Search,
-  Sparkles,
-  Layers,
   ArrowUpRight,
-  BarChart2,
-  Clock,
 } from 'lucide-react';
 import { Watchlist } from '../types/user';
 import { TickerSymbol } from '../types/market';

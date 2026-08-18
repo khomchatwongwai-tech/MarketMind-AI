@@ -27,8 +27,9 @@ export class MarketMindNewsEngine {
       sourceType?: SourceType;
     }
   ): NewsArticle {
-    const id = String(raw.id || `${providerConfig.providerId}_${Date.now()}_${Math.random().toString(36).substr(2, 6)}`);
     const headline = String(raw.headline || raw.title || raw.name || 'Financial Market Update').trim();
+    const hash = Math.abs(headline.split('').reduce((acc, c) => ((acc << 5) - acc + c.charCodeAt(0)) | 0, 0));
+    const id = String(raw.id || `${providerConfig.providerId}_${Date.now()}_${hash}`);
     const summary = String(raw.summary || raw.description || raw.abstract || headline).trim();
     const content = raw.content || raw.fullContent || raw.body || undefined;
     const url = String(raw.url || raw.link || raw.sourceUrl || 'https://marketmind.ai/news').trim();

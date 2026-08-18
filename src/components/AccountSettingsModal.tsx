@@ -26,9 +26,11 @@ import {
   FileText,
   CreditCard,
   AlertTriangle,
+  LogOut,
 } from 'lucide-react';
 import { UserProfile, TickerSymbol } from '../types/user';
 import { UserService } from '../services/userService';
+import { auth } from '../config/firebase';
 import { useI18n } from '../i18n/I18nContext';
 import { LanguageCode, RegionCode } from '../i18n/types';
 import { useTheme, ThemeMode } from '../context/ThemeContext';
@@ -801,6 +803,38 @@ export const AccountSettingsModal: React.FC<AccountSettingsModalProps> = ({
                     className="w-4 h-4 accent-[#D4AF37] cursor-pointer"
                   />
                 </div>
+              </div>
+
+              {/* Session Termination & Sign Out */}
+              <div className="p-3.5 bg-[var(--surface-secondary)] rounded-lg border border-[var(--border-primary)] space-y-3">
+                <div>
+                  <h4 className="text-xs font-bold text-[var(--text-primary)]">Session Management &amp; Terminal Sign Out</h4>
+                  <p className="text-[11px] text-[var(--text-secondary)]">
+                    Invalidate current authentication tokens and end active Firebase session on this browser.
+                  </p>
+                </div>
+                <button
+                  type="button"
+                  onClick={async () => {
+                    try {
+                      await auth.signOut();
+                      const guestProfile = UserService.getUser();
+                      guestProfile.isGuest = true;
+                      guestProfile.email = '';
+                      guestProfile.role = 'user';
+                      guestProfile.plan = 'free';
+                      UserService.saveUser(guestProfile);
+                      onUserSaved(guestProfile);
+                      onClose();
+                    } catch (err) {
+                      console.error('Sign out error:', err);
+                    }
+                  }}
+                  className="px-3 py-2 bg-rose-950/40 hover:bg-rose-900/60 border border-rose-800/60 text-rose-300 hover:text-rose-100 rounded-lg text-xs font-bold flex items-center gap-2 transition cursor-pointer"
+                >
+                  <LogOut className="w-4 h-4" />
+                  <span>Sign Out of Terminal</span>
+                </button>
               </div>
             </div>
           )}

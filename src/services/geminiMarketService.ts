@@ -431,7 +431,7 @@ INSTRUCTIONS FOR ANSWERING:
     const payload: AskAiResponse = {
       answer: resultText,
       timestamp,
-      source: `Gemini 3.7 Flash MarketMind AI (${mode === 'beginner' ? 'Beginner' : 'Advanced'})`,
+      source: `MarketMind Intelligence (${getGeminiModel()}) [${mode === 'beginner' ? 'Beginner' : 'Advanced'}]`,
       status: 'VERIFIED',
     };
 
@@ -444,7 +444,7 @@ INSTRUCTIONS FOR ANSWERING:
       return {
         answer: `MarketMind analysis for ${ticker}: Current price is $${structuredContext.currentPrice}.${structuredContext.indicators?.vwap !== null ? ` Session VWAP is $${structuredContext.indicators?.vwap}.` : ''}${structuredContext.supportResistance?.s1 !== null ? ` Primary support holds at $${structuredContext.supportResistance?.s1}.` : ''}${structuredContext.supportResistance?.r1 !== null ? ` Primary resistance sits at $${structuredContext.supportResistance?.r1}.` : ''}`,
         timestamp,
-        source: 'MarketMind Verified Data',
+        source: `MarketMind Verified Data (${getGeminiModel()})`,
         status: 'VERIFIED',
       };
     }
@@ -581,7 +581,7 @@ Return a strict JSON object matching this schema:
       risk: ['low', 'moderate', 'high', 'extreme'].includes(parsed.risk) ? parsed.risk : 'moderate',
       watchNext: parsed.watchNext || `Monitor price action around verified levels.`,
       timestamp,
-      source: `Gemini 3.7 Flash Institutional Analysis (${mode === 'beginner' ? 'Beginner' : 'Advanced'})`,
+      source: `MarketMind Institutional Analysis (${getGeminiModel()}) [${mode === 'beginner' ? 'Beginner' : 'Advanced'}]`,
       status: 'VERIFIED',
     };
 
@@ -730,7 +730,7 @@ Return a strict JSON object matching this schema:
         vwap: parsed.keyLevels?.vwap || (vwapVal !== null ? `$${vwapVal}` : 'Unavailable'),
       },
       timestamp,
-      source: `Gemini 3.7 Flash Driver Synthesis (${mode === 'beginner' ? 'Beginner' : 'Advanced'})`,
+      source: `MarketMind Catalyst Synthesis (${getGeminiModel()}) [${mode === 'beginner' ? 'Beginner' : 'Advanced'}]`,
       status: 'VERIFIED',
     };
 

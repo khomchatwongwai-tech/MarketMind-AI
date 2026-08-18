@@ -32,6 +32,11 @@ interface Message {
   timestamp: string;
   structuredAnalysis?: MarketAnalysisResponse | null;
   whyMoving?: WhyMovingResponse | null;
+  observedFacts?: string[];
+  bullScenario?: { thesis: string; confirmationLevel: string };
+  bearScenario?: { thesis: string; invalidationLevel: string };
+  keyLevels?: { support?: string; resistance?: string; vwap?: string };
+  riskRating?: string;
   source?: string;
 }
 
@@ -122,8 +127,8 @@ Ask any question below or trigger an instant institutional scenario breakdown!`,
     setIsLoading(true);
 
     try {
-      // Simulate/call AI endpoint with prompt & market data
-      const response = await fetch('/api/market/ask', {
+      // Query AI endpoint with prompt & market data
+      const response = await fetch('/api/ai/ask', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -142,8 +147,13 @@ Ask any question below or trigger an instant institutional scenario breakdown!`,
         id: String(Date.now() + 1),
         sender: 'ai',
         text: resData.answer || resData.text || 'Analysis completed with verified live market parameters.',
-        timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' }) + ' ET',
-        source: resData.source || 'MarketMind Quantitative Engine',
+        timestamp: resData.timestamp || new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' }) + ' ET',
+        source: resData.source || 'MarketMind Institutional Engine',
+        observedFacts: resData.observedFacts,
+        bullScenario: resData.bullScenario,
+        bearScenario: resData.bearScenario,
+        keyLevels: resData.keyLevels,
+        riskRating: resData.riskRating,
       };
       setMessages((prev) => [...prev, aiMsg]);
     } catch (e: any) {
@@ -521,9 +531,60 @@ Ask any question below or trigger an instant institutional scenario breakdown!`,
                     )}
                   </div>
                 ) : (
-                  /* 3. STANDARD RICH TEXT MESSAGE */
-                  <div className="space-y-2 whitespace-pre-wrap font-sans text-xs text-[var(--text-primary)] leading-relaxed">
-                    {m.text}
+                  /* 3. STANDARD RICH TEXT MESSAGE + STRUCTURED CARDS */
+                  <div className="space-y-3 font-sans text-xs text-[var(--text-primary)] leading-relaxed">
+                    {/* Observed Facts Banner */}
+                    {m.observedFacts && m.observedFacts.length > 0 && (
+                      <div className="p-2.5 rounded-lg bg-[var(--surface-secondary)] border border-[var(--border-subtle)] space-y-1">
+                        <div className="flex items-center gap-1.5 text-[10px] font-mono font-bold text-[var(--accent-gold)] uppercase tracking-wider">
+                          <CheckCircle2 className="w-3 h-3" />
+                          <span>Observed Verified Facts</span>
+                        </div>
+                        <ul className="space-y-1 text-[11px] text-[var(--text-secondary)] pl-1">
+                          {m.observedFacts.map((fact, idx) => (
+                            <li key={idx} className="flex items-start gap-1.5">
+                              <span className="text-[var(--accent-gold)] font-bold">&bull;</span>
+                              <span>{fact}</span>
+                            </li>
+                          ))}
+                        </ul>
+                      </div>
+                    )}
+
+                    <div className="whitespace-pre-wrap">{m.text}</div>
+
+                    {/* Bull vs Bear Scenario Grid */}
+                    {(m.bullScenario || m.bearScenario) && (
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-[11px] pt-1">
+                        {m.bullScenario && (
+                          <div className="p-2.5 rounded-lg bg-[rgba(34,197,94,0.05)] border border-[rgba(34,197,94,0.2)] space-y-1">
+                            <div className="flex items-center justify-between text-[10px] font-mono font-bold text-[#22C55E]">
+                              <span className="flex items-center gap-1"><TrendingUp className="w-3 h-3" /> Bull Scenario</span>
+                              <span className="text-[9px] px-1.5 py-0.5 rounded bg-[rgba(34,197,94,0.15)]">{m.bullScenario.confirmationLevel}</span>
+                            </div>
+                            <p className="text-[var(--text-secondary)] text-[11px] leading-relaxed">{m.bullScenario.thesis}</p>
+                          </div>
+                        )}
+                        {m.bearScenario && (
+                          <div className="p-2.5 rounded-lg bg-[rgba(239,68,68,0.05)] border border-[rgba(239,68,68,0.2)] space-y-1">
+                            <div className="flex items-center justify-between text-[10px] font-mono font-bold text-[#EF4444]">
+                              <span className="flex items-center gap-1"><TrendingDown className="w-3 h-3" /> Bear Scenario</span>
+                              <span className="text-[9px] px-1.5 py-0.5 rounded bg-[rgba(239,68,68,0.15)]">{m.bearScenario.invalidationLevel}</span>
+                            </div>
+                            <p className="text-[var(--text-secondary)] text-[11px] leading-relaxed">{m.bearScenario.thesis}</p>
+                          </div>
+                        )}
+                      </div>
+                    )}
+
+                    {/* Key Levels Footer */}
+                    {m.keyLevels && (m.keyLevels.vwap || m.keyLevels.support || m.keyLevels.resistance) && (
+                      <div className="flex flex-wrap items-center gap-2 text-[10px] font-mono text-[var(--text-muted)] p-2 bg-[var(--surface-secondary)] rounded-md border border-[var(--border-subtle)]">
+                        {m.keyLevels.vwap && <span>VWAP: <strong className="text-[var(--accent-gold)]">{m.keyLevels.vwap}</strong></span>}
+                        {m.keyLevels.support && <span>Support: <strong className="text-[#22C55E]">{m.keyLevels.support}</strong></span>}
+                        {m.keyLevels.resistance && <span>Resistance: <strong className="text-[#EF4444]">{m.keyLevels.resistance}</strong></span>}
+                      </div>
+                    )}
                   </div>
                 )}
               </div>

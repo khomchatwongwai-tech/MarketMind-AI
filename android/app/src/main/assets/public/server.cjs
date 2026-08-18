@@ -16716,6 +16716,14 @@ function getAI() {
 app.get("/api/health", (req, res) => {
   res.json({ status: "ok", service: "MarketMind AI Engine", timestamp: (/* @__PURE__ */ new Date()).toISOString() });
 });
+app.get("/api/ready", (req, res) => {
+  res.json({
+    status: "ready",
+    service: "MarketMind AI Engine",
+    timestamp: (/* @__PURE__ */ new Date()).toISOString(),
+    uptime: process.uptime()
+  });
+});
 app.get("/api/preflight", (req, res) => {
   const result = validateProductionEnvironment();
   res.json({

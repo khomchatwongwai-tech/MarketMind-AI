@@ -93,6 +93,16 @@ app.get('/api/health', (req, res) => {
   res.json({ status: 'ok', service: 'MarketMind AI Engine', timestamp: new Date().toISOString() });
 });
 
+// Readiness check endpoint
+app.get('/api/ready', (req, res) => {
+  res.json({
+    status: 'ready',
+    service: 'MarketMind AI Engine',
+    timestamp: new Date().toISOString(),
+    uptime: process.uptime(),
+  });
+});
+
 // Preflight check endpoint
 app.get('/api/preflight', (req, res) => {
   const result = validateProductionEnvironment();

@@ -100,24 +100,35 @@ export class FirestoreUserStore {
       const snapshot = await this.db().collection('users').get();
       accounts = snapshot.docs.map((doc: any) => doc.data() as StoredUserAccount);
     }
-    const counts = { free: 0, trial: 0, basic: 0, pro: 0, premium: 0, active: 0, canceled: 0 };
+    const counts = { free: 0, trial: 0, basic: 0, pro: 0, premium: 0, ultra: 0, active: 0, canceled: 0 };
     let mrr = 0;
     for (const account of accounts) {
       if (account.subscriptionStatus === 'trialing') counts.trial++;
       if (account.subscriptionStatus === 'active') counts.active++;
       if (account.subscriptionStatus === 'canceled') counts.canceled++;
       if (account.plan === 'free') counts.free++;
-      if (account.plan === 'basic' || account.plan === 'pro' || account.plan === 'premium') {
-        counts[account.plan]++; mrr += SUBSCRIPTION_PLANS[account.plan].monthlyPrice;
+      if (account.plan === 'basic' || account.plan === 'pro' || account.plan === 'premium' || account.plan === 'ultra') {
+        counts[account.plan]++;
+        mrr += SUBSCRIPTION_PLANS[account.plan]?.monthlyPrice || 0;
       }
     }
-    return { totalUsers: accounts.length, freeUsers: counts.free, trialUsers: counts.trial,
-      basicSubscribers: counts.basic, proSubscribers: counts.pro, premiumSubscribers: counts.premium,
-      activeSubscribers: counts.active, canceledSubscribers: counts.canceled,
-      trialConversionRate: counts.active + counts.trial ? Math.round(counts.active / (counts.active + counts.trial) * 100) : 0,
-      monthlyRecurringRevenue: mrr, annualRecurringRevenue: mrr * 12,
-      churnRate: counts.active + counts.canceled ? Math.round(counts.canceled / (counts.active + counts.canceled) * 100) : 0,
-      failedPayments: 0, upcomingTrialExpirations: 0 };
+    return {
+      totalUsers: accounts.length,
+      freeUsers: counts.free,
+      trialUsers: counts.trial,
+      basicSubscribers: counts.basic,
+      proSubscribers: counts.pro,
+      premiumSubscribers: counts.premium,
+      ultraSubscribers: counts.ultra,
+      activeSubscribers: counts.active,
+      canceledSubscribers: counts.canceled,
+      trialConversionRate: counts.active + counts.trial ? Math.round((counts.active / (counts.active + counts.trial)) * 100) : 0,
+      monthlyRecurringRevenue: mrr,
+      annualRecurringRevenue: mrr * 12,
+      churnRate: counts.active + counts.canceled ? Math.round((counts.canceled / (counts.active + counts.canceled)) * 100) : 0,
+      failedPayments: 0,
+      upcomingTrialExpirations: 0,
+    };
   }
 
   static convertToUserProfile(account: StoredUserAccount): UserProfile {

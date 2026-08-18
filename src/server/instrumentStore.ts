@@ -321,6 +321,7 @@ export class InstrumentStore {
       realTimeStatus: 'REAL_TIME',
       feedDelayMinutes: 0,
       isEntitled: true,
+      lastUpdated: new Date().toISOString(),
     };
   }
 

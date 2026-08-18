@@ -13,7 +13,7 @@ services:
       - key: FIREBASE_PROJECT_ID
         value: gen-lang-client-0282286222
       - key: FIREBASE_DATABASE_ID
-        sync: false
+        value: ai-studio-marketmindai-52b43fbe-5366-4a57-8a3b-5ac098b91d46
       - key: FIREBASE_SERVICE_ACCOUNT_KEY
         sync: false
       - key: VITE_SUPABASE_URL

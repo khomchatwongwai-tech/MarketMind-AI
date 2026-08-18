@@ -1,4 +1,4 @@
-import { DatabaseInstrument } from '../instrumentStore';
+import { DatabaseInstrument } from '../../server/instrumentStore';
 
 /**
  * Curated universe seed containing core major US equities, ETFs, and broad market components.

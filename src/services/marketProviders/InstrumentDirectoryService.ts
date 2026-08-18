@@ -4,11 +4,12 @@ import {
   InstrumentSearchResultGroup,
   ProviderSymbolMap,
 } from '../../types/instrument';
+import { ADDITIONAL_INSTRUMENTS } from './additionalInstrumentCatalog';
 
 // ==========================================
-// Master Universal Multi-Asset Reference Database
+// Base Universal Multi-Asset Reference List
 // ==========================================
-export const MASTER_INSTRUMENTS: NormalizedInstrument[] = [
+const BASE_MASTER_INSTRUMENTS: NormalizedInstrument[] = [
   // --- 1. U.S. & INTERNATIONAL STOCKS ---
   {
     instrumentId: 'inst_stock_nvda_nasdaq',
@@ -1672,18 +1673,63 @@ export const MASTER_INSTRUMENTS: NormalizedInstrument[] = [
   },
 ];
 
+export const MASTER_INSTRUMENTS: NormalizedInstrument[] = [
+  ...BASE_MASTER_INSTRUMENTS,
+  ...ADDITIONAL_INSTRUMENTS,
+];
+
 export class InstrumentDirectoryService {
   private static directory: Map<string, NormalizedInstrument> = new Map();
   private static symbolIndex: Map<string, NormalizedInstrument> = new Map();
 
   static {
-    // Populate indices
+    // 1. Populate directory and primary exact symbols first
     for (const inst of MASTER_INSTRUMENTS) {
       this.directory.set(inst.instrumentId, inst);
       this.symbolIndex.set(inst.symbol.toUpperCase(), inst);
-      this.symbolIndex.set(inst.displaySymbol.toUpperCase(), inst);
+    }
+
+    // 2. Populate aliases, display tickers, and provider symbols without overriding primary symbols
+    for (const inst of MASTER_INSTRUMENTS) {
+      const disp = inst.displaySymbol.toUpperCase();
+      if (!this.symbolIndex.has(disp)) {
+        this.symbolIndex.set(disp, inst);
+      }
       if (inst.providerSymbol) {
-        this.symbolIndex.set(inst.providerSymbol.toUpperCase(), inst);
+        const prov = inst.providerSymbol.toUpperCase();
+        if (!this.symbolIndex.has(prov)) {
+          this.symbolIndex.set(prov, inst);
+        }
+      }
+      if (inst.providerSymbols?.yahoo) {
+        const y = inst.providerSymbols.yahoo.toUpperCase();
+        if (!this.symbolIndex.has(y)) {
+          this.symbolIndex.set(y, inst);
+        }
+      }
+      if (inst.providerSymbols?.massive) {
+        const m = inst.providerSymbols.massive.toUpperCase();
+        if (!this.symbolIndex.has(m)) {
+          this.symbolIndex.set(m, inst);
+        }
+      }
+      if (inst.providerSymbols?.alpaca) {
+        const a = inst.providerSymbols.alpaca.toUpperCase();
+        if (!this.symbolIndex.has(a)) {
+          this.symbolIndex.set(a, inst);
+        }
+      }
+      if (inst.providerSymbols?.fred) {
+        const f = inst.providerSymbols.fred.toUpperCase();
+        if (!this.symbolIndex.has(f)) {
+          this.symbolIndex.set(f, inst);
+        }
+      }
+      if (inst.symbol.startsWith('ECON:')) {
+        const econKey = inst.symbol.replace('ECON:', '').toUpperCase();
+        if (!this.symbolIndex.has(econKey)) {
+          this.symbolIndex.set(econKey, inst);
+        }
       }
     }
   }
@@ -1746,16 +1792,29 @@ export class InstrumentDirectoryService {
     const seenSymbols = new Set<string>();
     const combined: NormalizedInstrument[] = [];
 
+    const cleanQ = q.replace(/[^a-z0-9]/g, '');
+
     // 1. Search local master instruments
     const localMatches = this.getAll().filter((inst) => {
       if (assetClassFilter && inst.assetClass !== assetClassFilter) {
         return false;
       }
       if (!q) return true;
+      const sym = inst.symbol.toLowerCase();
+      const disp = inst.displaySymbol.toLowerCase();
+      const prov = (inst.providerSymbol || '').toLowerCase();
+      const name = inst.name.toLowerCase();
+
+      // Alias handling for common trading queries
+      if (q === '/es' && (sym === 'es=f' || prov === 'es=f')) return true;
+      if (q === 'us10y' && (sym === '^tnx' || prov === '^tnx')) return true;
+      if (cleanQ === 'bitcoin' && (sym === 'btc-usd' || disp === 'btc/usd' || prov === 'btc-usd')) return true;
+
       return (
-        inst.symbol.toLowerCase().includes(q) ||
-        inst.displaySymbol.toLowerCase().includes(q) ||
-        inst.name.toLowerCase().includes(q) ||
+        sym.includes(q) ||
+        disp.includes(q) ||
+        prov.includes(q) ||
+        name.includes(q) ||
         inst.exchange.toLowerCase().includes(q) ||
         inst.assetClass.toLowerCase().includes(q) ||
         inst.instrumentType.toLowerCase().includes(q) ||

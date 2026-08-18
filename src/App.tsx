@@ -185,6 +185,16 @@ export default function App() {
         } catch (err) {
           console.warn('Firestore profile sync error on auth change:', err);
         }
+      } else {
+        const user = UserService.getUser();
+        if (!user.isGuest) {
+          user.isGuest = true;
+          user.email = '';
+          user.role = 'user';
+          user.plan = 'free';
+          UserService.saveUser(user);
+          setCurrentUser(user);
+        }
       }
     });
 

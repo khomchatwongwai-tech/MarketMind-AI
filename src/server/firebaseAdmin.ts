@@ -32,12 +32,15 @@ export function getFirebaseApp(): App {
 
     if (serviceAccountKey) {
       try {
-        const credentials = JSON.parse(serviceAccountKey);
+        const credentials = parseFirebaseServiceAccount(serviceAccountKey, projectId);
         appInstance = initializeApp({
           credential: cert(credentials),
           projectId,
         });
       } catch (err) {
+        if (process.env.NODE_ENV === 'production') {
+          throw err;
+        }
         console.warn(
           '[FirebaseAdmin] Failed to parse service account credentials, using project default initialization',
           err

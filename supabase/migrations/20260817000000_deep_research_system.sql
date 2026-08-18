@@ -147,16 +147,20 @@ ALTER TABLE public.research_watchlists ENABLE ROW LEVEL SECURITY;
 -- Production Security Policies
 CREATE POLICY "Users can manage their own research jobs"
     ON public.research_jobs FOR ALL
-    USING (auth.uid()::text = user_id OR user_id = 'user_default');
+    USING (coalesce((select auth.jwt()->>'sub'), auth.uid()::text) = user_id)
+    WITH CHECK (coalesce((select auth.jwt()->>'sub'), auth.uid()::text) = user_id);
 
 CREATE POLICY "Users can manage their own research reports"
     ON public.research_reports FOR ALL
-    USING (auth.uid()::text = user_id OR user_id = 'user_default');
+    USING (coalesce((select auth.jwt()->>'sub'), auth.uid()::text) = user_id)
+    WITH CHECK (coalesce((select auth.jwt()->>'sub'), auth.uid()::text) = user_id);
 
 CREATE POLICY "Users can manage their own research notes"
     ON public.research_notes FOR ALL
-    USING (auth.uid()::text = user_id OR user_id = 'user_default');
+    USING (coalesce((select auth.jwt()->>'sub'), auth.uid()::text) = user_id)
+    WITH CHECK (coalesce((select auth.jwt()->>'sub'), auth.uid()::text) = user_id);
 
 CREATE POLICY "Users can manage their own research watchlists"
     ON public.research_watchlists FOR ALL
-    USING (auth.uid()::text = user_id OR user_id = 'user_default');
+    USING (coalesce((select auth.jwt()->>'sub'), auth.uid()::text) = user_id)
+    WITH CHECK (coalesce((select auth.jwt()->>'sub'), auth.uid()::text) = user_id);

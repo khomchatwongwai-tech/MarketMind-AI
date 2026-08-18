@@ -66,6 +66,11 @@ export class SupabaseQueryBuilder implements PromiseLike<{ data: any; error: any
     return this;
   }
 
+  delete() {
+    this.mutationType = 'delete';
+    return this;
+  }
+
   async single(): Promise<{ data: any; error: any }> {
     const res = await this.execute();
     if (res.error) return { data: null, error: res.error };
@@ -124,6 +129,8 @@ export class SupabaseQueryBuilder implements PromiseLike<{ data: any; error: any
       } else if (this.mutationType === 'insert') {
         method = 'POST';
         body = JSON.stringify(this.mutationData);
+      } else if (this.mutationType === 'delete') {
+        method = 'DELETE';
       }
 
       const response = await fetch(urlObj.toString(), {

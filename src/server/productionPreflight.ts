@@ -182,6 +182,33 @@ export function validateProductionEnvironment(
     }
   }
 
+  if (!env.FIREBASE_DATABASE_ID || env.FIREBASE_DATABASE_ID.trim() === '') {
+    warnings.push('FIREBASE_DATABASE_ID not specified; using default database instance.');
+  }
+
+  // 7. APP_URL & Host Configuration
+  if (isProduction) {
+    if (!env.APP_URL || env.APP_URL.trim() === '') {
+      errors.push('Missing required production environment variable: APP_URL');
+    } else {
+      try {
+        const parsedAppUrl = new URL(env.APP_URL.trim());
+        if (parsedAppUrl.protocol !== 'https:' && parsedAppUrl.hostname !== 'localhost') {
+          errors.push('APP_URL must use HTTPS protocol in production');
+        }
+      } catch {
+        errors.push('APP_URL is not a valid URL');
+      }
+    }
+  }
+
+  // 8. Market Data Mode Consistency
+  const marketMode = env.MARKET_DATA_MODE;
+  const viteMarketMode = env.VITE_MARKET_DATA_MODE;
+  if (marketMode && viteMarketMode && marketMode !== viteMarketMode) {
+    errors.push('MARKET_DATA_MODE and VITE_MARKET_DATA_MODE must match');
+  }
+
   return {
     ok: errors.length === 0,
     errors,

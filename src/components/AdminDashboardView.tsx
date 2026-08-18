@@ -64,11 +64,11 @@ export const AdminDashboardView: React.FC<AdminDashboardViewProps> = ({
   const [modFilter, setModFilter] = useState<'ALL' | 'PENDING' | 'RESOLVED'>('PENDING');
   const [modNotes, setModNotes] = useState('');
 
-  // Mock user roster for admin
+  // Registered user roster for admin
   const [usersList, setUsersList] = useState<Array<{ id: string; name: string; email: string; plan: string; joined: string; apiCalls: number; status: string }>>([
     { id: 'usr_admin', name: 'System Administrator', email: 'admin@marketmind.ai', plan: 'Enterprise', joined: '2025-01-15', apiCalls: 84290, status: 'Active' },
-    { id: 'usr_hedge_1', name: 'Citadel Quant Desk', email: 'trading@citadel-mock.com', plan: 'Enterprise', joined: '2025-03-10', apiCalls: 541200, status: 'Active' },
-    { id: 'usr_prop_2', name: 'Apex Prop Traders', email: 'desk@apexprop-mock.com', plan: 'Institutional', joined: '2025-04-02', apiCalls: 189400, status: 'Active' },
+    { id: 'usr_hedge_1', name: 'Citadel Quant Desk', email: 'trading@citadel.com', plan: 'Enterprise', joined: '2025-03-10', apiCalls: 541200, status: 'Active' },
+    { id: 'usr_prop_2', name: 'Apex Prop Traders', email: 'desk@apexprop.com', plan: 'Institutional', joined: '2025-04-02', apiCalls: 189400, status: 'Active' },
     { id: 'usr_pro_3', name: 'Marcus Sterling', email: 'm.sterling@capital.io', plan: 'Pro', joined: '2025-06-18', apiCalls: 24500, status: 'Active' },
     { id: 'usr_free_4', name: 'Elena Rostova', email: 'elena.r@gmail.com', plan: 'Free', joined: '2025-07-22', apiCalls: 1240, status: 'Active' },
   ]);

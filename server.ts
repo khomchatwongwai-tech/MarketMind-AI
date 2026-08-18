@@ -95,12 +95,27 @@ app.get('/api/health', (req, res) => {
 
 // Readiness check endpoint
 app.get('/api/ready', (req, res) => {
-  res.json({
-    status: 'ready',
+  const preflight = validateProductionEnvironment();
+  const isProduction = process.env.NODE_ENV === 'production';
+  const ready = !isProduction || preflight.ok;
+
+  const responseBody = {
+    status: ready ? 'ready' : 'not_ready',
     service: 'MarketMind AI Engine',
+    environment: process.env.NODE_ENV || 'development',
     timestamp: new Date().toISOString(),
     uptime: process.uptime(),
-  });
+    preflight: {
+      ok: preflight.ok,
+      errors: preflight.errors,
+      warnings: preflight.warnings,
+    },
+  };
+
+  if (!ready) {
+    return res.status(503).json(responseBody);
+  }
+  return res.status(200).json(responseBody);
 });
 
 // Preflight check endpoint

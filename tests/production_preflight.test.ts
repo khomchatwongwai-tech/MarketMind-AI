@@ -187,6 +187,31 @@ describe('Production Preflight & Security Hardening Tests', () => {
     assert.equal(result.ok, true, `Errors: ${result.errors.join(', ')}`);
   });
 
+  it('Missing APP_URL in production fails preflight', () => {
+    const env = { ...validProductionEnv, APP_URL: '' };
+    const result = validateProductionEnvironment(env);
+    assert.equal(result.ok, false);
+    assert.ok(result.errors.some((e) => e.includes('APP_URL')));
+  });
+
+  it('Non-HTTPS APP_URL in production fails preflight', () => {
+    const env = { ...validProductionEnv, APP_URL: 'http://marketmind.ai' };
+    const result = validateProductionEnvironment(env);
+    assert.equal(result.ok, false);
+    assert.ok(result.errors.some((e) => e.includes('APP_URL must use HTTPS')));
+  });
+
+  it('Mismatched MARKET_DATA_MODE and VITE_MARKET_DATA_MODE fails preflight', () => {
+    const env = {
+      ...validProductionEnv,
+      MARKET_DATA_MODE: 'real_time',
+      VITE_MARKET_DATA_MODE: 'end_of_day',
+    };
+    const result = validateProductionEnvironment(env);
+    assert.equal(result.ok, false);
+    assert.ok(result.errors.some((e) => e.includes('MARKET_DATA_MODE and VITE_MARKET_DATA_MODE must match')));
+  });
+
   it('normalizeSupabaseUrl cleans paths and handles cases predictably', () => {
     assert.equal(normalizeSupabaseUrl('https://abc.supabase.co/'), 'https://abc.supabase.co');
     assert.equal(normalizeSupabaseUrl('HTTPS://ABC.SUPABASE.CO///'), 'https://abc.supabase.co');

@@ -17,29 +17,25 @@ import { Watchlist } from '../types/user';
 import { TickerSymbol } from '../types/market';
 import { UserService } from '../services/userService';
 
+import { InstrumentDirectoryService } from '../services/marketProviders/InstrumentDirectoryService';
+import { DataProviderRouter } from '../services/marketProviders/DataProviderRouter';
+import { useEffect, useCallback } from 'react';
+
 interface WatchlistsViewProps {
   onSelectTicker: (ticker: TickerSymbol) => void;
   currentTicker: TickerSymbol;
 }
 
-// Mock live ticker summary dictionary for watchlists
-const TICKER_DATA: Record<
-  string,
-  { name: string; price: number; change: number; changePercent: number; volume: string; rsi: number; bias: string }
-> = {
-  SPY: { name: 'SPDR S&P 500 ETF', price: 512.45, change: 4.25, changePercent: 0.84, volume: '48.2M', rsi: 58.4, bias: 'BULLISH' },
-  QQQ: { name: 'Invesco QQQ Trust', price: 446.8, change: 5.12, changePercent: 1.16, volume: '34.6M', rsi: 63.2, bias: 'BULLISH' },
-  NVDA: { name: 'NVIDIA Corporation', price: 129.6, change: 3.45, changePercent: 2.74, volume: '62.4M', rsi: 68.1, bias: 'BULLISH' },
-  TSLA: { name: 'Tesla, Inc.', price: 216.2, change: -2.8, changePercent: -1.28, volume: '41.8M', rsi: 44.5, bias: 'BEARISH' },
-  AAPL: { name: 'Apple Inc.', price: 224.75, change: 0.85, changePercent: 0.38, volume: '29.1M', rsi: 52.0, bias: 'NEUTRAL' },
-  MSFT: { name: 'Microsoft Corporation', price: 426.5, change: 3.2, changePercent: 0.76, volume: '18.4M', rsi: 59.8, bias: 'BULLISH' },
-  AMZN: { name: 'Amazon.com Inc.', price: 182.3, change: 1.6, changePercent: 0.89, volume: '22.0M', rsi: 56.4, bias: 'BULLISH' },
-  META: { name: 'Meta Platforms Inc.', price: 504.1, change: 6.8, changePercent: 1.37, volume: '14.5M', rsi: 64.9, bias: 'BULLISH' },
-  AMD: { name: 'Advanced Micro Devices', price: 148.9, change: 2.9, changePercent: 1.99, volume: '31.2M', rsi: 61.3, bias: 'BULLISH' },
-  IWM: { name: 'iShares Russell 2000', price: 205.8, change: -0.4, changePercent: -0.19, volume: '19.8M', rsi: 48.7, bias: 'NEUTRAL' },
-  COIN: { name: 'Coinbase Global', price: 218.4, change: 8.5, changePercent: 4.05, volume: '12.1M', rsi: 71.2, bias: 'BULLISH' },
-  PLTR: { name: 'Palantir Technologies', price: 31.8, change: 0.95, changePercent: 3.08, volume: '54.0M', rsi: 66.4, bias: 'BULLISH' },
-};
+interface LiveWatchlistSummary {
+  name: string;
+  price: number | null;
+  change: number | null;
+  changePercent: number | null;
+  volume: string;
+  rsi: number | null;
+  bias: string;
+  status: 'LIVE' | 'DELAYED' | 'UNAVAILABLE' | 'LOADING';
+}
 
 export const WatchlistsView: React.FC<WatchlistsViewProps> = ({
   onSelectTicker,
@@ -89,13 +85,98 @@ export const WatchlistsView: React.FC<WatchlistsViewProps> = ({
     }
   };
 
+  const [quotes, setQuotes] = useState<Record<string, LiveWatchlistSummary>>({});
+
+  const fetchQuotesForList = useCallback(async (tickers: TickerSymbol[]) => {
+    const updated: Record<string, LiveWatchlistSummary> = {};
+    for (const sym of tickers) {
+      const inst = InstrumentDirectoryService.getBySymbol(sym);
+      const name = inst?.name || `${sym} Asset`;
+      try {
+        const quoteRes = await DataProviderRouter.getQuote(sym);
+        if (quoteRes?.quote && quoteRes.quote.price !== null && quoteRes.quote.price !== undefined) {
+          const q = quoteRes.quote;
+          updated[sym] = {
+            name,
+            price: q.price,
+            change: q.change ?? 0,
+            changePercent: q.changePercent ?? 0,
+            volume: q.volume ? `${(q.volume / 1000000).toFixed(1)}M` : (inst?.volume ? `${(inst.volume / 1000000).toFixed(1)}M` : 'N/A'),
+            rsi: null,
+            bias: (q.change ?? 0) >= 0 ? 'BULLISH' : 'BEARISH',
+            status: 'LIVE',
+          };
+        } else if (inst && inst.price !== undefined && inst.price !== null) {
+          updated[sym] = {
+            name,
+            price: inst.price,
+            change: inst.change ?? null,
+            changePercent: inst.changePercent ?? null,
+            volume: inst.volume ? `${(inst.volume / 1000000).toFixed(1)}M` : 'N/A',
+            rsi: null,
+            bias: (inst.change ?? 0) >= 0 ? 'BULLISH' : 'BEARISH',
+            status: inst.realTimeStatus === 'REAL_TIME' ? 'LIVE' : 'DELAYED',
+          };
+        } else {
+          updated[sym] = {
+            name,
+            price: null,
+            change: null,
+            changePercent: null,
+            volume: 'N/A',
+            rsi: null,
+            bias: 'NEUTRAL',
+            status: 'UNAVAILABLE',
+          };
+        }
+      } catch {
+        updated[sym] = {
+          name,
+          price: inst?.price ?? null,
+          change: inst?.change ?? null,
+          changePercent: inst?.changePercent ?? null,
+          volume: inst?.volume ? `${(inst.volume / 1000000).toFixed(1)}M` : 'N/A',
+          rsi: null,
+          bias: 'NEUTRAL',
+          status: 'UNAVAILABLE',
+        };
+      }
+    }
+    setQuotes(updated);
+  }, []);
+
+  useEffect(() => {
+    if (currentList?.tickers && currentList.tickers.length > 0) {
+      fetchQuotesForList(currentList.tickers);
+    }
+  }, [currentList?.id, currentList?.tickers, fetchQuotesForList]);
+
   const exportCSV = () => {
     if (!currentList) return;
     const rows = [
-      ['Ticker', 'Name', 'Price', 'Change', 'Change %', 'Volume', 'RSI', 'Bias'],
+      ['Ticker', 'Name', 'Price', 'Change', 'Change %', 'Volume', 'RSI', 'Bias', 'Status'],
       ...currentList.tickers.map((t) => {
-        const d = TICKER_DATA[t] || { name: t, price: 100, change: 0, changePercent: 0, volume: '10M', rsi: 50, bias: 'NEUTRAL' };
-        return [t, d.name, d.price, d.change, `${d.changePercent}%`, d.volume, d.rsi, d.bias];
+        const d = quotes[t] || {
+          name: InstrumentDirectoryService.getBySymbol(t)?.name || `${t} Asset`,
+          price: null,
+          change: null,
+          changePercent: null,
+          volume: 'N/A',
+          rsi: null,
+          bias: 'NEUTRAL',
+          status: 'UNAVAILABLE',
+        };
+        return [
+          t,
+          d.name,
+          d.price !== null ? `$${d.price.toFixed(2)}` : 'UNAVAILABLE',
+          d.change !== null ? d.change.toFixed(2) : 'N/A',
+          d.changePercent !== null ? `${d.changePercent.toFixed(2)}%` : 'N/A',
+          d.volume,
+          d.rsi !== null ? d.rsi.toFixed(1) : 'N/A',
+          d.bias,
+          d.status,
+        ];
       }),
     ];
     const csvContent = 'data:text/csv;charset=utf-8,' + rows.map((e) => e.join(',')).join('\n');
@@ -217,16 +298,19 @@ export const WatchlistsView: React.FC<WatchlistsViewProps> = ({
             </thead>
             <tbody className="divide-y divide-[#23272f]">
               {currentList?.tickers.map((sym) => {
-                const data = TICKER_DATA[sym] || {
-                  name: `${sym} Asset`,
-                  price: 150.0,
-                  change: 1.25,
-                  changePercent: 0.85,
-                  volume: '15.4M',
-                  rsi: 55.0,
-                  bias: 'BULLISH',
+                const inst = InstrumentDirectoryService.getBySymbol(sym);
+                const data = quotes[sym] || {
+                  name: inst?.name || `${sym} Asset`,
+                  price: inst?.price ?? null,
+                  change: inst?.change ?? null,
+                  changePercent: inst?.changePercent ?? null,
+                  volume: inst?.volume ? `${(inst.volume / 1000000).toFixed(1)}M` : 'N/A',
+                  rsi: null,
+                  bias: 'NEUTRAL',
+                  status: 'LOADING' as const,
                 };
-                const isPos = data.change >= 0;
+                const hasPrice = data.price !== null && data.price !== undefined;
+                const isPos = (data.change ?? 0) >= 0;
                 const isSelected = currentTicker === sym;
 
                 return (
@@ -251,38 +335,50 @@ export const WatchlistsView: React.FC<WatchlistsViewProps> = ({
                     </td>
 
                     <td className="p-3 font-mono font-bold text-sm text-white">
-                      ${data.price.toFixed(2)}
+                      {hasPrice ? `$${data.price!.toFixed(2)}` : (
+                        <span className="text-slate-500 text-xs font-normal">
+                          {data.status === 'LOADING' ? 'Loading...' : 'UNAVAILABLE'}
+                        </span>
+                      )}
                     </td>
 
                     <td className="p-3 font-mono font-semibold">
-                      <div
-                        className={`flex items-center gap-1 ${
-                          isPos ? 'text-emerald-400' : 'text-rose-400'
-                        }`}
-                      >
-                        {isPos ? <TrendingUp className="w-3.5 h-3.5" /> : <TrendingDown className="w-3.5 h-3.5" />}
-                        <span>
-                          {isPos ? '+' : ''}
-                          {data.change.toFixed(2)} ({isPos ? '+' : ''}
-                          {data.changePercent.toFixed(2)}%)
-                        </span>
-                      </div>
+                      {data.change !== null && data.changePercent !== null ? (
+                        <div
+                          className={`flex items-center gap-1 ${
+                            isPos ? 'text-emerald-400' : 'text-rose-400'
+                          }`}
+                        >
+                          {isPos ? <TrendingUp className="w-3.5 h-3.5" /> : <TrendingDown className="w-3.5 h-3.5" />}
+                          <span>
+                            {isPos ? '+' : ''}
+                            {data.change.toFixed(2)} ({isPos ? '+' : ''}
+                            {data.changePercent.toFixed(2)}%)
+                          </span>
+                        </div>
+                      ) : (
+                        <span className="text-slate-500 text-xs font-normal">--</span>
+                      )}
                     </td>
 
                     <td className="p-3 font-mono text-slate-300">{data.volume}</td>
 
                     <td className="p-3">
-                      <span
-                        className={`font-mono font-bold ${
-                          data.rsi > 70
-                            ? 'text-rose-400'
-                            : data.rsi < 30
-                            ? 'text-emerald-400'
-                            : 'text-slate-300'
-                        }`}
-                      >
-                        {data.rsi.toFixed(1)}
-                      </span>
+                      {data.rsi !== null ? (
+                        <span
+                          className={`font-mono font-bold ${
+                            data.rsi > 70
+                              ? 'text-rose-400'
+                              : data.rsi < 30
+                              ? 'text-emerald-400'
+                              : 'text-slate-300'
+                          }`}
+                        >
+                          {data.rsi.toFixed(1)}
+                        </span>
+                      ) : (
+                        <span className="text-slate-500 font-mono text-xs">--</span>
+                      )}
                     </td>
 
                     <td className="p-3">

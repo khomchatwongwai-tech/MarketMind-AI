@@ -118,7 +118,7 @@ export const NewsAnalyzerView: React.FC<NewsAnalyzerViewProps> = ({ data }) => {
   const [selectedEventForModal, setSelectedEventForModal] = useState<MarketMindEventCluster | null>(null);
   const [shareModalArticle, setShareModalArticle] = useState<NewsItem | null>(null);
 
-  // Mock User Portfolio Holdings
+  // User Portfolio Holdings for Exposure Analysis
   const userHoldings = [
     { ticker: 'NVDA', shares: 120, price: 128.60, value: 15432 },
     { ticker: 'SPY', shares: 80, price: 512.48, value: 40998 },

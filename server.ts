@@ -2,6 +2,7 @@ import express from 'express';
 import http from 'http';
 import path from 'path';
 import dotenv from 'dotenv';
+import { GoogleGenAI } from '@google/genai';
 import { MassiveWebSocketManager } from './src/services/massiveWsManager';
 import { RealtimeServerManager } from './src/server/realtimeServerManager';
 import {

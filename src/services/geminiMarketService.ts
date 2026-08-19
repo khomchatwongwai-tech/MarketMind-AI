@@ -316,7 +316,7 @@ export async function executeAskMarketMind({
   language = 'en',
   conversationHistory = [],
   marketData,
-  aiClient,
+  aiClient = null,
 }: {
   question: string;
   ticker?: string;
@@ -324,7 +324,7 @@ export async function executeAskMarketMind({
   language?: string;
   conversationHistory?: Array<{ role: 'user' | 'assistant'; content: string }>;
   marketData: any;
-  aiClient: GoogleGenAI | null;
+  aiClient?: GoogleGenAI | null;
 }): Promise<AskAiResponse> {
   const cleanQuestion = (question || '').trim().slice(0, 500);
   if (!cleanQuestion) {
@@ -467,14 +467,14 @@ export async function executeAnalyzeMarket({
   timeframe = '5m',
   language = 'en',
   marketData,
-  aiClient,
+  aiClient = null,
 }: {
   ticker?: string;
   mode?: 'beginner' | 'advanced';
   timeframe?: string;
   language?: string;
   marketData: any;
-  aiClient: GoogleGenAI | null;
+  aiClient?: GoogleGenAI | null;
 }): Promise<MarketAnalysisResponse> {
   const structuredContext = buildStructuredMarketContext(marketData, ticker, timeframe);
   const cacheKey = `analyze_${ticker}_${mode}_${timeframe}_${language}_${structuredContext.currentPrice}`;
@@ -618,13 +618,13 @@ export async function executeWhyIsItMoving({
   mode = 'advanced',
   language = 'en',
   marketData,
-  aiClient,
+  aiClient = null,
 }: {
   ticker?: string;
   mode?: 'beginner' | 'advanced';
   language?: string;
   marketData: any;
-  aiClient: GoogleGenAI | null;
+  aiClient?: GoogleGenAI | null;
 }): Promise<WhyMovingResponse> {
   const structuredContext = buildStructuredMarketContext(marketData, ticker);
   const cacheKey = `why_${ticker}_${mode}_${language}_${structuredContext.currentPrice}`;

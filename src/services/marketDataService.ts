@@ -123,6 +123,8 @@ export function generateEmptyMarketData(ticker: TickerSymbol = 'SPY'): Comprehen
     r1, r2, r3, s1, s2, s3,
     keyResistance: r1,
     keySupport: s1,
+    breakoutStatus: 'DATA UNAVAILABLE',
+    breakoutType: 'CONSOLIDATING',
   };
 
   const quote: MarketQuote = {
@@ -154,8 +156,9 @@ export function generateEmptyMarketData(ticker: TickerSymbol = 'SPY'): Comprehen
     priceAction: 0,
     marketBreadth: 0,
     optionsSentiment: 0,
-    macroEnvironment: 0,
+    macroEconomics: 0,
     newsSentiment: 0,
+    intermarket: 0,
   };
 
   const probabilities: Probabilities = {
@@ -166,10 +169,15 @@ export function generateEmptyMarketData(ticker: TickerSymbol = 'SPY'): Comprehen
     setupScore: 0,
     setupQuality: 'B' as any,
     riskLevel: 'MODERATE' as any,
-    winRateEstimate: 50,
-    expectedRrr: '1:1.5',
-    regimeBias: 'NEUTRAL' as any,
+    primaryDriver: 'DATA UNAVAILABLE',
+    secondaryDriver: 'DATA UNAVAILABLE',
+    mainRisk: 'Verified market data is unavailable.',
+    bullishConfirmation: 'DATA UNAVAILABLE',
+    bearishInvalidation: 'DATA UNAVAILABLE',
+    aiSummary: 'Verified market data is unavailable.',
   };
+
+  const unavailableSector: SectorData = { symbol: 'N/A', name: 'DATA UNAVAILABLE', changePercent: 0, weight: 0, sentiment: 'Neutral', volumeRelative: 0 };
 
   return {
     quote,
@@ -177,18 +185,18 @@ export function generateEmptyMarketData(ticker: TickerSymbol = 'SPY'): Comprehen
     supportResistance,
     trends: [],
     trendAlignmentScore: 0,
-    breadth: { advancingCount: 0, decliningCount: 0, unchangedCount: 0, advancingVolumePct: 50, decliningVolumePct: 50, netAdvanceDecline: 0, highLowIndex: 50, mcclellanOscillator: 0, sp500Above50SmaPct: 50, sp500Above200SmaPct: 50, marketRegime: 'NEUTRAL', regimeDescription: 'Neutral' },
+    breadth: { sp500Adv: 0, sp500Dec: 0, sp500AdvDecRatio: 0, nasdaqAdv: 0, nasdaqDec: 0, nyseAdv: 0, nyseDec: 0, pctAbove20SMA: 0, pctAbove50SMA: 0, pctAbove200SMA: 0, newHighs: 0, newLows: 0, upVolumeRatio: 0, breadthScore: 0, breadthStatus: 'Weak Breadth' },
     intermarket: [],
     sectors: [],
-    strongestSector: 'N/A',
-    weakestSector: 'N/A',
-    options: { putCallRatio: 1, totalCallVolume: 0, totalPutVolume: 0, totalCallOi: 0, totalPutOi: 0, ivRank: 0, ivPercentile: 0, maxPainStrike: 0, gammaFlipStrike: 0, netGammaExposure: 0, gexRegime: 'LONG_GAMMA', expectedMoveDaily: 0, expectedMoveWeekly: 0, topUnusualActivity: [] },
+    strongestSector: unavailableSector,
+    weakestSector: unavailableSector,
+    options: { callVolume: 0, putVolume: 0, totalVolume: 0, putCallRatio: 1, totalOpenInterest: 0, impliedVolatility: 0, ivPercentile: 0, ivRank: 0, expectedDailyMove: { low: 0, high: 0, rangePoints: 0 }, largestCallOIStrike: 0, largestPutOIStrike: 0, gammaResistance: 0, gammaSupport: 0, sentiment: 'Neutral', hedgingContext: 'DATA UNAVAILABLE', unusualSweeps: [] },
     economicEvents: [],
     news: [],
-    fed: { fedFundsRate: 5.25, lastDecision: 'HOLD', nextMeetingDate: '2026-09-16', rateCutProbability: 25, rateHikeProbability: 5, pauseProbability: 70, dotPlotTarget2026: 4.75, hawkishDovishScore: 0, summary: 'Awaiting data' },
-    scenarios: { bullish: { title: 'Bull', probability: 25, targetPrice: 0, timeframe: '1d', rationale: 'N/A', keyTrigger: 'N/A' }, bearish: { title: 'Bear', probability: 25, targetPrice: 0, timeframe: '1d', rationale: 'N/A', keyTrigger: 'N/A' }, neutral: { title: 'Base', probability: 50, targetPrice: 0, timeframe: '1d', rationale: 'N/A', keyTrigger: 'N/A' } },
+    fed: { targetRange: 'DATA UNAVAILABLE', nextMeetingDate: 'DATA UNAVAILABLE', daysUntilMeeting: 0, cutProbability: 0, holdProbability: 0, hikeProbability: 0, recentCommentary: 'DATA UNAVAILABLE', hawkishDovishStance: 'Neutral', fedSentimentScore: 50, treasury10Y: 0, treasury2Y: 0, yieldCurveInversion: 0 },
+    scenarios: { bullish: { probability: 0, confirmationPrice: 0, target1: 0, target2: 0, target3: 0, invalidationLevel: 0, requiredVolume: 'DATA UNAVAILABLE', reasoning: 'DATA UNAVAILABLE' }, bearish: { probability: 0, confirmationPrice: 0, target1: 0, target2: 0, target3: 0, invalidationLevel: 0, requiredVolume: 'DATA UNAVAILABLE', reasoning: 'DATA UNAVAILABLE' }, neutral: { probability: 100, confirmationPrice: 0, target1: 0, target2: 0, target3: 0, invalidationLevel: 0, requiredVolume: 'DATA UNAVAILABLE', reasoning: 'DATA UNAVAILABLE' } },
     predictions: [],
-    backtest: { historicalWinRate: 50, profitFactor: 1, totalTrades: 0, avgReturn: 0, maxDrawdown: 0, sharpeRatio: 0, samplePeriod: 'N/A' },
+    backtest: { totalPredictions: 0, correctPredictions: 0, incorrectPredictions: 0, accuracy: 0, bullishAccuracy: 0, bearishAccuracy: 0, neutralAccuracy: 0, fifteenMinAccuracy: 0, oneHourAccuracy: 0, dailyAccuracy: 0, weeklyAccuracy: 0, avgPredictedProbability: 0, actualSuccessRate: 0, calibrationAdjustment: 0 },
     alerts: [],
     mlFeatures: [],
     factorScores,
@@ -1090,4 +1098,3 @@ export function simulateTick(prevData: ComprehensiveMarketData): ComprehensiveMa
     probabilities: updatedProbabilities,
   };
 }
-

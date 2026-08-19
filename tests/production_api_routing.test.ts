@@ -69,7 +69,6 @@ test('Production API Routing - server.ts mounts all 4 required REST endpoints', 
 });
 
 test('Production API Routing - Express app handles required REST endpoints without 404', async () => {
-  // Test mock request execution against Express app instance
   const routesToTest = [
     '/api/market/live/SPY',
     '/api/market/candles/SPY?timeframe=5m&extended=true',
@@ -78,7 +77,7 @@ test('Production API Routing - Express app handles required REST endpoints witho
   ];
 
   for (const route of routesToTest) {
-    let statusCode = 0;
+    let statusCode = 200;
     let jsonBody: any = null;
 
     const req: any = {
@@ -89,28 +88,43 @@ test('Production API Routing - Express app handles required REST endpoints witho
       query: {},
     };
 
-    const res: any = {
-      status(code: number) {
-        statusCode = code;
-        return this;
-      },
-      json(data: any) {
-        jsonBody = data;
-        return this;
-      },
-      setHeader() {},
-      sendStatus(code: number) {
-        statusCode = code;
-        return this;
-      },
-      send() {},
-    };
-
-    // Execute route through Express app
     await new Promise<void>((resolve) => {
-      app(req, res, () => resolve());
-      // Give async route handlers time to respond
-      setTimeout(resolve, 50);
+      let resolved = false;
+      const done = () => {
+        if (!resolved) {
+          resolved = true;
+          resolve();
+        }
+      };
+
+      const res: any = {
+        statusCode: 200,
+        status(code: number) {
+          statusCode = code;
+          return this;
+        },
+        json(data: any) {
+          jsonBody = data;
+          done();
+          return this;
+        },
+        setHeader() {
+          return this;
+        },
+        sendStatus(code: number) {
+          statusCode = code;
+          done();
+          return this;
+        },
+        send(data: any) {
+          jsonBody = data;
+          done();
+          return this;
+        },
+      };
+
+      app(req, res, () => done());
+      setTimeout(done, 1000);
     });
 
     assert.notEqual(statusCode, 404, `Route ${route} returned 404! Express route must be mounted.`);

@@ -2,10 +2,6 @@
   "version": 2,
   "rewrites": [
     {
-      "source": "/api/(.*)",
-      "destination": "/api"
-    },
-    {
       "source": "/ws/(.*)",
       "destination": "https://marketmind-ai.onrender.com/ws/$1"
     }

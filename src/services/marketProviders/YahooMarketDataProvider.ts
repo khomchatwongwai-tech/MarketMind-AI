@@ -8,6 +8,7 @@ import {
 } from '../../types/marketProviders';
 import { MarketQuote } from '../../types/market';
 import { InstitutionalMarketDataProvider } from './InstitutionalMarketDataProvider';
+import { CapacitorPlatform } from '../mobile/capacitorPlatform';
 
 export class YahooMarketDataProvider implements MarketDataProvider {
   readonly id = 'yahoo_finance';
@@ -18,7 +19,8 @@ export class YahooMarketDataProvider implements MarketDataProvider {
 
   async getQuote(symbol: string): Promise<MarketQuote> {
     try {
-      const res = await fetch(`/api/market/quote/${encodeURIComponent(symbol)}`);
+      const baseUrl = CapacitorPlatform.getApiBaseUrl();
+      const res = await fetch(`${baseUrl}/api/market/quote/${encodeURIComponent(symbol)}`);
       if (res.ok) {
         const json = await res.json();
         if (json && json.price) {

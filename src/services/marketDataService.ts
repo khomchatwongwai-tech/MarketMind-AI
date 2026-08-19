@@ -893,14 +893,17 @@ export function generateMarketData(
 
 export const getComprehensiveMarketData = generateMarketData;
 
-// Fetch live quote and intraday data from Yahoo Finance / Google Finance backend
-export async function fetchLiveMarketQuote(
+import { CapacitorPlatform } from './mobile/capacitorPlatform';
+
+// Fetch live quote and intraday data from backend
+export async function fetchLiveMarketData(
   ticker: string,
-  source: string = 'Yahoo Finance'
+  source: string = 'Massive API'
 ): Promise<any> {
   const startTime = Date.now();
   try {
-    const res = await fetch(`/api/market/live/${encodeURIComponent(ticker)}`);
+    const baseUrl = CapacitorPlatform.getApiBaseUrl();
+    const res = await fetch(`${baseUrl}/api/market/live/${encodeURIComponent(ticker)}`);
     if (!res.ok) throw new Error('Live endpoint error');
     const data = await res.json();
     const latencyMs = Date.now() - startTime;
@@ -915,6 +918,8 @@ export async function fetchLiveMarketQuote(
   }
 }
 
+export const fetchLiveMarketQuote = fetchLiveMarketData;
+
 // Fetch live multi-ticker market tape (SPY, QQQ, NVDA, AAPL, etc.)
 export async function fetchLiveTape(): Promise<Array<{
   symbol: string;
@@ -925,7 +930,8 @@ export async function fetchLiveTape(): Promise<Array<{
   volume?: number;
 }>> {
   try {
-    const res = await fetch('/api/market/tape');
+    const baseUrl = CapacitorPlatform.getApiBaseUrl();
+    const res = await fetch(`${baseUrl}/api/market/tape`);
     if (!res.ok) throw new Error('Tape error');
     const data = await res.json();
     return data.quotes || [];
@@ -943,7 +949,8 @@ export async function searchMarketSymbols(query: string): Promise<Array<{
 }>> {
   if (!query || query.trim().length === 0) return [];
   try {
-    const res = await fetch(`/api/market/search?q=${encodeURIComponent(query)}`);
+    const baseUrl = CapacitorPlatform.getApiBaseUrl();
+    const res = await fetch(`${baseUrl}/api/market/search?q=${encodeURIComponent(query)}`);
     if (!res.ok) return [];
     const data = await res.json();
     return data.quotes || [];

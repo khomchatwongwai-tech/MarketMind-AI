@@ -37,6 +37,15 @@ export class ApiClient {
   }
 
   /**
+   * Helper to construct full API URL for a given endpoint path.
+   */
+  public static buildApiUrl(path: string): string {
+    const baseUrl = CapacitorPlatform.getApiBaseUrl();
+    const cleanPath = path.startsWith('/') ? path : `/${path}`;
+    return `${baseUrl}${cleanPath}`;
+  }
+
+  /**
    * Get current auth token from token provider, secure storage, or localStorage
    */
   public async getAuthToken(): Promise<string | null> {

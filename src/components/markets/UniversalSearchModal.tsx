@@ -17,6 +17,7 @@ import { NormalizedInstrument, UniversalAssetClass, InstrumentSearchResultGroup 
 import { formatPercent } from '../../utils/formatters';
 import { AssetClassBadge } from '../common/AssetClassBadge';
 import { InstrumentDirectoryService } from '../../services/marketProviders/InstrumentDirectoryService';
+import { CapacitorPlatform } from '../../services/mobile/capacitorPlatform';
 
 interface UniversalSearchModalProps {
   isOpen: boolean;
@@ -82,7 +83,8 @@ export const UniversalSearchModal: React.FC<UniversalSearchModalProps> = ({
         if (filter) params.set('assetClass', filter);
         params.set('limit', '40');
 
-        const res = await fetch(`/api/instruments/search?${params.toString()}`);
+        const baseUrl = CapacitorPlatform.getApiBaseUrl();
+        const res = await fetch(`${baseUrl}/api/instruments/search?${params.toString()}`);
         if (res.ok) {
           const json = await res.json();
           if (json && Array.isArray(json.groupedResults)) {

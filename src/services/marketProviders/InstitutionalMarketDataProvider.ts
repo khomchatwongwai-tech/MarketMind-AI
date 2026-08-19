@@ -8,6 +8,7 @@ import {
 } from '../../types/marketProviders';
 import { MarketQuote } from '../../types/market';
 import { AppConfig } from '../../config/environment';
+import { CapacitorPlatform } from '../mobile/capacitorPlatform';
 
 export class InstitutionalMarketDataProvider implements MarketDataProvider {
   readonly id = 'institutional_multi_provider';
@@ -65,7 +66,8 @@ export class InstitutionalMarketDataProvider implements MarketDataProvider {
     const sym = symbol.toUpperCase().trim();
     // Check if backend API has it
     try {
-      const res = await fetch(`/api/market/quote/${encodeURIComponent(sym)}`);
+      const baseUrl = CapacitorPlatform.getApiBaseUrl();
+      const res = await fetch(`${baseUrl}/api/market/quote/${encodeURIComponent(sym)}`);
       if (res.ok) {
         const json = await res.json();
         if (json && json.price) {

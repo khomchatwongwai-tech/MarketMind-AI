@@ -4,6 +4,7 @@ import {
   ChartTimeframe,
   AIChartAnalysisResult,
 } from '../types/chart';
+import { CapacitorPlatform } from './mobile/capacitorPlatform';
 
 export interface CandleResponse {
   source: string;
@@ -23,8 +24,15 @@ export interface CandleResponse {
   pmLow?: number;
   orHigh?: number;
   orLow?: number;
-  levels: ChartLevels;
+  vwap: number;
+  rsi: number;
+  atr: number;
+  adx: number;
+  macdLine: number;
+  macdSignal: number;
+  macdHist: number;
   candles: ChartCandle[];
+  levels: ChartLevels;
   lastSyncTime: string;
 }
 
@@ -36,7 +44,8 @@ export async function fetchCandles(
   timeframe: ChartTimeframe = '5m',
   extended: boolean = true
 ): Promise<CandleResponse> {
-  const url = `/api/market/candles/${encodeURIComponent(ticker)}?timeframe=${timeframe}&extended=${extended}`;
+  const baseUrl = CapacitorPlatform.getApiBaseUrl();
+  const url = `${baseUrl}/api/market/candles/${encodeURIComponent(ticker)}?timeframe=${timeframe}&extended=${extended}`;
   try {
     const res = await fetch(url);
     if (!res.ok) {
@@ -72,8 +81,9 @@ export async function requestAIChartAnalysis(payload: {
   marketStructure: string;
   candles: ChartCandle[];
 }): Promise<AIChartAnalysisResult> {
+  const baseUrl = CapacitorPlatform.getApiBaseUrl();
   try {
-    const res = await fetch('/api/ai/analyze-chart', {
+    const res = await fetch(`${baseUrl}/api/ai/analyze-chart`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(payload),

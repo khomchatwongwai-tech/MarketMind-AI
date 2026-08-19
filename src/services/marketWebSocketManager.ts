@@ -1,5 +1,6 @@
 import { WebSocketConnectionState, WebSocketMetrics } from '../types/marketProviders';
 import { MarketQuote } from '../types/market';
+import { CapacitorPlatform } from './mobile/capacitorPlatform';
 
 export type QuoteUpdateCallback = (quote: MarketQuote) => void;
 export type StateChangeCallback = (state: WebSocketConnectionState, metrics: WebSocketMetrics) => void;
@@ -9,7 +10,7 @@ export class MarketWebSocketManagerClient {
   private ws: WebSocket | null = null;
   private state: WebSocketConnectionState = 'OFFLINE';
   private reconnectAttempts = 0;
-  private maxReconnectAttempts = 10;
+  private maxReconnectAttempts = 5;
   private baseReconnectDelayMs = 1000;
   private maxReconnectDelayMs = 16000;
   private reconnectTimer: NodeJS.Timeout | null = null;
@@ -22,11 +23,7 @@ export class MarketWebSocketManagerClient {
   private stateListeners = new Set<StateChangeCallback>();
   private quoteCache = new Map<string, MarketQuote>();
 
-  private constructor() {
-    if (typeof window !== 'undefined') {
-      this.connect();
-    }
-  }
+  private constructor() {}
 
   public static getInstance(): MarketWebSocketManagerClient {
     if (!MarketWebSocketManagerClient.instance) {
@@ -50,18 +47,24 @@ export class MarketWebSocketManagerClient {
     };
   }
 
-  public addStateListener(listener: StateChangeCallback): () => void {
+  public subscribeStateChange(listener: StateChangeCallback): () => void {
     this.stateListeners.add(listener);
     listener(this.state, this.getMetrics());
-    return () => this.stateListeners.delete(listener);
+    return () => {
+      this.stateListeners.delete(listener);
+    };
   }
 
   private setState(newState: WebSocketConnectionState) {
-    if (this.state !== newState) {
-      this.state = newState;
-      const metrics = this.getMetrics();
-      this.stateListeners.forEach((cb) => cb(this.state, metrics));
-    }
+    this.state = newState;
+    const metrics = this.getMetrics();
+    this.stateListeners.forEach((fn) => {
+      try {
+        fn(newState, metrics);
+      } catch (err) {
+        console.error('[MarketWebSocketManager] Listener error:', err);
+      }
+    });
   }
 
   public connect() {
@@ -72,8 +75,7 @@ export class MarketWebSocketManagerClient {
 
     this.setState(this.reconnectAttempts > 0 ? 'RECONNECTING' : 'OFFLINE');
 
-    const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
-    const wsUrl = `${protocol}//${window.location.host}/ws/massive`;
+    const wsUrl = CapacitorPlatform.getWebSocketUrl('/ws/massive');
 
     try {
       this.ws = new WebSocket(wsUrl);

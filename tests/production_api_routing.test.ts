@@ -14,12 +14,11 @@ test('Production API Routing - vercel.json & api/index.ts configured for Serverl
 
   const content = fs.readFileSync(vercelJsonPath, 'utf8');
   const parsed = JSON.parse(content);
-  assert.ok(Array.isArray(parsed.rewrites), 'vercel.json must have a rewrites array');
-  const apiRewrite = parsed.rewrites.find((r: any) => r.source === '/api/(.*)' || r.source === '/api/:path*');
-  assert.ok(apiRewrite, 'vercel.json must rewrite /api/* to /api');
-
   const apiIndexPath = path.join(process.cwd(), 'api', 'index.ts');
   assert.equal(fs.existsSync(apiIndexPath), true, 'api/index.ts serverless function entrypoint must exist');
+
+  const apiSlugPath = path.join(process.cwd(), 'api', '[...slug].ts');
+  assert.equal(fs.existsSync(apiSlugPath), true, 'api/[...slug].ts catch-all serverless function entrypoint must exist');
 });
 
 test('Production API Routing - CapacitorPlatform returns clean relative URL on web', () => {

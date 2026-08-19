@@ -15,6 +15,7 @@ import {
   ShieldCheck,
 } from 'lucide-react';
 import { NormalizedInstrument, MultiAssetQuoteResponse } from '../../types/instrument';
+import { isFiniteMarketNumber } from '../../utils/formatters';
 import { AssetClassBadge, RealTimeBadge, SessionStatusBadge } from '../common/AssetClassBadge';
 
 interface InstrumentHeaderCardProps {
@@ -175,8 +176,9 @@ export const InstrumentHeaderCard: React.FC<InstrumentHeaderCardProps> = ({
             {isPositive ? <TrendingUp className="w-3.5 h-3.5" /> : <TrendingDown className="w-3.5 h-3.5" />}
             <span>
               {isPositive ? '+' : ''}
-              {changeVal.toFixed(decimals)} ({isPositive ? '+' : ''}
-              {changePercentVal.toFixed(2)}%)
+              {typeof changeVal === 'number' && !isNaN(changeVal) ? changeVal.toFixed(decimals) : 'N/A'} (
+              {isPositive ? '+' : ''}
+              {typeof changePercentVal === 'number' && !isNaN(changePercentVal) ? changePercentVal.toFixed(2) : 'N/A'}%)
             </span>
           </div>
         </div>
@@ -188,22 +190,24 @@ export const InstrumentHeaderCard: React.FC<InstrumentHeaderCardProps> = ({
             <div>
               <span className="text-slate-500 text-[10px]">BID</span>
               <p className="text-white font-bold text-sm">
-                {quote?.bid ? quote.bid.toFixed(decimals) : (currentPrice * 0.9998).toFixed(decimals)}
+                {quote?.bid ? quote.bid.toFixed(decimals) : typeof currentPrice === 'number' && !isNaN(currentPrice) && currentPrice > 0 ? (currentPrice * 0.9998).toFixed(decimals) : 'N/A'}
               </p>
             </div>
             <div>
               <span className="text-slate-500 text-[10px]">ASK</span>
               <p className="text-white font-bold text-sm">
-                {quote?.ask ? quote.ask.toFixed(decimals) : (currentPrice * 1.0002).toFixed(decimals)}
+                {quote?.ask ? quote.ask.toFixed(decimals) : typeof currentPrice === 'number' && !isNaN(currentPrice) && currentPrice > 0 ? (currentPrice * 1.0002).toFixed(decimals) : 'N/A'}
               </p>
             </div>
           </div>
           <div className="mt-1 flex justify-between text-[11px] text-slate-400">
             <span>Spread:</span>
             <span className="text-slate-300 font-bold">
-              {quote?.spread
-                ? quote.spread.toFixed(decimals)
-                : (currentPrice * 0.0004).toFixed(decimals)}{' '}
+              {isFiniteMarketNumber(quote?.spread)
+                ? quote!.spread.toFixed(decimals)
+                : isFiniteMarketNumber(currentPrice) && currentPrice > 0
+                ? (currentPrice * 0.0004).toFixed(decimals)
+                : 'N/A'}{' '}
               {isForex ? `(${((quote?.spread || 0.0002) * 10000).toFixed(1)} pips)` : ''}
             </span>
           </div>
@@ -213,19 +217,19 @@ export const InstrumentHeaderCard: React.FC<InstrumentHeaderCardProps> = ({
         <div className="p-3 bg-[#16181f] rounded-lg border border-[#242833] flex flex-col justify-between">
           <div className="flex justify-between text-[11px] font-mono text-slate-400">
             <span>{instrument.tradingSession === 'CONTINUOUS_24_7' ? '24H RANGE' : 'DAY RANGE'}</span>
-            <span className="text-[#D4AF37] font-bold">{currentRangePercent.toFixed(0)}%</span>
+            <span className="text-[#D4AF37] font-bold">{typeof currentRangePercent === 'number' && !isNaN(currentRangePercent) ? currentRangePercent.toFixed(0) : '0'}%</span>
           </div>
           <div className="my-2">
             <div className="w-full h-1.5 bg-[#252a36] rounded-full overflow-hidden relative">
               <div
                 className="h-full bg-gradient-to-r from-emerald-500 via-[#D4AF37] to-rose-500 rounded-full"
-                style={{ width: `${currentRangePercent}%` }}
+                style={{ width: `${currentRangePercent || 0}%` }}
               />
             </div>
           </div>
           <div className="flex justify-between text-[11px] font-mono">
-            <span className="text-slate-400">L: {dayLow.toFixed(decimals)}</span>
-            <span className="text-slate-400">H: {dayHigh.toFixed(decimals)}</span>
+            <span className="text-slate-400">L: {typeof dayLow === 'number' && !isNaN(dayLow) && dayLow > 0 ? dayLow.toFixed(decimals) : 'N/A'}</span>
+            <span className="text-slate-400">H: {typeof dayHigh === 'number' && !isNaN(dayHigh) && dayHigh > 0 ? dayHigh.toFixed(decimals) : 'N/A'}</span>
           </div>
         </div>
 
@@ -382,11 +386,11 @@ function renderAssetSpecificBar(instrument: NormalizedInstrument) {
         <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 text-center text-xs font-mono">
           <div className="p-1.5 bg-[#1b1e28] rounded border border-[#2a2f3d]">
             <span className="text-slate-500 text-[10px] block">YIELD TO MATURITY</span>
-            <span className="text-[#F2D675] font-bold">{b.yieldToMaturity.toFixed(3)}%</span>
+            <span className="text-[#F2D675] font-bold">{typeof b.yieldToMaturity === 'number' && !isNaN(b.yieldToMaturity) ? `${b.yieldToMaturity.toFixed(3)}%` : 'N/A'}</span>
           </div>
           <div className="p-1.5 bg-[#1b1e28] rounded border border-[#2a2f3d]">
             <span className="text-slate-500 text-[10px] block">COUPON</span>
-            <span className="text-white font-bold">{b.couponRate.toFixed(2)}%</span>
+            <span className="text-white font-bold">{typeof b.couponRate === 'number' && !isNaN(b.couponRate) ? `${b.couponRate.toFixed(2)}%` : 'N/A'}</span>
           </div>
           <div className="p-1.5 bg-[#1b1e28] rounded border border-[#2a2f3d]">
             <span className="text-slate-500 text-[10px] block">DURATION</span>

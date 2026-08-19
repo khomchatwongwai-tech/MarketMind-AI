@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { Calculator, AlertTriangle, TrendingUp, TrendingDown, ArrowRight, ShieldAlert, Sparkles } from 'lucide-react';
 import { ComprehensiveMarketData } from '../services/marketDataService';
+import { formatPrice, isFiniteMarketNumber } from '../utils/formatters';
 
 interface TradeSimulatorViewProps {
   data: ComprehensiveMarketData;
@@ -10,10 +11,10 @@ export const TradeSimulatorView: React.FC<TradeSimulatorViewProps> = ({ data }) 
   const { quote, supportResistance, technicals } = data;
 
   const [optionType, setOptionType] = useState<'CALL' | 'PUT'>('CALL');
-  const [strike, setStrike] = useState<number>(Number(Math.round(quote.price).toFixed(0)));
+  const [strike, setStrike] = useState<number>(Number(Math.round(quote.price || 500).toFixed(0)));
   const [premium, setPremium] = useState<number>(2.45);
   const [contracts, setContracts] = useState<number>(5);
-  const [targetPrice, setTargetPrice] = useState<number>(Number((quote.price * 1.008).toFixed(2)));
+  const [targetPrice, setTargetPrice] = useState<number>(Number(( (quote.price || 500) * 1.008).toFixed(2)));
   const [daysHeld, setDaysHeld] = useState<number>(1);
   const [ivChange, setIvChange] = useState<number>(0);
 
@@ -56,7 +57,7 @@ export const TradeSimulatorView: React.FC<TradeSimulatorViewProps> = ({ data }) 
             </h3>
           </div>
           <span className="text-[10px] text-slate-400 font-mono">
-            {quote.ticker} Underlying Reference: ${quote.price.toFixed(2)}
+            {quote.ticker} Underlying Reference: {formatPrice(quote.price)}
           </span>
         </div>
 
@@ -157,28 +158,28 @@ export const TradeSimulatorView: React.FC<TradeSimulatorViewProps> = ({ data }) 
             <div className="text-[9px] font-bold text-slate-400 uppercase">Set Target from S/R</div>
             <div className="grid grid-cols-2 gap-1 mt-1">
               <button
-                onClick={() => setTargetPrice(supportResistance.r1)}
+                onClick={() => isFiniteMarketNumber(supportResistance.r1) && setTargetPrice(supportResistance.r1)}
                 className="px-2 py-1 bg-[#15171a] hover:bg-[#252830] border border-[#2d3139] rounded text-[10px] font-mono text-rose-300 font-bold"
               >
-                R1 (${supportResistance.r1.toFixed(2)})
+                R1 ({isFiniteMarketNumber(supportResistance.r1) ? `$${supportResistance.r1.toFixed(2)}` : 'N/A'})
               </button>
               <button
-                onClick={() => setTargetPrice(supportResistance.r2)}
+                onClick={() => isFiniteMarketNumber(supportResistance.r2) && setTargetPrice(supportResistance.r2)}
                 className="px-2 py-1 bg-[#15171a] hover:bg-[#252830] border border-[#2d3139] rounded text-[10px] font-mono text-rose-300 font-bold"
               >
-                R2 (${supportResistance.r2.toFixed(2)})
+                R2 ({isFiniteMarketNumber(supportResistance.r2) ? `$${supportResistance.r2.toFixed(2)}` : 'N/A'})
               </button>
               <button
-                onClick={() => setTargetPrice(supportResistance.s1)}
+                onClick={() => isFiniteMarketNumber(supportResistance.s1) && setTargetPrice(supportResistance.s1)}
                 className="px-2 py-1 bg-[#15171a] hover:bg-[#252830] border border-[#2d3139] rounded text-[10px] font-mono text-emerald-300 font-bold"
               >
-                S1 (${supportResistance.s1.toFixed(2)})
+                S1 ({isFiniteMarketNumber(supportResistance.s1) ? `$${supportResistance.s1.toFixed(2)}` : 'N/A'})
               </button>
               <button
-                onClick={() => setTargetPrice(technicals.vwap)}
+                onClick={() => isFiniteMarketNumber(technicals.vwap) && setTargetPrice(technicals.vwap)}
                 className="px-2 py-1 bg-[#15171a] hover:bg-[#252830] border border-[#2d3139] rounded text-[10px] font-mono text-[#a5b4fc] font-bold"
               >
-                VWAP (${technicals.vwap.toFixed(2)})
+                VWAP ({isFiniteMarketNumber(technicals.vwap) ? `$${technicals.vwap.toFixed(2)}` : 'N/A'})
               </button>
             </div>
           </div>
@@ -201,7 +202,7 @@ export const TradeSimulatorView: React.FC<TradeSimulatorViewProps> = ({ data }) 
             ${breakeven.toFixed(2)}
           </div>
           <div className="text-[9px] text-slate-500 font-mono mt-0.5">
-            Distance: {((Math.abs(breakeven - quote.price) / quote.price) * 100).toFixed(2)}% away
+            Distance: {isFiniteMarketNumber(quote.price) && quote.price > 0 ? `${((Math.abs(breakeven - quote.price) / quote.price) * 100).toFixed(2)}% away` : 'N/A'}
           </div>
         </div>
 

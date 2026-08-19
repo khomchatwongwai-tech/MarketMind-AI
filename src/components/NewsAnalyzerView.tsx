@@ -1049,9 +1049,11 @@ export const NewsAnalyzerView: React.FC<NewsAnalyzerViewProps> = ({ data }) => {
 
               <div className="flex items-center gap-2">
                 <span className="text-sm font-black text-white font-mono">{stockBrief.companyName}</span>
-                <span className="text-sm font-bold font-mono text-[#D4AF37]">${stockBrief.latestPrice.toFixed(2)}</span>
-                <span className={`text-xs font-mono font-bold ${stockBrief.priceChangePercent >= 0 ? 'text-emerald-400' : 'text-rose-400'}`}>
-                  {stockBrief.priceChangePercent >= 0 ? '+' : ''}{stockBrief.priceChangePercent.toFixed(2)}%
+                <span className="text-sm font-bold font-mono text-[#D4AF37]">
+                  {typeof stockBrief.latestPrice === 'number' && !isNaN(stockBrief.latestPrice) ? `$${stockBrief.latestPrice.toFixed(2)}` : 'N/A'}
+                </span>
+                <span className={`text-xs font-mono font-bold ${(stockBrief.priceChangePercent ?? 0) >= 0 ? 'text-emerald-400' : 'text-rose-400'}`}>
+                  {typeof stockBrief.priceChangePercent === 'number' && !isNaN(stockBrief.priceChangePercent) ? `${stockBrief.priceChangePercent >= 0 ? '+' : ''}${stockBrief.priceChangePercent.toFixed(2)}%` : 'N/A'}
                 </span>
               </div>
             </div>

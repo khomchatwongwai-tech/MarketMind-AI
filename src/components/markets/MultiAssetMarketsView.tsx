@@ -19,6 +19,7 @@ import {
   UniversalAssetClass,
   InstrumentSearchResultGroup,
 } from '../../types/instrument';
+import { formatPercent, isFiniteMarketNumber } from '../../utils/formatters';
 import { AssetClassBadge, RealTimeBadge, SessionStatusBadge } from '../common/AssetClassBadge';
 import { InstrumentDirectoryService } from '../../services/marketProviders/InstrumentDirectoryService';
 import { ProviderCapabilityPanel } from './ProviderCapabilityPanel';
@@ -251,17 +252,18 @@ export const MultiAssetMarketsView: React.FC<MultiAssetMarketsViewProps> = ({
                         >
                           {isPositive ? <TrendingUp className="w-3.5 h-3.5" /> : <TrendingDown className="w-3.5 h-3.5" />}
                           <span>
-                            {isPositive ? '+' : ''}
-                            {inst.changePercent?.toFixed(2)}%
+                            {isFiniteMarketNumber(inst.changePercent)
+                              ? formatPercent(inst.changePercent)
+                              : 'N/A'}
                           </span>
                         </div>
                       </td>
 
                       {/* Spread */}
                       <td className="p-3.5 text-right font-mono text-slate-400 hidden sm:table-cell">
-                        {inst.spread != null
-                          ? inst.spread.toFixed(decimals)
-                          : '--'}
+                        {isFiniteMarketNumber(inst.spread)
+                          ? inst.spread!.toFixed(decimals)
+                          : 'N/A'}
                       </td>
 
                       {/* Session Regime */}

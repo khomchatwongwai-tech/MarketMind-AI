@@ -14,6 +14,7 @@ import {
   Loader2,
 } from 'lucide-react';
 import { NormalizedInstrument, UniversalAssetClass, InstrumentSearchResultGroup } from '../../types/instrument';
+import { formatPercent } from '../../utils/formatters';
 import { AssetClassBadge } from '../common/AssetClassBadge';
 import { InstrumentDirectoryService } from '../../services/marketProviders/InstrumentDirectoryService';
 
@@ -261,14 +262,14 @@ export const UniversalSearchModal: React.FC<UniversalSearchModalProps> = ({
                                   })
                                 : '--'}
                             </div>
-                            {inst.changePercent != null && (
+                             {inst.changePercent != null && typeof inst.changePercent === 'number' && !isNaN(inst.changePercent) && (
                               <div
                                 className={`text-[11px] font-mono font-semibold flex items-center justify-end gap-0.5 ${
                                   isPositive ? 'text-emerald-400' : 'text-rose-400'
                                 }`}
                               >
                                 {isPositive ? <TrendingUp className="w-3 h-3" /> : <TrendingDown className="w-3 h-3" />}
-                                <span>{isPositive ? '+' : ''}{inst.changePercent.toFixed(2)}%</span>
+                                <span>{formatPercent(inst.changePercent)}</span>
                               </div>
                             )}
                           </div>

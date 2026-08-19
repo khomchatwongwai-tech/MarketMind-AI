@@ -79,9 +79,9 @@ export const WhyMovingModal: React.FC<WhyMovingModalProps> = ({
                 Net Portfolio Change Today
               </span>
               <div className="text-2xl font-bold font-mono">
-                {isPositive ? '+' : ''}${analysis.portfolioDayChangeDollar.toLocaleString('en-US', { minimumFractionDigits: 2 })}
+                {isPositive ? '+' : ''}${typeof analysis.portfolioDayChangeDollar === 'number' ? analysis.portfolioDayChangeDollar.toLocaleString('en-US', { minimumFractionDigits: 2 }) : '0.00'}
                 <span className="text-sm ml-2 font-semibold">
-                  ({isPositive ? '+' : ''}{analysis.portfolioDayChangePercent.toFixed(2)}%)
+                  ({isPositive ? '+' : ''}{analysis.portfolioDayChangePercent?.toFixed(2) ?? '0.00'}%)
                 </span>
               </div>
             </div>
@@ -138,7 +138,7 @@ export const WhyMovingModal: React.FC<WhyMovingModalProps> = ({
                         <div className="flex items-center gap-1.5">
                           <span className="font-bold text-white font-mono">{c.symbol}</span>
                           <span className="text-[10px] text-emerald-400 font-mono font-semibold">
-                            +{c.dayChangePercent.toFixed(2)}%
+                            +{c.dayChangePercent?.toFixed(2) ?? '0.00'}%
                           </span>
                         </div>
                         <span className="text-[11px] font-bold text-emerald-400 font-mono">
@@ -168,7 +168,7 @@ export const WhyMovingModal: React.FC<WhyMovingModalProps> = ({
                         <div className="flex items-center gap-1.5">
                           <span className="font-bold text-white font-mono">{d.symbol}</span>
                           <span className="text-[10px] text-rose-400 font-mono font-semibold">
-                            {d.dayChangePercent.toFixed(2)}%
+                            {d.dayChangePercent?.toFixed(2) ?? '0.00'}%
                           </span>
                         </div>
                         <span className="text-[11px] font-bold text-rose-400 font-mono">

@@ -389,7 +389,7 @@ export const RealTimeDiagnosticsPanel: React.FC = () => {
                   <div key={t.id} className="flex items-center justify-between text-slate-300 hover:text-white">
                     <span className="text-slate-400">{t.timestamp}</span>
                     <span className="font-bold text-white">{t.symbol}</span>
-                    <span className="text-emerald-400 font-bold">${t.price.toFixed(2)}</span>
+                    <span className="text-emerald-400 font-bold">{typeof t.price === 'number' && !isNaN(t.price) ? `$${t.price.toFixed(2)}` : 'N/A'}</span>
                     <span className="text-purple-400">[{t.provider}]</span>
                     <span className="text-amber-400">{t.totalLatencyMs}ms total latency</span>
                   </div>

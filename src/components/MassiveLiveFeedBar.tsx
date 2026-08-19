@@ -16,6 +16,7 @@ import {
   Lock,
 } from 'lucide-react';
 import { CalculatedMarketSignals, MassiveWsStatus, MassiveAiInsight } from '../types/massiveWs';
+import { isFiniteMarketNumber } from '../utils/formatters';
 
 interface MassiveLiveFeedBarProps {
   status: MassiveWsStatus;
@@ -53,6 +54,15 @@ export const MassiveLiveFeedBar: React.FC<MassiveLiveFeedBarProps> = ({
       : status === 'RECONNECTING' || status === 'CONNECTING' || status === 'AUTHENTICATING'
       ? 'RECONNECTING'
       : 'DISCONNECTED';
+
+  const priceStr = isFiniteMarketNumber(liveTrade?.price) ? `$${liveTrade.price.toFixed(2)}` : 'Awaiting ticks';
+  const vwapStr = isFiniteMarketNumber(signals?.vwap) ? `$${signals.vwap.toFixed(2)}` : 'N/A';
+  const cumVolStr = isFiniteMarketNumber(signals?.cumulativeVolume) ? `Cum Vol: ${(signals.cumulativeVolume / 1e6).toFixed(1)}M` : 'Cum Vol: N/A';
+  const ema9Str = isFiniteMarketNumber(signals?.ema9) ? `$${signals.ema9.toFixed(2)}` : 'N/A';
+  const ema20Str = isFiniteMarketNumber(signals?.ema20) ? `$${signals.ema20.toFixed(2)}` : 'N/A';
+  const ema50Str = isFiniteMarketNumber(signals?.ema50) ? `50 EMA: $${signals.ema50.toFixed(2)}` : '50 EMA: N/A';
+  const rsiStr = isFiniteMarketNumber(signals?.rsi) ? `${signals.rsi.toFixed(1)}` : 'N/A';
+  const rvolStr = isFiniteMarketNumber(signals?.relativeVolume) ? `${signals.relativeVolume.toFixed(2)}x` : 'N/A';
 
   return (
     <div className="bg-[#0A0A0A] border border-[#242424] rounded-xl p-3 md:p-4 mb-3.5 shadow-2xl">
@@ -122,7 +132,7 @@ export const MassiveLiveFeedBar: React.FC<MassiveLiveFeedBarProps> = ({
           <span className="text-[10px] text-[#9CA3AF] font-mono uppercase">Live Trade ({ticker})</span>
           <div className="flex items-baseline gap-1 mt-1">
             <span className="text-lg font-black font-mono text-white">
-              {signals ? `$${signals.price.toFixed(2)}` : '--'}
+              {priceStr}
             </span>
           </div>
           <span className="text-[10px] text-[#9CA3AF] font-mono">
@@ -145,10 +155,10 @@ export const MassiveLiveFeedBar: React.FC<MassiveLiveFeedBarProps> = ({
             )}
           </div>
           <span className="text-lg font-black font-mono text-[#F2D675] mt-1">
-            {signals ? `$${signals.vwap.toFixed(2)}` : '--'}
+            {vwapStr}
           </span>
           <span className="text-[10px] text-[#9CA3AF] font-mono truncate">
-            {signals ? `CumVol: ${(signals.cumulativeVolume / 1000000).toFixed(2)}M` : 'CumVol: --'}
+            {cumVolStr}
           </span>
         </div>
 
@@ -167,12 +177,12 @@ export const MassiveLiveFeedBar: React.FC<MassiveLiveFeedBarProps> = ({
             )}
           </div>
           <div className="flex items-baseline gap-1.5 mt-1 font-mono text-xs">
-            <span className="text-white font-bold">{signals?.ema9 ? `$${signals.ema9.toFixed(2)}` : '--'}</span>
+            <span className="text-white font-bold">{ema9Str}</span>
             <span className="text-[#6B7280]">/</span>
-            <span className="text-[#D4AF37] font-bold">{signals?.ema20 ? `$${signals.ema20.toFixed(2)}` : '--'}</span>
+            <span className="text-[#D4AF37] font-bold">{ema20Str}</span>
           </div>
           <span className="text-[10px] text-[#9CA3AF] font-mono">
-            {signals?.ema50 ? `50 EMA: $${signals.ema50.toFixed(2)}` : '50 EMA: --'}
+            {ema50Str}
           </span>
         </div>
 
@@ -180,10 +190,10 @@ export const MassiveLiveFeedBar: React.FC<MassiveLiveFeedBarProps> = ({
         <div className="bg-[#101010] border border-[#242424] hover:border-[rgba(212,175,55,0.4)] rounded-lg p-2.5 flex flex-col justify-between transition">
           <span className="text-[10px] text-[#9CA3AF] font-mono uppercase">RSI(14)</span>
           <span className="text-lg font-black font-mono text-white mt-1">
-            {signals?.rsi ? signals.rsi.toFixed(1) : '--'}
+            {rsiStr}
           </span>
           <span className="text-[10px] text-[#9CA3AF] font-mono">
-            {signals ? (signals.rsi > 70 ? 'Overbought' : signals.rsi < 30 ? 'Oversold' : 'Neutral Range') : 'Awaiting data'}
+            {isFiniteMarketNumber(signals?.rsi) ? (signals.rsi > 70 ? 'Overbought' : signals.rsi < 30 ? 'Oversold' : 'Neutral Range') : 'Awaiting data'}
           </span>
         </div>
 
@@ -191,7 +201,7 @@ export const MassiveLiveFeedBar: React.FC<MassiveLiveFeedBarProps> = ({
         <div className="bg-[#101010] border border-[#242424] hover:border-[rgba(212,175,55,0.4)] rounded-lg p-2.5 flex flex-col justify-between transition">
           <span className="text-[10px] text-[#9CA3AF] font-mono uppercase">Relative Volume</span>
           <span className="text-lg font-black font-mono text-[#22C55E] mt-1">
-            {signals?.relativeVolume !== undefined ? `${signals.relativeVolume.toFixed(2)}x` : '--'}
+            {rvolStr}
           </span>
           <span className="text-[10px] text-[#9CA3AF] font-mono">
             Institutional Flow

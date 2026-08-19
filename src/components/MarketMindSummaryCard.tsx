@@ -24,6 +24,7 @@ import {
 } from 'lucide-react';
 import { ComprehensiveMarketData } from '../services/marketDataService';
 import { Probabilities } from '../types/market';
+import { isFiniteMarketNumber, formatPrice, formatPercent, formatNumber } from '../utils/formatters';
 
 interface MarketMindSummaryCardProps {
   data: ComprehensiveMarketData;
@@ -42,32 +43,47 @@ export const MarketMindSummaryCard: React.FC<MarketMindSummaryCardProps> = ({
 }) => {
   const { t, timezone, currency } = useI18n();
   const { quote, technicals, supportResistance, trends, breadth } = data;
-  const isPositive = quote.change >= 0;
+  const isPositive = isFiniteMarketNumber(quote.change) ? quote.change >= 0 : true;
 
   // Determine Direction
-  const isBullish = probabilities.bullish >= probabilities.bearish;
+  const isBullish = (probabilities?.bullish ?? 50) >= (probabilities?.bearish ?? 50);
   const primaryOutlook = isBullish ? t('dashboard.bullish') : t('dashboard.bearish');
-  const primaryConfidence = isBullish ? probabilities.bullish : probabilities.bearish;
+  const primaryConfidence = isBullish ? (probabilities?.bullish ?? 50) : (probabilities?.bearish ?? 50);
 
   // Multi-timeframe percentages
-  const tf15MScore = isBullish ? Math.min(95, probabilities.bullish - 4) : Math.min(95, probabilities.bearish - 3);
-  const tf1HScore = isBullish ? probabilities.bullish : probabilities.bearish;
-  const tfTodayScore = isBullish ? Math.max(50, probabilities.bullish - 7) : Math.max(50, probabilities.bearish - 6);
+  const tf15MScore = isBullish ? Math.min(95, primaryConfidence - 4) : Math.min(95, primaryConfidence - 3);
+  const tf1HScore = primaryConfidence;
+  const tfTodayScore = isBullish ? Math.max(50, primaryConfidence - 7) : Math.max(50, primaryConfidence - 6);
 
   // Setup Quality & Score Calculation
-  const setupScore = probabilities.setupScore || 78;
+  const setupScore = probabilities?.setupScore || 78;
   const setupQualityText =
-    probabilities.setupQuality ||
+    probabilities?.setupQuality ||
     (setupScore >= 75 ? t('dashboard.strongSetup') : setupScore >= 55 ? t('dashboard.moderateSetup') : t('dashboard.weakSetup'));
 
   // Confirmation & Invalidation levels
-  const confirmationLevel = (supportResistance.r1 || (quote.price * 1.004)).toFixed(2);
-  const invalidationLevel = (supportResistance.s1 || (quote.price * 0.996)).toFixed(2);
+  const confirmationLevel = isFiniteMarketNumber(supportResistance.r1)
+    ? supportResistance.r1.toFixed(2)
+    : isFiniteMarketNumber(quote.price)
+    ? (quote.price * 1.004).toFixed(2)
+    : 'N/A';
+
+  const invalidationLevel = isFiniteMarketNumber(supportResistance.s1)
+    ? supportResistance.s1.toFixed(2)
+    : isFiniteMarketNumber(quote.price)
+    ? (quote.price * 0.996).toFixed(2)
+    : 'N/A';
 
   // Dynamic Factors Check
-  const isAboveVwap = quote.price >= technicals.vwap;
-  const isEmaBullish = technicals.ema9 >= technicals.ema20;
-  const isBreadthPositive = breadth.advanceDeclineRatio >= 1.0;
+  const isAboveVwap = isFiniteMarketNumber(quote.price) && isFiniteMarketNumber(technicals.vwap)
+    ? quote.price >= technicals.vwap
+    : true;
+  const isEmaBullish = isFiniteMarketNumber(technicals.ema9) && isFiniteMarketNumber(technicals.ema20)
+    ? technicals.ema9 >= technicals.ema20
+    : true;
+  const isBreadthPositive = isFiniteMarketNumber(breadth.advanceDeclineRatio)
+    ? breadth.advanceDeclineRatio >= 1.0
+    : true;
 
   // Timestamp in ET
   const timeET = quote.timestamp || new Date().toLocaleTimeString('en-US', {
@@ -81,6 +97,12 @@ export const MarketMindSummaryCard: React.FC<MarketMindSummaryCardProps> = ({
   const radius = 42;
   const circumference = 2 * Math.PI * radius;
   const strokeDashoffset = circumference - (setupScore / 100) * circumference;
+
+  const priceStr = formatPrice(quote.price, 2, 'Unavailable');
+  const changeStr = formatPercent(quote.changePercent, 2, true, 'N/A');
+  const changeAbsStr = isFiniteMarketNumber(quote.change) ? `${isPositive ? '+' : ''}${quote.change.toFixed(2)}` : 'N/A';
+  const vwapStr = isFiniteMarketNumber(technicals.vwap) ? `$${technicals.vwap.toFixed(2)}` : 'N/A';
+  const r1Str = isFiniteMarketNumber(supportResistance.r1) ? `$${supportResistance.r1.toFixed(2)}` : 'N/A';
 
   return (
     <div
@@ -100,16 +122,14 @@ export const MarketMindSummaryCard: React.FC<MarketMindSummaryCardProps> = ({
           </div>
           <div className="flex items-baseline gap-2 mt-1">
             <span className="text-2xl sm:text-3xl font-black font-mono text-white">
-              ${quote.price.toFixed(2)}
+              {priceStr}
             </span>
             <span
               className={`text-sm sm:text-base font-bold font-mono ${
                 isPositive ? 'text-[#22C55E]' : 'text-[#EF4444]'
               }`}
             >
-              {isPositive ? '+' : ''}
-              {quote.change.toFixed(2)} ({isPositive ? '+' : ''}
-              {quote.changePercent.toFixed(2)}%)
+              {changeAbsStr} ({changeStr})
             </span>
           </div>
         </div>
@@ -301,7 +321,7 @@ export const MarketMindSummaryCard: React.FC<MarketMindSummaryCardProps> = ({
             <div className="flex items-center gap-2 p-2.5 bg-[#050505] rounded-lg border border-[#1C1C1C]">
               <span className="text-[#22C55E] font-bold text-base">✓</span>
               <span className="text-[#E5E5E5]">
-                {isAboveVwap ? `Above VWAP ($${technicals.vwap.toFixed(2)})` : `Below VWAP ($${technicals.vwap.toFixed(2)})`}
+                {isAboveVwap ? `Above VWAP (${vwapStr})` : `Below VWAP (${vwapStr})`}
               </span>
             </div>
 
@@ -332,7 +352,7 @@ export const MarketMindSummaryCard: React.FC<MarketMindSummaryCardProps> = ({
             <div className="flex items-center gap-2 p-2.5 bg-[#050505] rounded-lg border border-[#1C1C1C]">
               <span className="text-[#F2D675] font-bold text-base">⚠</span>
               <span className="text-[#E5E5E5]">
-                Major resistance nearby (${supportResistance.r1.toFixed(2)})
+                Major resistance nearby ({r1Str})
               </span>
             </div>
           </div>

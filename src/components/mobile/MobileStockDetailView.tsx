@@ -15,6 +15,7 @@ import {
   ExternalLink,
 } from 'lucide-react';
 import { NormalizedInstrument, MultiAssetQuoteResponse } from '../../types/instrument';
+import { isFiniteMarketNumber } from '../../utils/formatters';
 import { sharedApiClient } from '../../services/apiClient';
 import { AssetClassBadge } from '../common/AssetClassBadge';
 import { TradingViewChart } from '../TradingViewChart';
@@ -156,10 +157,10 @@ export const MobileStockDetailView: React.FC<MobileStockDetailViewProps> = ({
               }`}
             >
               {isPositive ? <TrendingUp className="w-4 h-4" /> : <TrendingDown className="w-4 h-4" />}
-              <span>{isPositive ? '+' : ''}{changePercent.toFixed(2)}%</span>
-              {quoteData?.quote?.change != null && (
+              <span>{isPositive ? '+' : ''}{typeof changePercent === 'number' && !isNaN(changePercent) ? `${changePercent.toFixed(2)}%` : 'N/A'}</span>
+              {isFiniteMarketNumber(quoteData?.quote?.change) && (
                 <span className="text-xs text-slate-400">
-                  ({isPositive ? '+' : ''}${quoteData.quote.change.toFixed(2)})
+                  ({isPositive ? '+' : ''}${quoteData!.quote.change!.toFixed(2)})
                 </span>
               )}
             </div>
@@ -180,19 +181,19 @@ export const MobileStockDetailView: React.FC<MobileStockDetailViewProps> = ({
         <div className="grid grid-cols-4 gap-2 mt-4 pt-3 border-t border-[#1c2230]/70 text-[11px] font-mono">
           <div className="bg-[#121620] p-2 rounded border border-[#1d2332]">
             <span className="text-slate-500 block text-[10px]">OPEN</span>
-            <span className="text-slate-200 font-semibold">{quoteData?.quote?.openPrice ? `$${quoteData.quote.openPrice.toFixed(2)}` : '--'}</span>
+            <span className="text-slate-200 font-semibold">{typeof quoteData?.quote?.openPrice === 'number' && !isNaN(quoteData.quote.openPrice) ? `$${quoteData.quote.openPrice.toFixed(2)}` : '--'}</span>
           </div>
           <div className="bg-[#121620] p-2 rounded border border-[#1d2332]">
             <span className="text-slate-500 block text-[10px]">HIGH</span>
-            <span className="text-slate-200 font-semibold">{quoteData?.quote?.dayHigh ? `$${quoteData.quote.dayHigh.toFixed(2)}` : '--'}</span>
+            <span className="text-slate-200 font-semibold">{typeof quoteData?.quote?.dayHigh === 'number' && !isNaN(quoteData.quote.dayHigh) ? `$${quoteData.quote.dayHigh.toFixed(2)}` : '--'}</span>
           </div>
           <div className="bg-[#121620] p-2 rounded border border-[#1d2332]">
             <span className="text-slate-500 block text-[10px]">LOW</span>
-            <span className="text-slate-200 font-semibold">{quoteData?.quote?.dayLow ? `$${quoteData.quote.dayLow.toFixed(2)}` : '--'}</span>
+            <span className="text-slate-200 font-semibold">{typeof quoteData?.quote?.dayLow === 'number' && !isNaN(quoteData.quote.dayLow) ? `$${quoteData.quote.dayLow.toFixed(2)}` : '--'}</span>
           </div>
           <div className="bg-[#121620] p-2 rounded border border-[#1d2332]">
             <span className="text-slate-500 block text-[10px]">PREV CLS</span>
-            <span className="text-slate-200 font-semibold">{quoteData?.quote?.previousClose ? `$${quoteData.quote.previousClose.toFixed(2)}` : '--'}</span>
+            <span className="text-slate-200 font-semibold">{typeof quoteData?.quote?.previousClose === 'number' && !isNaN(quoteData.quote.previousClose) ? `$${quoteData.quote.previousClose.toFixed(2)}` : '--'}</span>
           </div>
         </div>
       </div>

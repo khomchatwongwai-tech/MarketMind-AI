@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { X, FileText, Copy, Check, Sparkles, Download, Printer } from 'lucide-react';
 import { ComprehensiveMarketData } from '../services/marketDataService';
+import { formatPrice, formatPercent, formatNumber, isFiniteMarketNumber } from '../utils/formatters';
 
 interface ReportModalProps {
   reportType: 'morning' | 'eod';
@@ -33,55 +34,70 @@ export const ReportModal: React.FC<ReportModalProps> = ({ reportType, data, onCl
         }
       } catch (err) {
         // Fallback robust institutional template
-        const bias = data.probabilities.bullish >= 50 ? 'BULLISH' : 'NEUTRAL-BULLISH';
+        const bias = (data.probabilities?.bullish ?? 50) >= 50 ? 'BULLISH' : 'NEUTRAL-BULLISH';
+        const priceStr = formatPrice(data.quote.price);
+        const changeStr = formatNumber(data.quote.change);
+        const pctStr = formatPercent(data.quote.changePercent);
+
+        const vwapStr = isFiniteMarketNumber(data.technicals?.vwap) ? `$${data.technicals.vwap.toFixed(2)}` : 'N/A';
+        const r1Str = isFiniteMarketNumber(data.supportResistance?.r1) ? `$${data.supportResistance.r1.toFixed(2)}` : 'N/A';
+        const r2Str = isFiniteMarketNumber(data.supportResistance?.r2) ? `$${data.supportResistance.r2.toFixed(2)}` : 'N/A';
+        const r3Str = isFiniteMarketNumber(data.supportResistance?.r3) ? `$${data.supportResistance.r3.toFixed(2)}` : 'N/A';
+        const s1Str = isFiniteMarketNumber(data.supportResistance?.s1) ? `$${data.supportResistance.s1.toFixed(2)}` : 'N/A';
+        const s2Str = isFiniteMarketNumber(data.supportResistance?.s2) ? `$${data.supportResistance.s2.toFixed(2)}` : 'N/A';
+        const s3Str = isFiniteMarketNumber(data.supportResistance?.s3) ? `$${data.supportResistance.s3.toFixed(2)}` : 'N/A';
+
+        const bullConf = isFiniteMarketNumber(data.scenarios?.bullish?.confirmationPrice) ? `$${data.scenarios.bullish.confirmationPrice.toFixed(2)}` : 'N/A';
+        const bearConf = isFiniteMarketNumber(data.scenarios?.bearish?.confirmationPrice) ? `$${data.scenarios.bearish.confirmationPrice.toFixed(2)}` : 'N/A';
+
         const template = `# MARKETMIND AI — ${reportType === 'morning' ? 'MORNING PRE-MARKET INTELLIGENCE' : 'END-OF-DAY RECAP & PROJECTIONS'}
-**Asset**: ${data.quote.ticker} (${data.quote.name})
+**Asset**: ${data.quote.ticker} (${data.quote.name || 'Asset'})
 **Date**: ${new Date().toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}
-**Reference Price**: $${data.quote.price.toFixed(2)} (${data.quote.change >= 0 ? '+' : ''}${data.quote.change.toFixed(2)}, ${data.quote.change >= 0 ? '+' : ''}${data.quote.changePercent.toFixed(2)}%)
+**Reference Price**: ${priceStr} (${changeStr}, ${pctStr})
 **Status**: DEMO QUANT ENGINE CALIBRATED
 
 ---
 
 ### 1. EXECUTIVE SUMMARY & PROBABILITY PROFILE
-- **Directional Bias**: **${bias}** (Setup Quality: **${data.probabilities.setupQuality}** [${data.probabilities.setupScore}/100])
+- **Directional Bias**: **${bias}** (Setup Quality: **${data.probabilities?.setupQuality || 'Moderate'}** [${data.probabilities?.setupScore || 75}/100])
 - **Calculated Probabilities**:
-  - **Bullish Scenario**: ${data.probabilities.bullish}%
-  - **Neutral / Chop**: ${data.probabilities.neutral}%
-  - **Bearish Scenario**: ${data.probabilities.bearish}%
-- **Primary Driver**: ${data.probabilities.primaryDriver}
-- **Main Risk Factor**: ${data.probabilities.mainRisk}
-- **Current Risk Meter**: ${data.probabilities.riskLevel}
+  - **Bullish Scenario**: ${data.probabilities?.bullish ?? 50}%
+  - **Neutral / Chop**: ${data.probabilities?.neutral ?? 0}%
+  - **Bearish Scenario**: ${data.probabilities?.bearish ?? 50}%
+- **Primary Driver**: ${data.probabilities?.primaryDriver || 'Technical Momentum'}
+- **Main Risk Factor**: ${data.probabilities?.mainRisk || 'Macro Volatility'}
+- **Current Risk Meter**: ${data.probabilities?.riskLevel || 'MODERATE'}
 
 ---
 
 ### 2. CRITICAL INTRADAY PRICE LEVELS
-- **Resistance 3 (R3 Target)**: $${data.supportResistance.r3.toFixed(2)}
-- **Resistance 2 (R2 Call Wall)**: $${data.supportResistance.r2.toFixed(2)}
-- **Resistance 1 (R1 Key Overhead)**: $${data.supportResistance.r1.toFixed(2)}
-- **Intraday VWAP Baseline**: $${data.technicals.vwap.toFixed(2)}
-- **Support 1 (S1 Key Floor)**: $${data.supportResistance.s1.toFixed(2)}
-- **Support 2 (S2 Gamma Put Floor)**: $${data.supportResistance.s2.toFixed(2)}
-- **Support 3 (S3 Extreme Low)**: $${data.supportResistance.s3.toFixed(2)}
+- **Resistance 3 (R3 Target)**: ${r3Str}
+- **Resistance 2 (R2 Call Wall)**: ${r2Str}
+- **Resistance 1 (R1 Key Overhead)**: ${r1Str}
+- **Intraday VWAP Baseline**: ${vwapStr}
+- **Support 1 (S1 Key Floor)**: ${s1Str}
+- **Support 2 (S2 Gamma Put Floor)**: ${s2Str}
+- **Support 3 (S3 Extreme Low)**: ${s3Str}
 
-**Bullish Confirmation**: 15-minute candle close above $${data.scenarios.bullish.confirmationPrice.toFixed(2)} with relative volume > 1.25x.
-**Bearish Invalidation**: Loss of VWAP / support floor at $${data.scenarios.bearish.confirmationPrice.toFixed(2)}.
+**Bullish Confirmation**: 15-minute candle close above ${bullConf} with relative volume > 1.25x.
+**Bearish Invalidation**: Loss of VWAP / support floor at ${bearConf}.
 
 ---
 
 ### 3. OPTIONS FLOW & GAMMA STRUCTURE
-- **Put/Call Ratio**: ${data.options.putCallRatio.toFixed(2)} (${data.options.sentiment})
-- **Implied Volatility (IV)**: ${data.options.impliedVolatility}% (IV Percentile: ${data.options.ivPercentile}%)
-- **Expected Daily Move Range**: $${data.options.expectedDailyMove.low.toFixed(2)} - $${data.options.expectedDailyMove.high.toFixed(2)} (±$${(data.options.expectedDailyMove.rangePoints/2).toFixed(2)})
-- **Largest Call Strike**: $${data.options.largestCallOIStrike.toFixed(2)} | **Largest Put Strike**: $${data.options.largestPutOIStrike.toFixed(2)}
-- **Context Note**: ${data.options.hedgingContext}
+- **Put/Call Ratio**: ${isFiniteMarketNumber(data.options?.putCallRatio) ? data.options.putCallRatio.toFixed(2) : 'N/A'} (${data.options?.sentiment || 'NEUTRAL'})
+- **Implied Volatility (IV)**: ${data.options?.impliedVolatility ?? 'N/A'}% (IV Percentile: ${data.options?.ivPercentile ?? 'N/A'}%)
+- **Expected Daily Move Range**: ${isFiniteMarketNumber(data.options?.expectedDailyMove?.low) ? `$${data.options.expectedDailyMove.low.toFixed(2)}` : 'N/A'} - ${isFiniteMarketNumber(data.options?.expectedDailyMove?.high) ? `$${data.options.expectedDailyMove.high.toFixed(2)}` : 'N/A'} (±${isFiniteMarketNumber(data.options?.expectedDailyMove?.rangePoints) ? `$${(data.options.expectedDailyMove.rangePoints / 2).toFixed(2)}` : 'N/A'})
+- **Largest Call Strike**: ${isFiniteMarketNumber(data.options?.largestCallOIStrike) ? `$${data.options.largestCallOIStrike.toFixed(2)}` : 'N/A'} | **Largest Put Strike**: ${isFiniteMarketNumber(data.options?.largestPutOIStrike) ? `$${data.options.largestPutOIStrike.toFixed(2)}` : 'N/A'}
+- **Context Note**: ${data.options?.hedgingContext || 'N/A'}
 
 ---
 
 ### 4. SECTOR & CROSS-ASSET BREADTH
-- **Strongest Sector**: ${data.strongestSector.name} (${data.strongestSector.symbol}) +${data.strongestSector.changePercent}%
-- **Weakest Sector**: ${data.weakestSector.name} (${data.weakestSector.symbol}) ${data.weakestSector.changePercent}%
-- **S&P 500 Advancers / Decliners**: ${data.breadth.sp500Adv} Adv vs ${data.breadth.sp500Dec} Dec (Score: ${data.breadth.breadthScore}/100 - ${data.breadth.breadthStatus})
-- **Federal Reserve Sentiment**: ${data.fed.fedSentimentScore}/100 (${data.fed.hawkishDovishStance})
+- **Strongest Sector**: ${data.strongestSector?.name || 'N/A'} (${data.strongestSector?.symbol || 'N/A'}) ${isFiniteMarketNumber(data.strongestSector?.changePercent) ? `+${data.strongestSector.changePercent}%` : 'N/A'}
+- **Weakest Sector**: ${data.weakestSector?.name || 'N/A'} (${data.weakestSector?.symbol || 'N/A'}) ${isFiniteMarketNumber(data.weakestSector?.changePercent) ? `${data.weakestSector.changePercent}%` : 'N/A'}
+- **S&P 500 Advancers / Decliners**: ${data.breadth?.sp500Adv ?? 'N/A'} Adv vs ${data.breadth?.sp500Dec ?? 'N/A'} Dec (Score: ${data.breadth?.breadthScore ?? 'N/A'}/100 - ${data.breadth?.breadthStatus || 'N/A'})
+- **Federal Reserve Sentiment**: ${data.fed?.fedSentimentScore ?? 'N/A'}/100 (${data.fed?.hawkishDovishStance || 'NEUTRAL'})
 
 ---
 

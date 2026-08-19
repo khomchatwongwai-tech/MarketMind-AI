@@ -1,5 +1,6 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { useI18n } from '../i18n/I18nContext';
+import { formatPrice, formatPercent, formatNumber, isFiniteMarketNumber } from '../utils/formatters';
 import {
   BotMessageSquare,
   Send,
@@ -56,11 +57,11 @@ export const AskMarketMindChat: React.FC<AskMarketMindChatProps> = ({ data, init
       text: `Welcome to **MarketMind AI Assistant** — your real-time institutional quantitative market intelligence terminal.
 
 I am actively tracking verified live market data for **${ticker}**:
-- **Price**: $${data.quote.price.toFixed(2)} (${data.quote.change >= 0 ? '+' : ''}${data.quote.change.toFixed(2)} / ${data.quote.changePercent >= 0 ? '+' : ''}${data.quote.changePercent.toFixed(2)}%)
-- **Intraday VWAP**: $${data.technicals.vwap.toFixed(2)} (${data.quote.price >= data.technicals.vwap ? 'Price is ABOVE VWAP' : 'Price is BELOW VWAP'})
-- **Key Levels**: Support S1 $${data.supportResistance.s1.toFixed(2)} &bull; Resistance R1 $${data.supportResistance.r1.toFixed(2)}
+- **Price**: ${formatPrice(data.quote.price)} (${formatNumber(data.quote.change)} / ${formatPercent(data.quote.changePercent)})
+- **Intraday VWAP**: ${isFiniteMarketNumber(data.technicals.vwap) ? `$${data.technicals.vwap.toFixed(2)}` : 'N/A'} (${isFiniteMarketNumber(data.quote.price) && isFiniteMarketNumber(data.technicals.vwap) && data.quote.price >= data.technicals.vwap ? 'Price is ABOVE VWAP' : 'Price is BELOW VWAP'})
+- **Key Levels**: Support S1 ${isFiniteMarketNumber(data.supportResistance.s1) ? `$${data.supportResistance.s1.toFixed(2)}` : 'N/A'} &bull; Resistance R1 ${isFiniteMarketNumber(data.supportResistance.r1) ? `$${data.supportResistance.r1.toFixed(2)}` : 'N/A'}
 - **Probabilities**: ${data.probabilities.bullish}% Bullish | ${data.probabilities.bearish}% Bearish | ${data.probabilities.neutral}% Neutral
-- **Options Flow**: ${data.options.sentiment} (Put/Call: ${data.options.putCallRatio.toFixed(2)})
+- **Options Flow**: ${data.options.sentiment} (Put/Call: ${isFiniteMarketNumber(data.options.putCallRatio) ? data.options.putCallRatio.toFixed(2) : 'N/A'})
 
 Ask any question below or trigger an instant institutional scenario breakdown!`,
       timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' }) + ' ET',
@@ -158,15 +159,24 @@ Ask any question below or trigger an instant institutional scenario breakdown!`,
       setMessages((prev) => [...prev, aiMsg]);
     } catch (e: any) {
       // Fallback deterministic response based on live market metrics
-      const isAboveVWAP = data.quote.price >= data.technicals.vwap;
+      const isAboveVWAP = isFiniteMarketNumber(data.quote.price) && isFiniteMarketNumber(data.technicals.vwap)
+        ? data.quote.price >= data.technicals.vwap
+        : true;
+      const vwapStr = isFiniteMarketNumber(data.technicals.vwap) ? `$${data.technicals.vwap.toFixed(2)}` : 'N/A';
+      const s1Str = isFiniteMarketNumber(data.supportResistance.s1) ? `$${data.supportResistance.s1.toFixed(2)}` : 'N/A';
+      const r1Str = isFiniteMarketNumber(data.supportResistance.r1) ? `$${data.supportResistance.r1.toFixed(2)}` : 'N/A';
+      const pivotStr = isFiniteMarketNumber(data.supportResistance.pivot) ? `$${data.supportResistance.pivot.toFixed(2)}` : 'N/A';
+      const r2Str = isFiniteMarketNumber(data.supportResistance.r2) ? `$${data.supportResistance.r2.toFixed(2)}` : 'N/A';
+      const pcrStr = isFiniteMarketNumber(data.options.putCallRatio) ? data.options.putCallRatio.toFixed(2) : 'N/A';
+
       const fallbackText = `Here is the current quantitative breakdown for **${ticker}**:
 
-- **Current Status**: Trading at **$${data.quote.price.toFixed(2)}** (${data.quote.change >= 0 ? '+' : ''}${data.quote.change.toFixed(2)} / ${data.quote.changePercent >= 0 ? '+' : ''}${data.quote.changePercent.toFixed(2)}%).
-- **VWAP Positioning**: ${isAboveVWAP ? `Holding above intraday VWAP ($${data.technicals.vwap.toFixed(2)}) indicating bullish institutional intraday control.` : `Below intraday VWAP ($${data.technicals.vwap.toFixed(2)}) signaling short-term resistance.`}
+- **Current Status**: Trading at **${formatPrice(data.quote.price)}** (${formatNumber(data.quote.change)} / ${formatPercent(data.quote.changePercent)}).
+- **VWAP Positioning**: ${isAboveVWAP ? `Holding above intraday VWAP (${vwapStr}) indicating bullish institutional intraday control.` : `Below intraday VWAP (${vwapStr}) signaling short-term resistance.`}
 - **Quant Probabilities**: **${data.probabilities.bullish}% Bullish** vs **${data.probabilities.bearish}% Bearish**.
-- **Key Support**: S1 $${data.supportResistance.s1.toFixed(2)} | Pivot: $${data.supportResistance.pivot.toFixed(2)}
-- **Key Resistance**: R1 $${data.supportResistance.r1.toFixed(2)} | R2 $${data.supportResistance.r2.toFixed(2)}
-- **Options Bias**: ${data.options.sentiment} with Put/Call volume ratio at ${data.options.putCallRatio.toFixed(2)}.
+- **Key Support**: S1 ${s1Str} | Pivot: ${pivotStr}
+- **Key Resistance**: R1 ${r1Str} | R2 ${r2Str}
+- **Options Bias**: ${data.options.sentiment} with Put/Call volume ratio at ${pcrStr}.
 
 *Educational Note: Maintain strict stop-loss positioning relative to verified intraday pivot levels.*`;
 
@@ -218,21 +228,21 @@ Ask any question below or trigger an instant institutional scenario breakdown!`,
       const fallbackAnalysis: MarketAnalysisResponse = {
         bias: data.probabilities.bullish > 55 ? 'bullish' : data.probabilities.bearish > 50 ? 'bearish' : 'neutral',
         confidenceExplanation: `Calculated from ${data.probabilities.bullish}% bullish probability and live order volume delta.`,
-        summary: `${ticker} is currently showing a ${data.quote.price >= data.technicals.vwap ? 'resilient structure holding above VWAP' : 'consolidation below intraday VWAP'} with strong liquidity at $${data.supportResistance.pivot.toFixed(2)}.`,
+        summary: `${ticker} is currently showing a ${isFiniteMarketNumber(data.quote.price) && isFiniteMarketNumber(data.technicals.vwap) && data.quote.price >= data.technicals.vwap ? 'resilient structure holding above VWAP' : 'consolidation below intraday VWAP'} with strong liquidity at ${isFiniteMarketNumber(data.supportResistance.pivot) ? `$${data.supportResistance.pivot.toFixed(2)}` : 'N/A'}.`,
         bullishFactors: [
-          `Relative volume active at ${data.quote.relativeVolume}x 30-day baseline`,
-          `Institutional order book bid density confirmed at S1 ($${data.supportResistance.s1.toFixed(2)})`,
-          `MACD momentum showing ${data.technicals.macd.histogram >= 0 ? 'expanding positive histogram' : 'tight compression near zero'}`,
+          `Relative volume active at ${data.quote.relativeVolume ?? 1}x 30-day baseline`,
+          `Institutional order book bid density confirmed at S1 (${isFiniteMarketNumber(data.supportResistance.s1) ? `$${data.supportResistance.s1.toFixed(2)}` : 'N/A'})`,
+          `MACD momentum showing ${isFiniteMarketNumber(data.technicals.macd?.histogram) && data.technicals.macd.histogram >= 0 ? 'expanding positive histogram' : 'tight compression near zero'}`,
         ],
         bearishFactors: [
-          `Key resistance cluster located at R1 ($${data.supportResistance.r1.toFixed(2)})`,
-          `Options Put/Call ratio reflects cautious delta hedging at ${data.options.putCallRatio.toFixed(2)}`,
+          `Key resistance cluster located at R1 (${isFiniteMarketNumber(data.supportResistance.r1) ? `$${data.supportResistance.r1.toFixed(2)}` : 'N/A'})`,
+          `Options Put/Call ratio reflects cautious delta hedging at ${isFiniteMarketNumber(data.options?.putCallRatio) ? data.options.putCallRatio.toFixed(2) : 'N/A'}`,
         ],
-        support: [`S1: $${data.supportResistance.s1.toFixed(2)}`, `S2: $${data.supportResistance.s2.toFixed(2)}`],
-        resistance: [`R1: $${data.supportResistance.r1.toFixed(2)}`, `R2: $${data.supportResistance.r2.toFixed(2)}`],
-        confirmation: `A 5-minute candle close above R1 ($${data.supportResistance.r1.toFixed(2)}) targets $${data.supportResistance.r2.toFixed(2)}.`,
-        invalidation: `Loss of S1 ($${data.supportResistance.s1.toFixed(2)}) opens test of major psychological liquidity.`,
-        risk: data.quote.relativeVolume > 1.5 ? 'high' : 'moderate',
+        support: [`S1: ${isFiniteMarketNumber(data.supportResistance.s1) ? `$${data.supportResistance.s1.toFixed(2)}` : 'N/A'}`, `S2: ${isFiniteMarketNumber(data.supportResistance.s2) ? `$${data.supportResistance.s2.toFixed(2)}` : 'N/A'}`],
+        resistance: [`R1: ${isFiniteMarketNumber(data.supportResistance.r1) ? `$${data.supportResistance.r1.toFixed(2)}` : 'N/A'}`, `R2: ${isFiniteMarketNumber(data.supportResistance.r2) ? `$${data.supportResistance.r2.toFixed(2)}` : 'N/A'}`],
+        confirmation: `A 5-minute candle close above R1 (${isFiniteMarketNumber(data.supportResistance.r1) ? `$${data.supportResistance.r1.toFixed(2)}` : 'N/A'}) targets ${isFiniteMarketNumber(data.supportResistance.r2) ? `$${data.supportResistance.r2.toFixed(2)}` : 'N/A'}.`,
+        invalidation: `Loss of S1 (${isFiniteMarketNumber(data.supportResistance.s1) ? `$${data.supportResistance.s1.toFixed(2)}` : 'N/A'}) opens test of major psychological liquidity.`,
+        risk: (data.quote.relativeVolume ?? 1) > 1.5 ? 'high' : 'moderate',
         watchNext: 'Intraday volume delta and VWAP stability at market pivot.',
         timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) + ' ET',
         source: 'MarketMind Real-Time Engine',
@@ -283,29 +293,29 @@ Ask any question below or trigger an instant institutional scenario breakdown!`,
       setMessages((prev) => [...prev, aiMsg]);
     } catch (e) {
       const fallbackWhy: WhyMovingResponse = {
-        headline: `${ticker} Session Movement (${data.quote.change >= 0 ? '+' : ''}${data.quote.changePercent.toFixed(2)}%) on ${data.quote.relativeVolume}x Volume`,
-        summary: `${ticker} is registering session movement of ${data.quote.change >= 0 ? '+' : ''}${data.quote.changePercent.toFixed(2)}% on ${data.quote.relativeVolume}x relative trading volume.`,
+        headline: `${ticker} Session Movement (${formatPercent(data.quote.changePercent)}) on ${data.quote.relativeVolume ?? 1}x Volume`,
+        summary: `${ticker} is registering session movement of ${formatPercent(data.quote.changePercent)} on ${data.quote.relativeVolume ?? 1}x relative trading volume.`,
         drivers: [
           {
             category: 'News Catalyst',
-            impact: data.quote.change >= 0 ? 'Bullish' : 'Bearish',
+            impact: isFiniteMarketNumber(data.quote.change) && data.quote.change >= 0 ? 'Bullish' : 'Bearish',
             explanation: 'Market participant reactions to macroeconomic interest rate trajectories and institutional liquidity deployment.',
           },
           {
             category: 'Technical Trigger',
-            impact: data.quote.price >= data.technicals.vwap ? 'Bullish' : 'Bearish',
-            explanation: data.quote.price >= data.technicals.vwap ? 'Defending intraday VWAP support with active buy-side order book delta.' : 'Rejecting lower session highs below VWAP.',
+            impact: isFiniteMarketNumber(data.quote.price) && isFiniteMarketNumber(data.technicals.vwap) && data.quote.price >= data.technicals.vwap ? 'Bullish' : 'Bearish',
+            explanation: isFiniteMarketNumber(data.quote.price) && isFiniteMarketNumber(data.technicals.vwap) && data.quote.price >= data.technicals.vwap ? 'Defending intraday VWAP support with active buy-side order book delta.' : 'Rejecting lower session highs below VWAP.',
           },
           {
             category: 'Options Flow',
-            impact: data.options.sentiment === 'BULLISH' ? 'Bullish' : data.options.sentiment === 'BEARISH' ? 'Bearish' : 'Neutral',
-            explanation: `Options flow sentiment is currently ${data.options.sentiment} with Put/Call volume ratio of ${data.options.putCallRatio.toFixed(2)}.`,
+            impact: data.options?.sentiment === 'BULLISH' ? 'Bullish' : data.options?.sentiment === 'BEARISH' ? 'Bearish' : 'Neutral',
+            explanation: `Options flow sentiment is currently ${data.options?.sentiment || 'NEUTRAL'} with Put/Call volume ratio of ${isFiniteMarketNumber(data.options?.putCallRatio) ? data.options.putCallRatio.toFixed(2) : 'N/A'}.`,
           },
         ],
         keyLevels: {
-          support: `$${data.supportResistance.s1.toFixed(2)}`,
-          resistance: `$${data.supportResistance.r1.toFixed(2)}`,
-          vwap: `$${data.technicals.vwap.toFixed(2)}`,
+          support: isFiniteMarketNumber(data.supportResistance?.s1) ? `$${data.supportResistance.s1.toFixed(2)}` : 'N/A',
+          resistance: isFiniteMarketNumber(data.supportResistance?.r1) ? `$${data.supportResistance.r1.toFixed(2)}` : 'N/A',
+          vwap: isFiniteMarketNumber(data.technicals?.vwap) ? `$${data.technicals.vwap.toFixed(2)}` : 'N/A',
         },
         timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) + ' ET',
         source: 'MarketMind Real-Time Engine',

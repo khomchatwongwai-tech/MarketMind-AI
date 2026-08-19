@@ -15,7 +15,7 @@ export function formatNumber(
 ): string {
   if (value === null || value === undefined || value === '') return '—';
   const num = typeof value === 'string' ? parseFloat(value) : value;
-  if (isNaN(num)) return '—';
+  if (typeof num !== 'number' || !Number.isFinite(num)) return '—';
 
   try {
     return new Intl.NumberFormat(locale, options).format(num);
@@ -35,7 +35,7 @@ export function formatCurrency(
 ): string {
   if (value === null || value === undefined || value === '') return '—';
   const num = typeof value === 'string' ? parseFloat(value) : value;
-  if (isNaN(num)) return '—';
+  if (typeof num !== 'number' || !Number.isFinite(num)) return '—';
 
   try {
     return new Intl.NumberFormat(locale, {
@@ -61,7 +61,7 @@ export function formatPercent(
 ): string {
   if (value === null || value === undefined || value === '') return '—%';
   const num = typeof value === 'string' ? parseFloat(value) : value;
-  if (isNaN(num)) return '—%';
+  if (typeof num !== 'number' || !Number.isFinite(num)) return '—%';
 
   const prefix = includeSign && num > 0 ? '+' : '';
   try {
@@ -82,9 +82,9 @@ export function formatCompactNumber(
   value: number | string | null | undefined,
   locale: LanguageCode = 'en'
 ): string {
-  if (value === null || value === undefined || value === '') return '0';
+  if (value === null || value === undefined || value === '') return '—';
   const num = typeof value === 'string' ? parseFloat(value) : value;
-  if (isNaN(num)) return '0';
+  if (typeof num !== 'number' || !Number.isFinite(num)) return '—';
 
   try {
     return new Intl.NumberFormat(locale, {

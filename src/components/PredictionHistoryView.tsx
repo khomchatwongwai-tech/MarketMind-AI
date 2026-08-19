@@ -273,9 +273,9 @@ export const PredictionHistoryView: React.FC<PredictionHistoryViewProps> = ({
                     </td>
 
                     <td className="p-3 font-mono text-xs">
-                      <span className="text-slate-300">${pred.entryPrice.toFixed(2)}</span>
+                      <span className="text-slate-300">{pred.entryPrice != null ? `$${pred.entryPrice.toFixed(2)}` : 'N/A'}</span>
                       <span className="text-slate-500 mx-1">&rarr;</span>
-                      <span className="text-emerald-400 font-bold">${pred.targetPrice.toFixed(2)}</span>
+                      <span className="text-emerald-400 font-bold">{pred.targetPrice != null ? `$${pred.targetPrice.toFixed(2)}` : 'N/A'}</span>
                     </td>
 
                     <td className="p-3">
@@ -300,7 +300,7 @@ export const PredictionHistoryView: React.FC<PredictionHistoryViewProps> = ({
                     </td>
 
                     <td className="p-3 font-mono font-bold text-slate-300">
-                      {pred.brierScore.toFixed(2)}
+                      {pred.brierScore != null ? pred.brierScore.toFixed(2) : 'N/A'}
                     </td>
 
                     <td className="p-3 text-[11px] text-slate-300 leading-snug max-w-xs">

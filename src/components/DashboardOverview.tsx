@@ -33,6 +33,7 @@ import { ExplainSimplyModal } from './ExplainSimplyModal';
 import { MASTER_INSTRUMENTS } from '../services/marketProviders/InstrumentDirectoryService';
 import { useRealTimeWatchlist } from '../hooks/useRealTimeMarket';
 import { MarketMoversCard } from './MarketMoversCard';
+import { isFiniteMarketNumber } from '../utils/formatters';
 
 interface DashboardOverviewProps {
   data: ComprehensiveMarketData;
@@ -78,65 +79,65 @@ export const DashboardOverview: React.FC<DashboardOverviewProps> = ({
     {
       name: 'S&P 500',
       symbol: 'SPX',
-      price: rtMacroQuotes['SPX']?.price ? `$${rtMacroQuotes['SPX']!.price.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}` : quote.ticker === 'SPY' && quote.price ? `$${quote.price.toFixed(2)}` : '--',
-      change: rtMacroQuotes['SPX']?.changePercent !== undefined ? `${rtMacroQuotes['SPX']!.changePercent >= 0 ? '+' : ''}${rtMacroQuotes['SPX']!.changePercent.toFixed(2)}%` : `${isPositive ? '+' : ''}${quote.changePercent.toFixed(2)}%`,
-      isUp: rtMacroQuotes['SPX']?.change !== undefined ? rtMacroQuotes['SPX']!.change >= 0 : isPositive,
+      price: isFiniteMarketNumber(rtMacroQuotes['SPX']?.price) ? `$${rtMacroQuotes['SPX']!.price.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}` : quote.ticker === 'SPY' && isFiniteMarketNumber(quote.price) ? `$${quote.price.toFixed(2)}` : '--',
+      change: isFiniteMarketNumber(rtMacroQuotes['SPX']?.changePercent) ? `${rtMacroQuotes['SPX']!.changePercent >= 0 ? '+' : ''}${rtMacroQuotes['SPX']!.changePercent.toFixed(2)}%` : isFiniteMarketNumber(quote.changePercent) ? `${isPositive ? '+' : ''}${quote.changePercent.toFixed(2)}%` : '--',
+      isUp: isFiniteMarketNumber(rtMacroQuotes['SPX']?.change) ? rtMacroQuotes['SPX']!.change >= 0 : isPositive,
     },
     {
       name: 'NASDAQ 100',
       symbol: 'NDX',
-      price: rtMacroQuotes['NDX']?.price ? `$${rtMacroQuotes['NDX']!.price.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}` : '--',
-      change: rtMacroQuotes['NDX']?.changePercent !== undefined ? `${rtMacroQuotes['NDX']!.changePercent >= 0 ? '+' : ''}${rtMacroQuotes['NDX']!.changePercent.toFixed(2)}%` : '--',
-      isUp: rtMacroQuotes['NDX']?.change !== undefined ? rtMacroQuotes['NDX']!.change >= 0 : true,
+      price: isFiniteMarketNumber(rtMacroQuotes['NDX']?.price) ? `$${rtMacroQuotes['NDX']!.price.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}` : '--',
+      change: isFiniteMarketNumber(rtMacroQuotes['NDX']?.changePercent) ? `${rtMacroQuotes['NDX']!.changePercent >= 0 ? '+' : ''}${rtMacroQuotes['NDX']!.changePercent.toFixed(2)}%` : '--',
+      isUp: isFiniteMarketNumber(rtMacroQuotes['NDX']?.change) ? rtMacroQuotes['NDX']!.change >= 0 : true,
     },
     {
       name: 'DOW JONES',
       symbol: 'DJI',
-      price: rtMacroQuotes['DJI']?.price ? `$${rtMacroQuotes['DJI']!.price.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}` : '--',
-      change: rtMacroQuotes['DJI']?.changePercent !== undefined ? `${rtMacroQuotes['DJI']!.changePercent >= 0 ? '+' : ''}${rtMacroQuotes['DJI']!.changePercent.toFixed(2)}%` : '--',
-      isUp: rtMacroQuotes['DJI']?.change !== undefined ? rtMacroQuotes['DJI']!.change >= 0 : true,
+      price: isFiniteMarketNumber(rtMacroQuotes['DJI']?.price) ? `$${rtMacroQuotes['DJI']!.price.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}` : '--',
+      change: isFiniteMarketNumber(rtMacroQuotes['DJI']?.changePercent) ? `${rtMacroQuotes['DJI']!.changePercent >= 0 ? '+' : ''}${rtMacroQuotes['DJI']!.changePercent.toFixed(2)}%` : '--',
+      isUp: isFiniteMarketNumber(rtMacroQuotes['DJI']?.change) ? rtMacroQuotes['DJI']!.change >= 0 : true,
     },
     {
       name: 'SPY ETF',
       symbol: 'SPY',
-      price: quote.ticker === 'SPY' && quote.price ? `$${quote.price.toFixed(2)}` : rtMacroQuotes['SPY']?.price ? `$${rtMacroQuotes['SPY']!.price.toFixed(2)}` : '--',
-      change: quote.ticker === 'SPY' ? `${isPositive ? '+' : ''}${quote.changePercent.toFixed(2)}%` : rtMacroQuotes['SPY']?.changePercent !== undefined ? `${rtMacroQuotes['SPY']!.changePercent >= 0 ? '+' : ''}${rtMacroQuotes['SPY']!.changePercent.toFixed(2)}%` : '--',
-      isUp: quote.ticker === 'SPY' ? isPositive : rtMacroQuotes['SPY']?.change !== undefined ? rtMacroQuotes['SPY']!.change >= 0 : true,
+      price: quote.ticker === 'SPY' && isFiniteMarketNumber(quote.price) ? `$${quote.price.toFixed(2)}` : isFiniteMarketNumber(rtMacroQuotes['SPY']?.price) ? `$${rtMacroQuotes['SPY']!.price.toFixed(2)}` : '--',
+      change: quote.ticker === 'SPY' && isFiniteMarketNumber(quote.changePercent) ? `${isPositive ? '+' : ''}${quote.changePercent.toFixed(2)}%` : isFiniteMarketNumber(rtMacroQuotes['SPY']?.changePercent) ? `${rtMacroQuotes['SPY']!.changePercent >= 0 ? '+' : ''}${rtMacroQuotes['SPY']!.changePercent.toFixed(2)}%` : '--',
+      isUp: quote.ticker === 'SPY' ? isPositive : isFiniteMarketNumber(rtMacroQuotes['SPY']?.change) ? rtMacroQuotes['SPY']!.change >= 0 : true,
     },
     {
       name: 'QQQ ETF',
       symbol: 'QQQ',
-      price: quote.ticker === 'QQQ' && quote.price ? `$${quote.price.toFixed(2)}` : rtMacroQuotes['QQQ']?.price ? `$${rtMacroQuotes['QQQ']!.price.toFixed(2)}` : '--',
-      change: quote.ticker === 'QQQ' ? `${isPositive ? '+' : ''}${quote.changePercent.toFixed(2)}%` : rtMacroQuotes['QQQ']?.changePercent !== undefined ? `${rtMacroQuotes['QQQ']!.changePercent >= 0 ? '+' : ''}${rtMacroQuotes['QQQ']!.changePercent.toFixed(2)}%` : '--',
-      isUp: quote.ticker === 'QQQ' ? isPositive : rtMacroQuotes['QQQ']?.change !== undefined ? rtMacroQuotes['QQQ']!.change >= 0 : true,
+      price: quote.ticker === 'QQQ' && isFiniteMarketNumber(quote.price) ? `$${quote.price.toFixed(2)}` : isFiniteMarketNumber(rtMacroQuotes['QQQ']?.price) ? `$${rtMacroQuotes['QQQ']!.price.toFixed(2)}` : '--',
+      change: quote.ticker === 'QQQ' && isFiniteMarketNumber(quote.changePercent) ? `${isPositive ? '+' : ''}${quote.changePercent.toFixed(2)}%` : isFiniteMarketNumber(rtMacroQuotes['QQQ']?.changePercent) ? `${rtMacroQuotes['QQQ']!.changePercent >= 0 ? '+' : ''}${rtMacroQuotes['QQQ']!.changePercent.toFixed(2)}%` : '--',
+      isUp: quote.ticker === 'QQQ' ? isPositive : isFiniteMarketNumber(rtMacroQuotes['QQQ']?.change) ? rtMacroQuotes['QQQ']!.change >= 0 : true,
     },
     {
       name: 'VIX VOLATILITY',
       symbol: 'VIX',
-      price: rtMacroQuotes['VIX']?.price ? `${rtMacroQuotes['VIX']!.price.toFixed(2)}` : '--',
-      change: rtMacroQuotes['VIX']?.changePercent !== undefined ? `${rtMacroQuotes['VIX']!.changePercent >= 0 ? '+' : ''}${rtMacroQuotes['VIX']!.changePercent.toFixed(2)}%` : '--',
-      isUp: rtMacroQuotes['VIX']?.change !== undefined ? rtMacroQuotes['VIX']!.change >= 0 : false,
+      price: isFiniteMarketNumber(rtMacroQuotes['VIX']?.price) ? `${rtMacroQuotes['VIX']!.price.toFixed(2)}` : '--',
+      change: isFiniteMarketNumber(rtMacroQuotes['VIX']?.changePercent) ? `${rtMacroQuotes['VIX']!.changePercent >= 0 ? '+' : ''}${rtMacroQuotes['VIX']!.changePercent.toFixed(2)}%` : '--',
+      isUp: isFiniteMarketNumber(rtMacroQuotes['VIX']?.change) ? rtMacroQuotes['VIX']!.change >= 0 : false,
     },
     {
       name: '10Y TREASURY',
       symbol: 'US10Y',
-      price: rtMacroQuotes['US10Y']?.price ? `${rtMacroQuotes['US10Y']!.price.toFixed(2)}%` : '--',
-      change: rtMacroQuotes['US10Y']?.change !== undefined ? `${rtMacroQuotes['US10Y']!.change >= 0 ? '+' : ''}${rtMacroQuotes['US10Y']!.change.toFixed(2)}` : '--',
-      isUp: rtMacroQuotes['US10Y']?.change !== undefined ? rtMacroQuotes['US10Y']!.change >= 0 : false,
+      price: isFiniteMarketNumber(rtMacroQuotes['US10Y']?.price) ? `${rtMacroQuotes['US10Y']!.price.toFixed(2)}%` : '--',
+      change: isFiniteMarketNumber(rtMacroQuotes['US10Y']?.change) ? `${rtMacroQuotes['US10Y']!.change >= 0 ? '+' : ''}${rtMacroQuotes['US10Y']!.change.toFixed(2)}` : '--',
+      isUp: isFiniteMarketNumber(rtMacroQuotes['US10Y']?.change) ? rtMacroQuotes['US10Y']!.change >= 0 : false,
     },
     {
       name: 'WTI CRUDE OIL',
       symbol: 'CL',
-      price: rtMacroQuotes['CL']?.price ? `$${rtMacroQuotes['CL']!.price.toFixed(2)}` : '--',
-      change: rtMacroQuotes['CL']?.changePercent !== undefined ? `${rtMacroQuotes['CL']!.changePercent >= 0 ? '+' : ''}${rtMacroQuotes['CL']!.changePercent.toFixed(2)}%` : '--',
-      isUp: rtMacroQuotes['CL']?.change !== undefined ? rtMacroQuotes['CL']!.change >= 0 : false,
+      price: isFiniteMarketNumber(rtMacroQuotes['CL']?.price) ? `$${rtMacroQuotes['CL']!.price.toFixed(2)}` : '--',
+      change: isFiniteMarketNumber(rtMacroQuotes['CL']?.changePercent) ? `${rtMacroQuotes['CL']!.changePercent >= 0 ? '+' : ''}${rtMacroQuotes['CL']!.changePercent.toFixed(2)}%` : '--',
+      isUp: isFiniteMarketNumber(rtMacroQuotes['CL']?.change) ? rtMacroQuotes['CL']!.change >= 0 : false,
     },
     {
       name: 'GOLD SPOT',
       symbol: 'XAU',
-      price: rtMacroQuotes['XAU']?.price ? `$${rtMacroQuotes['XAU']!.price.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}` : '--',
-      change: rtMacroQuotes['XAU']?.changePercent !== undefined ? `${rtMacroQuotes['XAU']!.changePercent >= 0 ? '+' : ''}${rtMacroQuotes['XAU']!.changePercent.toFixed(2)}%` : '--',
-      isUp: rtMacroQuotes['XAU']?.change !== undefined ? rtMacroQuotes['XAU']!.change >= 0 : true,
+      price: isFiniteMarketNumber(rtMacroQuotes['XAU']?.price) ? `$${rtMacroQuotes['XAU']!.price.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}` : '--',
+      change: isFiniteMarketNumber(rtMacroQuotes['XAU']?.changePercent) ? `${rtMacroQuotes['XAU']!.changePercent >= 0 ? '+' : ''}${rtMacroQuotes['XAU']!.changePercent.toFixed(2)}%` : '--',
+      isUp: isFiniteMarketNumber(rtMacroQuotes['XAU']?.change) ? rtMacroQuotes['XAU']!.change >= 0 : true,
     },
     {
       name: 'BITCOIN',
@@ -332,41 +333,41 @@ export const DashboardOverview: React.FC<DashboardOverviewProps> = ({
 
                 <div className="flex flex-col">
                   <span className="text-[9px] text-[#9CA3AF] uppercase font-semibold">VWAP</span>
-                  <span className="text-xs font-mono font-bold text-[#F2D675]">${technicals.vwap.toFixed(2)}</span>
+                  <span className="text-xs font-mono font-bold text-[#F2D675]">{isFiniteMarketNumber(technicals.vwap) ? `$${technicals.vwap.toFixed(2)}` : 'N/A'}</span>
                 </div>
 
                 <div className="flex flex-col">
                   <span className="text-[9px] text-[#9CA3AF] uppercase font-semibold">9 EMA</span>
-                  <span className="text-xs font-mono font-bold text-white">${technicals.ema9.toFixed(2)}</span>
+                  <span className="text-xs font-mono font-bold text-white">{isFiniteMarketNumber(technicals.ema9) ? `$${technicals.ema9.toFixed(2)}` : 'N/A'}</span>
                 </div>
 
                 <div className="flex flex-col">
                   <span className="text-[9px] text-[#9CA3AF] uppercase font-semibold">20 EMA</span>
-                  <span className="text-xs font-mono font-bold text-white">${technicals.ema20.toFixed(2)}</span>
+                  <span className="text-xs font-mono font-bold text-white">{isFiniteMarketNumber(technicals.ema20) ? `$${technicals.ema20.toFixed(2)}` : 'N/A'}</span>
                 </div>
 
                 <div className="flex flex-col">
                   <span className="text-[9px] text-[#9CA3AF] uppercase font-semibold">MACD (12,26,9)</span>
                   <span className="text-xs font-mono font-bold text-[#22C55E]">
-                    +{technicals.macd} <span className="text-[9px] font-normal text-[#9CA3AF]">Bull</span>
+                    +{isFiniteMarketNumber(technicals.macd) ? technicals.macd : 'N/A'} <span className="text-[9px] font-normal text-[#9CA3AF]">Bull</span>
                   </span>
                 </div>
 
                 <div className="flex flex-col">
                   <span className="text-[9px] text-[#9CA3AF] uppercase font-semibold">ADX (14)</span>
                   <span className="text-xs font-mono font-bold text-[#F2D675]">
-                    {technicals.adx} <span className="text-[9px] font-normal text-[#9CA3AF]">{technicals.adxStrength}</span>
+                    {isFiniteMarketNumber(technicals.adx) ? technicals.adx : 'N/A'} <span className="text-[9px] font-normal text-[#9CA3AF]">{technicals.adxStrength}</span>
                   </span>
                 </div>
 
                 <div className="flex flex-col">
                   <span className="text-[9px] text-[#9CA3AF] uppercase font-semibold">ATR (14)</span>
-                  <span className="text-xs font-mono font-bold text-white">${technicals.atr14.toFixed(2)}</span>
+                  <span className="text-xs font-mono font-bold text-white">{isFiniteMarketNumber(technicals.atr14) ? `$${technicals.atr14.toFixed(2)}` : 'N/A'}</span>
                 </div>
 
                 <div className="flex flex-col">
                   <span className="text-[9px] text-[#9CA3AF] uppercase font-semibold">Rel Volume</span>
-                  <span className="text-xs font-mono font-bold text-[#22C55E]">{quote.relativeVolume}x</span>
+                  <span className="text-xs font-mono font-bold text-[#22C55E]">{quote.relativeVolume ?? 1}x</span>
                 </div>
               </div>
 
@@ -374,43 +375,43 @@ export const DashboardOverview: React.FC<DashboardOverviewProps> = ({
               <div className="p-3 border-t border-[#1C1C1C] space-y-2 bg-[#050505]">
                 <div className="flex justify-between items-center text-[9px] font-bold text-[#9CA3AF] uppercase tracking-widest">
                   <span>Support & Resistance</span>
-                  <span className="text-[8px] text-[#F2D675] font-mono">Pivot: ${((technicals.prevDayHigh + technicals.prevDayLow + technicals.prevDayClose)/3).toFixed(2)}</span>
+                  <span className="text-[8px] text-[#F2D675] font-mono">Pivot: {isFiniteMarketNumber(technicals.prevDayHigh) && isFiniteMarketNumber(technicals.prevDayLow) && isFiniteMarketNumber(technicals.prevDayClose) ? `$${((technicals.prevDayHigh + technicals.prevDayLow + technicals.prevDayClose)/3).toFixed(2)}` : 'N/A'}</span>
                 </div>
 
                 <div className="space-y-1 font-mono text-[11px]">
                   <div className="flex justify-between items-center text-[#9CA3AF] opacity-60">
                     <span className="text-[#EF4444]">R3 Target</span>
-                    <span>${supportResistance.r3.toFixed(2)}</span>
+                    <span>{isFiniteMarketNumber(supportResistance.r3) ? `$${supportResistance.r3.toFixed(2)}` : 'N/A'}</span>
                   </div>
                   <div className="flex justify-between items-center text-[#E5E5E5] opacity-80">
                     <span className="text-[#EF4444]">R2 Area</span>
-                    <span>${supportResistance.r2.toFixed(2)}</span>
+                    <span>{isFiniteMarketNumber(supportResistance.r2) ? `$${supportResistance.r2.toFixed(2)}` : 'N/A'}</span>
                   </div>
                   <div className="flex justify-between items-center font-bold px-2 py-0.5 bg-[#EF4444]/10 border border-[#EF4444]/30 rounded text-[#EF4444]">
                     <span>R1 Key Level</span>
-                    <span>${supportResistance.r1.toFixed(2)}</span>
+                    <span>{isFiniteMarketNumber(supportResistance.r1) ? `$${supportResistance.r1.toFixed(2)}` : 'N/A'}</span>
                   </div>
 
                   {/* Current Price Line Indicator */}
                   <div className="py-0.5 flex items-center gap-2">
                     <div className="h-[1px] flex-1 bg-gradient-to-r from-transparent via-[#D4AF37] to-transparent" />
                     <span className="text-[10px] font-bold text-white bg-[#151515] px-2 py-0.2 rounded border border-[#D4AF37]/50 font-mono">
-                      Current ${quote.price.toFixed(2)}
+                      Current {isFiniteMarketNumber(quote.price) ? `$${quote.price.toFixed(2)}` : 'N/A'}
                     </span>
                     <div className="h-[1px] flex-1 bg-gradient-to-r from-transparent via-[#D4AF37] to-transparent" />
                   </div>
 
                   <div className="flex justify-between items-center font-bold px-2 py-0.5 bg-[#22C55E]/10 border border-[#22C55E]/30 rounded text-[#22C55E]">
                     <span>S1 Key Level</span>
-                    <span>${supportResistance.s1.toFixed(2)}</span>
+                    <span>{isFiniteMarketNumber(supportResistance.s1) ? `$${supportResistance.s1.toFixed(2)}` : 'N/A'}</span>
                   </div>
                   <div className="flex justify-between items-center text-[#E5E5E5] opacity-80">
                     <span className="text-[#22C55E]">S2 Area</span>
-                    <span>${supportResistance.s2.toFixed(2)}</span>
+                    <span>{isFiniteMarketNumber(supportResistance.s2) ? `$${supportResistance.s2.toFixed(2)}` : 'N/A'}</span>
                   </div>
                   <div className="flex justify-between items-center text-[#9CA3AF] opacity-60">
                     <span className="text-[#22C55E]">S3 Major</span>
-                    <span>${supportResistance.s3.toFixed(2)}</span>
+                    <span>{isFiniteMarketNumber(supportResistance.s3) ? `$${supportResistance.s3.toFixed(2)}` : 'N/A'}</span>
                   </div>
                 </div>
               </div>
@@ -485,7 +486,7 @@ export const DashboardOverview: React.FC<DashboardOverviewProps> = ({
 
                 {/* AI Explanation Narrative Box */}
                 <p className="text-xs md:text-sm text-[#E5E5E5] leading-relaxed italic border-l-2 border-[#D4AF37] pl-3.5 py-1.5 mb-3 bg-[#101010] rounded-r-lg border-y border-r border-[#1C1C1C]">
-                  &ldquo;{quote.ticker} is currently showing {isPositive ? 'solid bullish momentum' : 'distribution pressure'}. Price is trading {quote.price >= technicals.vwap ? 'above VWAP' : 'below VWAP'} and short-term exponential averages while technology and large-cap leaders show strength. Treasury yields have stabilized, expanding multiples. However, overhead resistance near ${supportResistance.r1.toFixed(2)} requires volume expansion (&gt;1.25x) for continuation.&rdquo;
+                  &ldquo;{quote.ticker} is currently showing {isPositive ? 'solid bullish momentum' : 'distribution pressure'}. Price is trading {isFiniteMarketNumber(quote.price) && isFiniteMarketNumber(technicals.vwap) && quote.price >= technicals.vwap ? 'above VWAP' : 'below VWAP'} and short-term exponential averages while technology and large-cap leaders show strength. Treasury yields have stabilized, expanding multiples. However, overhead resistance near {isFiniteMarketNumber(supportResistance.r1) ? `$${supportResistance.r1.toFixed(2)}` : 'N/A'} requires volume expansion (&gt;1.25x) for continuation.&rdquo;
                 </p>
 
                 {/* Drivers & Setup Quality Grid */}
@@ -536,7 +537,7 @@ export const DashboardOverview: React.FC<DashboardOverviewProps> = ({
                     <TrendingUp className="w-3 h-3" /> Bullish Confirmation
                   </div>
                   <div className="text-[11px] text-[#E5E5E5]">
-                    Break and 15m candle close above <span className="font-bold text-white font-mono">${scenarios.bullish.confirmationPrice.toFixed(2)}</span> with relative volume &gt; 1.25x. Targets: ${scenarios.bullish.target1.toFixed(2)}, ${scenarios.bullish.target2.toFixed(2)}.
+                    Break and 15m candle close above <span className="font-bold text-white font-mono">{isFiniteMarketNumber(scenarios.bullish.confirmationPrice) ? `$${scenarios.bullish.confirmationPrice.toFixed(2)}` : 'N/A'}</span> with relative volume &gt; 1.25x. Targets: {isFiniteMarketNumber(scenarios.bullish.target1) ? `$${scenarios.bullish.target1.toFixed(2)}` : 'N/A'}, {isFiniteMarketNumber(scenarios.bullish.target2) ? `$${scenarios.bullish.target2.toFixed(2)}` : 'N/A'}.
                   </div>
                 </div>
 
@@ -545,7 +546,7 @@ export const DashboardOverview: React.FC<DashboardOverviewProps> = ({
                     <TrendingDown className="w-3 h-3" /> Bearish Invalidation
                   </div>
                   <div className="text-[11px] text-[#E5E5E5]">
-                    Loss of VWAP / support at <span className="font-bold text-white font-mono">${scenarios.bearish.confirmationPrice.toFixed(2)}</span> invalidates current setup. Targets: ${scenarios.bearish.target1.toFixed(2)}, ${scenarios.bearish.target2.toFixed(2)}.
+                    Loss of VWAP / support at <span className="font-bold text-white font-mono">{isFiniteMarketNumber(scenarios.bearish.confirmationPrice) ? `$${scenarios.bearish.confirmationPrice.toFixed(2)}` : 'N/A'}</span> invalidates current setup. Targets: {isFiniteMarketNumber(scenarios.bearish.target1) ? `$${scenarios.bearish.target1.toFixed(2)}` : 'N/A'}, {isFiniteMarketNumber(scenarios.bearish.target2) ? `$${scenarios.bearish.target2.toFixed(2)}` : 'N/A'}.
                   </div>
                 </div>
               </div>
@@ -566,21 +567,21 @@ export const DashboardOverview: React.FC<DashboardOverviewProps> = ({
                 </div>
                 <div className="flex items-center gap-3">
                   <div className="text-xl font-bold font-mono text-white">
-                    {options.putCallRatio.toFixed(2)}{' '}
+                    {isFiniteMarketNumber(options.putCallRatio) ? options.putCallRatio.toFixed(2) : 'N/A'}{' '}
                     <span className="text-[10px] font-normal text-[#9CA3AF]">P/C Ratio</span>
                   </div>
                   <div
                     className={`text-[10px] px-2 py-0.5 border rounded uppercase font-bold ${
-                      options.sentiment.includes('Bullish')
+                      options.sentiment?.includes('Bullish')
                         ? 'bg-[#22C55E]/10 text-[#22C55E] border-[#22C55E]/30'
                         : 'bg-[#EF4444]/10 text-[#EF4444] border-[#EF4444]/30'
                     }`}
                   >
-                    {options.sentiment}
+                    {options.sentiment || 'NEUTRAL'}
                   </div>
                 </div>
                 <div className="mt-1.5 text-[10px] text-[#9CA3AF] font-mono">
-                  Largest OI Wall: <span className="text-white font-bold">${options.largestCallOIStrike.toFixed(2)} Call</span> | Gamma Support: <span className="text-white font-bold">${options.gammaSupport.toFixed(2)}</span>
+                  Largest OI Wall: <span className="text-white font-bold">{isFiniteMarketNumber(options.largestCallOIStrike) ? `$${options.largestCallOIStrike.toFixed(2)} Call` : 'N/A'}</span> | Gamma Support: <span className="text-white font-bold">{isFiniteMarketNumber(options.gammaSupport) ? `$${options.gammaSupport.toFixed(2)}` : 'N/A'}</span>
                 </div>
               </div>
 

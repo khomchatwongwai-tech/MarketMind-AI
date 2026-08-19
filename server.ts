@@ -2,7 +2,6 @@ import express from 'express';
 import http from 'http';
 import path from 'path';
 import dotenv from 'dotenv';
-import { createServer as createViteServer } from 'vite';
 import { GoogleGenAI } from '@google/genai';
 import { MassiveWebSocketManager } from './src/services/massiveWsManager';
 import { RealtimeServerManager } from './src/server/realtimeServerManager';
@@ -3007,7 +3006,8 @@ async function startServer() {
   realtimeServerManager.init(server);
   massiveWsManager.init(server);
 
-  if (process.env.NODE_ENV !== 'production') {
+  if (process.env.NODE_ENV !== 'production' && !process.env.VERCEL) {
+    const { createServer: createViteServer } = await import('vite');
     const vite = await createViteServer({
       server: { middlewareMode: true },
       appType: 'spa',

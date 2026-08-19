@@ -16,6 +16,7 @@ import { PrimaryOfficialProvider } from './newsProviders/PrimaryOfficialProvider
 import { FinancialNewsApiProvider } from './newsProviders/FinancialNewsApiProvider';
 import { SpecializedIndustryProvider } from './newsProviders/SpecializedIndustryProvider';
 import { SocialSentimentProvider } from './newsProviders/SocialSentimentProvider';
+import { reputablePublisherProviders } from './newsProviders/ReputablePublisherProvider';
 import { MarketMindNewsEngine } from './MarketMindNewsEngine';
 import {
   NewsItem,
@@ -151,6 +152,7 @@ export class NewsIntelligenceService {
       this.financialProvider,
       this.specializedProvider,
       this.socialProvider,
+      ...reputablePublisherProviders,
     ];
   }
 
@@ -215,7 +217,8 @@ export class NewsIntelligenceService {
     }
 
     // Sort by publication time descending and source priority (1 = Tier 1 Primary)
-    const sorted = allItems.sort((a, b) => {
+    const validItems = allItems.filter(item => Boolean(item.url) && Number.isFinite(Date.parse(item.publishedAt)));
+    const sorted = validItems.sort((a, b) => {
       const timeDiff = new Date(b.publishedAt).getTime() - new Date(a.publishedAt).getTime();
       if (Math.abs(timeDiff) < 15 * 60000) { // within 15 minutes, prioritize official source priority
         return a.sourcePriority - b.sourcePriority;
@@ -1164,4 +1167,3 @@ export class NewsIntelligenceService {
 }
 
 export const newsIntelligenceService = new NewsIntelligenceService();
-

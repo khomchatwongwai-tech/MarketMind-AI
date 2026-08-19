@@ -1,1 +1,1 @@
-export function logAITelemetry(event: Record<string, unknown>) { const safe = Object.fromEntries(Object.entries(event).filter(([key]) => !/key|token|authorization|secret|portfolio|query/i.test(key))); console.info('[AI_TELEMETRY]', JSON.stringify(safe)); }
+export function logAITelemetry(event: Record<string, unknown>) { const safe = Object.fromEntries(Object.entries(event).filter(([key]) => !/(api.?key|auth(orization)?|access.?token|secret|portfolio|query|prompt)/i.test(key))); console.info('[AI_TELEMETRY]', JSON.stringify(safe)); }

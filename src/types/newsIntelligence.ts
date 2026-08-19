@@ -1,10 +1,12 @@
 export type SourceTier = 'TIER_1_PRIMARY' | 'TIER_2_FINANCIAL' | 'TIER_3_SPECIALIZED' | 'TIER_4_SOCIAL';
 
-export type SourceType = 'LICENSED_API' | 'OFFICIAL_FEED' | 'PRIMARY_REGULATORY' | 'WIRE' | 'INDUSTRY_MONITOR';
+export type SourceType = 'OFFICIAL_PRIMARY' | 'LICENSED_API' | 'RSS' | 'METADATA_ONLY' | 'SEARCH_PROVIDER' | 'OFFICIAL_FEED' | 'PRIMARY_REGULATORY' | 'WIRE' | 'INDUSTRY_MONITOR';
 
 export type FeedDelay = 'REAL_TIME' | 'NEAR_REAL_TIME' | 'DELAYED_15M' | 'LAST_UPDATED' | 'OFFLINE';
 
-export type VerificationStatus = 'CONFIRMED' | 'DEVELOPING' | 'UNVERIFIED';
+export type VerificationStatus = 'CONFIRMED' | 'DEVELOPING' | 'CONFLICTED' | 'UNVERIFIED' | 'STALE';
+
+export type SourceMetadata = { publisher: string; providerId: string; sourceTier: SourceTier; sourceType: 'OFFICIAL_PRIMARY' | 'LICENSED_API' | 'RSS' | 'METADATA_ONLY' | 'SEARCH_PROVIDER'; canonicalUrl: string; author?: string; publishedAt: string; retrievedAt: string; licensingMode?: string; reliabilityScore?: number; syndicationId?: string; };
 
 export type NewsSentiment = 'VERY_BULLISH' | 'BULLISH' | 'NEUTRAL' | 'BEARISH' | 'VERY_BEARISH';
 
@@ -112,6 +114,7 @@ export interface NewsArticle {
     yieldChangeBps?: number;
   };
   rawMetadata?: Record<string, any>;
+  sourceMetadata?: SourceMetadata;
 }
 
 // NewsItem is unified with NewsArticle for backward-compatibility and type ergonomics
@@ -139,6 +142,8 @@ export interface MarketMindEventCluster {
   }>;
   aiSummary: string;
   verificationStatus: VerificationStatus;
+  independentSourceCount?: number;
+  primarySourceCount?: number;
   sentiment: NewsSentiment;
   impact: NewsImpact;
   impactScore: number; // 0 - 100
@@ -407,4 +412,3 @@ export interface SavedArticle {
   savedAt: string;
   notes?: string;
 }
-

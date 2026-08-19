@@ -32,8 +32,9 @@ export class MarketMindNewsEngine {
     const id = String(raw.id || `${providerConfig.providerId}_${Date.now()}_${hash}`);
     const summary = String(raw.summary || raw.description || raw.abstract || headline).trim();
     const content = raw.content || raw.fullContent || raw.body || undefined;
-    const url = String(raw.url || raw.link || raw.sourceUrl || 'https://marketmind.ai/news').trim();
-    const publishedAt = raw.publishedAt || raw.datetime || raw.created_at || raw.date || new Date().toISOString();
+    const candidateUrl = String(raw.url || raw.link || raw.sourceUrl || '').trim();
+    let url = ''; try { const parsed = new URL(candidateUrl); if (parsed.protocol === 'https:' || parsed.protocol === 'http:') url = parsed.toString(); } catch { /* invalid source URLs fail closed */ }
+    const publishedAt = raw.publishedAt || raw.datetime || raw.created_at || raw.date || '';
     const retrievedAt = raw.retrievedAt || new Date().toISOString();
 
     // Extract & normalize tickers
@@ -165,6 +166,19 @@ export class MarketMindNewsEngine {
       primaryOfficialSource: raw.primaryOfficialSource,
       marketReaction: raw.marketReaction,
       rawMetadata: raw,
+      sourceMetadata: {
+        publisher: source,
+        providerId: providerConfig.providerId,
+        sourceTier: providerConfig.tier,
+        sourceType: (providerConfig.sourceType === 'OFFICIAL_PRIMARY' || providerConfig.sourceType === 'OFFICIAL_FEED' || providerConfig.sourceType === 'PRIMARY_REGULATORY') ? 'OFFICIAL_PRIMARY' : providerConfig.sourceType === 'RSS' || providerConfig.sourceType === 'METADATA_ONLY' || providerConfig.sourceType === 'SEARCH_PROVIDER' ? providerConfig.sourceType : 'LICENSED_API',
+        canonicalUrl: url,
+        author: raw.author,
+        publishedAt,
+        retrievedAt,
+        licensingMode: raw.licensingMode,
+        reliabilityScore: raw.reliabilityScore,
+        syndicationId: raw.syndicationId || raw.wireId,
+      },
     };
   }
 
@@ -290,14 +304,31 @@ export class MarketMindNewsEngine {
    * Determine verification status from source tiers and coverage count
    */
   public static evaluateVerificationStatus(items: NewsArticle[]): VerificationStatus {
-    const hasTier1 = items.some((i) => i.sourceTier === 'TIER_1_PRIMARY');
+    const valid = items.filter(item => item.url && Number.isFinite(Date.parse(item.publishedAt)));
+    if (!valid.length) return 'UNVERIFIED';
+    const newest = Math.max(...valid.map(item => Date.parse(item.publishedAt)));
+    if (Date.now() - newest > 72 * 60 * 60 * 1000) return 'STALE';
+    const bullish = valid.some(item => item.sentiment === 'BULLISH' || item.sentiment === 'VERY_BULLISH');
+    const bearish = valid.some(item => item.sentiment === 'BEARISH' || item.sentiment === 'VERY_BEARISH');
+    if (bullish && bearish && valid.length > 1) return 'CONFLICTED';
+    const hasTier1 = valid.some((i) => i.sourceTier === 'TIER_1_PRIMARY');
     if (hasTier1) return 'CONFIRMED';
-
-    const tier2Count = items.filter((i) => i.sourceTier === 'TIER_2_FINANCIAL').length;
+    const tier2Count = this.independentSources(valid).filter((i) => i.sourceTier === 'TIER_2_FINANCIAL').length;
     if (tier2Count >= 2) return 'CONFIRMED';
     if (tier2Count === 1) return 'DEVELOPING';
 
     return 'UNVERIFIED';
+  }
+
+  public static independentSources(items: NewsArticle[]): NewsArticle[] {
+    const seen = new Set<string>();
+    return items.filter(item => {
+      const syndication = item.sourceMetadata?.syndicationId || item.rawMetadata?.syndicationId || item.rawMetadata?.wireId;
+      let canonical = item.originalUrl || item.sourceMetadata?.canonicalUrl || item.url;
+      try { const parsed = new URL(canonical); parsed.search = ''; parsed.hash = ''; canonical = parsed.toString(); } catch { canonical = ''; }
+      const key = syndication ? `syndication:${syndication}` : canonical ? `url:${canonical}` : `publisher:${item.providerId}`;
+      if (seen.has(key)) return false; seen.add(key); return true;
+    });
   }
 
   /**
@@ -427,6 +458,7 @@ export class MarketMindNewsEngine {
       const primary = group[0];
       const additional = group.slice(1);
 
+      const independent = this.independentSources(group);
       const verificationStatus = this.evaluateVerificationStatus(group);
       const allTickers = Array.from(new Set(group.flatMap((g) => g.tickers)));
       const allAffected = Array.from(new Set(group.flatMap((g) => g.affectedAssets)));
@@ -437,7 +469,7 @@ export class MarketMindNewsEngine {
         sourceTier: primary.sourceTier,
         tickers: allTickers,
         isBreaking: group.some((g) => g.isBreaking),
-        confirmationCount: group.length,
+        confirmationCount: independent.length,
         marketReaction: primary.marketReaction,
       });
 
@@ -469,7 +501,7 @@ export class MarketMindNewsEngine {
       // Extract verified facts
       const verifiedFacts = [
         `${primary.source} reported: "${primary.headline}"`,
-        `Direct filing/feed released at ${new Date(primary.publishedAt).toLocaleTimeString()} with ${group.length} independent confirmations.`,
+        `${Number.isFinite(Date.parse(primary.publishedAt)) ? `Reported at ${new Date(primary.publishedAt).toISOString()}` : 'Publication time unavailable'} with ${independent.length} independent source${independent.length === 1 ? '' : 's'}.`,
         allTickers.length > 0 ? `Target tickers: ${allTickers.join(', ')}.` : `Global macro/sector coverage: ${allSectors.join(', ')}.`,
       ];
 
@@ -495,6 +527,8 @@ export class MarketMindNewsEngine {
         })),
         aiSummary: primary.summary,
         verificationStatus,
+        independentSourceCount: independent.length,
+        primarySourceCount: independent.filter(item => item.sourceTier === 'TIER_1_PRIMARY').length,
         sentiment,
         impact,
         impactScore,
@@ -564,4 +598,3 @@ export class MarketMindNewsEngine {
     return exposures;
   }
 }
-

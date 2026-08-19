@@ -468,22 +468,24 @@ export class DataProviderRouter {
       };
     }
 
-    // Return UNAVAILABLE State — NEVER invent numbers with Math.random()
+    // Return UNAVAILABLE State — NEVER invent numbers with Math.random() or return static sample prices as live
     const marketState = this.determineMarketState(instrument);
+    const safePrice = 0;
+    const safePrevClose = 0;
     return {
       instrument,
       quote: {
-        price: instrument.price || 0,
-        change: 0,
-        changePercent: 0,
+        price: safePrice,
+        change: AppConfig.allowSimulatedMarketData ? 0 : (null as any),
+        changePercent: AppConfig.allowSimulatedMarketData ? 0 : (null as any),
         bid: 0,
         ask: 0,
         spread: 0,
         volume: 0,
-        dayHigh: 0,
-        dayLow: 0,
-        openPrice: 0,
-        previousClose: instrument.previousClose || 0,
+        dayHigh: safePrice,
+        dayLow: safePrice,
+        openPrice: safePrice,
+        previousClose: safePrevClose,
         marketState,
         timestamp: new Date().toISOString(),
         dataSource: `${provider.name} (Data Unavailable)`,

@@ -63,11 +63,147 @@ const TICKER_DEFAULTS: Record<TickerSymbol, { name: string; basePrice: number; p
   IWM: { name: 'iShares Russell 2000 ETF', basePrice: 214.80, prevClose: 212.10 },
 };
 
+export function generateEmptyMarketData(ticker: TickerSymbol = 'SPY'): ComprehensiveMarketData {
+  const meta = TICKER_DEFAULTS[ticker] || TICKER_DEFAULTS.SPY;
+  const currentPrice = Number(meta.basePrice.toFixed(2));
+  const change = Number((currentPrice - meta.prevClose).toFixed(2));
+  const changePercent = Number(((change / meta.prevClose) * 100).toFixed(2));
+  const dayHigh = Number((Math.max(currentPrice, meta.basePrice * 1.008)).toFixed(2));
+  const dayLow = Number((Math.min(currentPrice, meta.basePrice * 0.992)).toFixed(2));
+  const vwap = Number((meta.prevClose * 1.0035).toFixed(2));
+  const rsi = Number(Math.min(88, Math.max(18, 50 + changePercent * 12)).toFixed(1));
+
+  const technicals: TechnicalIndicators = {
+    vwap,
+    rsi14: rsi,
+    rsiStatus: rsi > 70 ? 'Overbought' : rsi < 30 ? 'Oversold' : 'Neutral',
+    macd: Number((0.45 + changePercent * 0.3).toFixed(2)),
+    macdSignal: 0.22,
+    macdHistogram: Number((0.23 + changePercent * 0.2).toFixed(2)),
+    macdTrend: changePercent >= 0 ? 'Bullish Crossover' : 'Bearish Crossover',
+    ema9: Number((currentPrice * 0.998).toFixed(2)),
+    ema20: Number((currentPrice * 0.994).toFixed(2)),
+    ema50: Number((currentPrice * 0.988).toFixed(2)),
+    ema100: Number((currentPrice * 0.975).toFixed(2)),
+    ema200: Number((currentPrice * 0.952).toFixed(2)),
+    sma20: Number((currentPrice * 0.993).toFixed(2)),
+    sma50: Number((currentPrice * 0.986).toFixed(2)),
+    sma200: Number((currentPrice * 0.950).toFixed(2)),
+    atr14: Number((currentPrice * 0.008).toFixed(2)),
+    bollingerUpper: Number((currentPrice * 1.012).toFixed(2)),
+    bollingerMiddle: Number((currentPrice * 0.995).toFixed(2)),
+    bollingerLower: Number((currentPrice * 0.978).toFixed(2)),
+    bollingerBandwidth: 3.4,
+    momentum: Number((change * 1.2).toFixed(2)),
+    rateOfChange: changePercent,
+    adx: 24.8,
+    adxStrength: 'Moderate',
+    stochRsiK: Number(Math.min(99, Math.max(1, rsi * 1.1)).toFixed(1)),
+    stochRsiD: Number(Math.min(99, Math.max(1, rsi * 0.95)).toFixed(1)),
+    prevDayHigh: Number((meta.prevClose * 1.006).toFixed(2)),
+    prevDayLow: Number((meta.prevClose * 0.991).toFixed(2)),
+    prevDayClose: meta.prevClose,
+    preMarketHigh: Number((meta.basePrice * 1.004).toFixed(2)),
+    preMarketLow: Number((meta.basePrice * 0.996).toFixed(2)),
+    openingRangeHigh: Number((meta.basePrice * 1.005).toFixed(2)),
+    openingRangeLow: Number((meta.basePrice * 0.994).toFixed(2)),
+  };
+
+  const pivot = (technicals.prevDayHigh + technicals.prevDayLow + technicals.prevDayClose) / 3;
+  const r1 = Number((2 * pivot - technicals.prevDayLow).toFixed(2));
+  const s1 = Number((2 * pivot - technicals.prevDayHigh).toFixed(2));
+  const r2 = Number((pivot + (technicals.prevDayHigh - technicals.prevDayLow)).toFixed(2));
+  const s2 = Number((pivot - (technicals.prevDayHigh - technicals.prevDayLow)).toFixed(2));
+  const r3 = Number((technicals.prevDayHigh + 2 * (pivot - technicals.prevDayLow)).toFixed(2));
+  const s3 = Number((technicals.prevDayLow - 2 * (technicals.prevDayHigh - pivot)).toFixed(2));
+
+  const supportResistance: SupportResistanceLevels = {
+    current: currentPrice,
+    pivot: Number(pivot.toFixed(2)),
+    r1, r2, r3, s1, s2, s3,
+    keyResistance: r1,
+    keySupport: s1,
+  };
+
+  const quote: MarketQuote = {
+    ticker,
+    name: meta.name,
+    price: null as any,
+    change: null as any,
+    changePercent: null as any,
+    dayHigh: null as any,
+    dayLow: null as any,
+    openPrice: null as any,
+    previousClose: null as any,
+    preMarketPrice: null as any,
+    preMarketChangePercent: null as any,
+    afterHoursPrice: null as any,
+    afterHoursChangePercent: null as any,
+    volume: 0,
+    avgVolume: 58900000,
+    relativeVolume: 0,
+    fiftyTwoWeekHigh: null as any,
+    fiftyTwoWeekLow: null as any,
+    timestamp: new Date().toLocaleTimeString('en-US', { timeZone: 'America/New_York' }) + ' ET',
+    marketStatus: 'LIVE DATA UNAVAILABLE' as any,
+    dataSource: 'DATA UNAVAILABLE',
+  };
+
+  const factorScores: FactorScores = {
+    technicals: 0,
+    priceAction: 0,
+    marketBreadth: 0,
+    optionsSentiment: 0,
+    macroEnvironment: 0,
+    newsSentiment: 0,
+  };
+
+  const probabilities: Probabilities = {
+    bullish: 50,
+    bearish: 50,
+    neutral: 0,
+    aiConfidence: 0,
+    setupScore: 0,
+    setupQuality: 'B' as any,
+    riskLevel: 'MODERATE' as any,
+    winRateEstimate: 50,
+    expectedRrr: '1:1.5',
+    regimeBias: 'NEUTRAL' as any,
+  };
+
+  return {
+    quote,
+    technicals,
+    supportResistance,
+    trends: [],
+    trendAlignmentScore: 0,
+    breadth: { advancingCount: 0, decliningCount: 0, unchangedCount: 0, advancingVolumePct: 50, decliningVolumePct: 50, netAdvanceDecline: 0, highLowIndex: 50, mcclellanOscillator: 0, sp500Above50SmaPct: 50, sp500Above200SmaPct: 50, marketRegime: 'NEUTRAL', regimeDescription: 'Neutral' },
+    intermarket: [],
+    sectors: [],
+    strongestSector: 'N/A',
+    weakestSector: 'N/A',
+    options: { putCallRatio: 1, totalCallVolume: 0, totalPutVolume: 0, totalCallOi: 0, totalPutOi: 0, ivRank: 0, ivPercentile: 0, maxPainStrike: 0, gammaFlipStrike: 0, netGammaExposure: 0, gexRegime: 'LONG_GAMMA', expectedMoveDaily: 0, expectedMoveWeekly: 0, topUnusualActivity: [] },
+    economicEvents: [],
+    news: [],
+    fed: { fedFundsRate: 5.25, lastDecision: 'HOLD', nextMeetingDate: '2026-09-16', rateCutProbability: 25, rateHikeProbability: 5, pauseProbability: 70, dotPlotTarget2026: 4.75, hawkishDovishScore: 0, summary: 'Awaiting data' },
+    scenarios: { bullish: { title: 'Bull', probability: 25, targetPrice: 0, timeframe: '1d', rationale: 'N/A', keyTrigger: 'N/A' }, bearish: { title: 'Bear', probability: 25, targetPrice: 0, timeframe: '1d', rationale: 'N/A', keyTrigger: 'N/A' }, neutral: { title: 'Base', probability: 50, targetPrice: 0, timeframe: '1d', rationale: 'N/A', keyTrigger: 'N/A' } },
+    predictions: [],
+    backtest: { historicalWinRate: 50, profitFactor: 1, totalTrades: 0, avgReturn: 0, maxDrawdown: 0, sharpeRatio: 0, samplePeriod: 'N/A' },
+    alerts: [],
+    mlFeatures: [],
+    factorScores,
+    probabilities,
+  };
+}
+
 export function generateMarketData(
   ticker: TickerSymbol = 'SPY',
   priceDeltaPercent: number = 0,
   factorWeights?: FactorWeights
 ): ComprehensiveMarketData {
+  if (!AppConfig.allowSimulatedMarketData) {
+    return generateEmptyMarketData(ticker);
+  }
   const meta = TICKER_DEFAULTS[ticker] || TICKER_DEFAULTS.SPY;
   const currentPrice = Number((meta.basePrice * (1 + priceDeltaPercent / 100)).toFixed(2));
   const change = Number((currentPrice - meta.prevClose).toFixed(2));

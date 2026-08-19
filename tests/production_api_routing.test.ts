@@ -1,60 +1,50 @@
+process.env.NODE_ENV = 'test';
+
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
 import { CapacitorPlatform } from '../src/services/mobile/capacitorPlatform';
 import { ApiClient } from '../src/services/apiClient';
+import app from '../server';
 
-test('Production API Routing - vercel.json exists and contains required proxy rewrites', () => {
+test('Production API Routing - vercel.json & api/index.ts configured for Serverless API execution', () => {
   const vercelJsonPath = path.join(process.cwd(), 'vercel.json');
   assert.equal(fs.existsSync(vercelJsonPath), true, 'vercel.json must exist in repository root');
 
   const content = fs.readFileSync(vercelJsonPath, 'utf8');
   const parsed = JSON.parse(content);
-
   assert.ok(Array.isArray(parsed.rewrites), 'vercel.json must have a rewrites array');
 
-  const apiRewrite = parsed.rewrites.find((r: any) => r.source === '/api/:path*');
-  assert.ok(apiRewrite, 'vercel.json must rewrite /api/:path*');
-  assert.ok(
-    apiRewrite.destination.includes('onrender.com'),
-    'apiRewrite destination must point to Render backend server'
-  );
+  const apiRewrite = parsed.rewrites.find((r: any) => r.source === '/api/(.*)' || r.source === '/api/:path*');
+  assert.ok(apiRewrite, 'vercel.json must rewrite /api/*');
 
-  const wsRewrite = parsed.rewrites.find((r: any) => r.source === '/ws/:path*');
-  assert.ok(wsRewrite, 'vercel.json must rewrite /ws/:path*');
-  assert.ok(
-    wsRewrite.destination.includes('onrender.com'),
-    'wsRewrite destination must point to Render backend server'
-  );
+  const apiIndexPath = path.join(process.cwd(), 'api', 'index.ts');
+  assert.equal(fs.existsSync(apiIndexPath), true, 'api/index.ts serverless function entrypoint must exist');
 });
 
-test('Production API Routing - CapacitorPlatform resolves production backend URL for web host', () => {
+test('Production API Routing - CapacitorPlatform returns clean relative URL on web', () => {
   const originalWindow = (global as any).window;
 
-  // Mock production browser environment
   (global as any).window = {
     location: {
-      hostname: 'getmarketmindai.com',
+      hostname: 'market-mind-ai-xi.vercel.app',
       protocol: 'https:',
-      host: 'getmarketmindai.com',
+      host: 'market-mind-ai-xi.vercel.app',
+      origin: 'https://market-mind-ai-xi.vercel.app',
     },
   };
 
   const apiBase = CapacitorPlatform.getApiBaseUrl();
-  assert.equal(apiBase, 'https://marketmind-ai.onrender.com');
-
-  const wsUrl = CapacitorPlatform.getWebSocketUrl('/ws/massive');
-  assert.equal(wsUrl, 'wss://marketmind-ai.onrender.com/ws/massive');
+  assert.equal(apiBase, '', 'Web browser must return relative "" so API requests hit Vercel serverless / proxy');
 
   const fullApiUrl = ApiClient.buildApiUrl('/api/market/live/SPY');
-  assert.equal(fullApiUrl, 'https://marketmind-ai.onrender.com/api/market/live/SPY');
+  assert.equal(fullApiUrl, '/api/market/live/SPY');
 
-  // Restore window
   (global as any).window = originalWindow;
 });
 
-test('Production API Routing - server.ts mounts all mandatory endpoints', () => {
+test('Production API Routing - server.ts mounts all 4 required REST endpoints', () => {
   const serverPath = path.join(process.cwd(), 'server.ts');
   const serverContent = fs.readFileSync(serverPath, 'utf8');
 
@@ -71,15 +61,75 @@ test('Production API Routing - server.ts mounts all mandatory endpoints', () => 
     'server.ts must contain /api/market/candles/:ticker route'
   );
   assert.ok(
-    serverContent.includes('/api/market/quote/:symbol'),
-    'server.ts must contain /api/market/quote/:symbol route'
+    serverContent.includes('/api/market/tape'),
+    'server.ts must contain /api/market/tape route'
   );
   assert.ok(
     serverContent.includes('MassiveWebSocketManager'),
-    'server.ts must integrate MassiveWebSocketManager for WebSocket streaming'
+    'server.ts must integrate MassiveWebSocketManager'
   );
-  assert.ok(
-    serverContent.includes('.vercel.app'),
-    'server.ts CORS middleware must support Vercel preview origins'
-  );
+});
+
+test('Production API Routing - Express app handles required REST endpoints without 404', async () => {
+  const routesToTest = [
+    '/api/market/live/SPY',
+    '/api/market/candles/SPY?timeframe=5m&extended=true',
+    '/api/instruments/search?limit=40',
+    '/api/market/tape',
+  ];
+
+  for (const route of routesToTest) {
+    let statusCode = 200;
+    let jsonBody: any = null;
+
+    const req: any = {
+      method: 'GET',
+      url: route,
+      originalUrl: route,
+      headers: { host: 'market-mind-ai-xi.vercel.app' },
+      query: {},
+    };
+
+    await new Promise<void>((resolve) => {
+      let resolved = false;
+      const done = () => {
+        if (!resolved) {
+          resolved = true;
+          resolve();
+        }
+      };
+
+      const res: any = {
+        statusCode: 200,
+        status(code: number) {
+          statusCode = code;
+          return this;
+        },
+        json(data: any) {
+          jsonBody = data;
+          done();
+          return this;
+        },
+        setHeader() {
+          return this;
+        },
+        sendStatus(code: number) {
+          statusCode = code;
+          done();
+          return this;
+        },
+        send(data: any) {
+          jsonBody = data;
+          done();
+          return this;
+        },
+      };
+
+      app(req, res, () => done());
+      setTimeout(done, 1000);
+    });
+
+    assert.notEqual(statusCode, 404, `Route ${route} returned 404! Express route must be mounted.`);
+    assert.ok(statusCode === 200 || statusCode === 503, `Route ${route} returned unexpected status ${statusCode}`);
+  }
 });

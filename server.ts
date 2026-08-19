@@ -3029,4 +3029,11 @@ async function startServer() {
   });
 }
 
-startServer();
+const isTestEnv = process.env.NODE_ENV === 'test' || process.argv.some((arg) => arg.includes('test'));
+
+if (!isTestEnv && !process.env.VERCEL) {
+  startServer();
+}
+
+export { app };
+export default app;

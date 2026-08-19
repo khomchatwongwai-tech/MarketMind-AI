@@ -31,18 +31,10 @@ export class CapacitorPlatform {
 
   /**
    * Get the production or staging API base URL.
-   * On Web: Returns explicit VITE_API_BASE_URL if set, or production Render backend URL when hosted on Vercel/production domain.
+   * On Web: Returns relative '' so API requests route to the origin Vercel/Express serverless handlers or proxy.
    * On Native (iOS/Android): Returns absolute HTTPS URL from environment.
    */
   public static getApiBaseUrl(): string {
-    // If running in browser on production domain or Vercel preview, route API requests to Render backend
-    if (typeof window !== 'undefined' && window.location?.hostname) {
-      const host = window.location.hostname;
-      if (host === 'getmarketmindai.com' || host.endsWith('.getmarketmindai.com') || host.endsWith('.vercel.app')) {
-        return 'https://marketmind-ai.onrender.com';
-      }
-    }
-
     const isNode = typeof process !== 'undefined' && Boolean(process.versions?.node);
     if (isNode && (typeof window === 'undefined' || !window.location?.hostname)) {
       return process.env.APP_URL || 'http://localhost:3000';
@@ -57,15 +49,15 @@ export class CapacitorPlatform {
         return env.VITE_API_BASE_URL.replace(/\/$/, '');
       }
 
-      // If running inside Native Capacitor (iOS/Android), point to production backend
+      // If running inside Native Capacitor (iOS/Android), point to production web origin
       if (this.isNative()) {
         if (env.VITE_APP_URL && env.VITE_APP_URL.trim() !== '') {
           return env.VITE_APP_URL.replace(/\/$/, '');
         }
-        return 'https://marketmind-ai.onrender.com';
+        return 'https://getmarketmindai.com';
       }
 
-      // In local browser dev (localhost), relative API calls route to local Vite dev proxy / server
+      // On Web browser (Vercel production or local dev), relative API calls route to standard Vercel API routes / origin
       return '';
     } catch {
       return '';

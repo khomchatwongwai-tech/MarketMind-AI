@@ -19,6 +19,7 @@ import { MASTER_INSTRUMENTS, InstrumentDirectoryService } from '../marketProvide
 import { newsIntelligenceService } from '../newsIntelligenceService';
 import { NormalizedInstrument } from '../../types/instrument';
 import { getLanguageInstruction } from '../aiLanguageHelper';
+import type { MarketOutcome } from '../ai/marketOutcomeEngine';
 
 export class DeepResearchEngine {
   /**
@@ -123,7 +124,8 @@ export class DeepResearchEngine {
    */
   public static async executeResearchJob(
     job: ResearchJob,
-    getAI: () => GoogleGenAI | null
+    getAI: () => GoogleGenAI | null,
+    marketOutcome?: MarketOutcome
   ): Promise<ResearchReport> {
     const ticker = job.targetSymbols[0] || 'NVDA';
     const now = new Date().toISOString();
@@ -139,8 +141,9 @@ export class DeepResearchEngine {
     // Stage 3: Market Data Retrieval & Normalization (Tier 2)
     const inst = InstrumentDirectoryService.getBySymbol(ticker) || MASTER_INSTRUMENTS[0];
     let quoteData = await DataProviderRouter.getQuote(inst.instrumentId || ticker);
-    const refPrice = quoteData?.quote?.price ?? inst.price ?? 125.50;
-    const isRealTime = quoteData?.quote?.isRealTime ?? false;
+    const quote: any = quoteData?.quote;
+    const refPrice = quote?.price ?? inst.price ?? 125.50;
+    const isRealTime = quote?.isRealTime ?? false;
 
     const marketSource: ResearchSource = {
       id: `src_market_${ticker.toLowerCase()}_1`,
@@ -156,7 +159,7 @@ export class DeepResearchEngine {
       content_hash: `hash_quote_${ticker}_${Date.now()}`,
       freshness_seconds: 12,
       verified: true,
-      excerpt: `Last verified price: ${refPrice.toFixed(2)}, Change: ${quoteData?.quote?.changePercent ? quoteData.quote.changePercent.toFixed(2) : '+1.45'}%`,
+      excerpt: `Last verified price: ${refPrice.toFixed(2)}, Change: ${quote?.changePercent ? quote.changePercent.toFixed(2) : '+1.45'}%`,
     };
 
     // Stage 4: News & Catalysts Retrieval (Tier 3)
@@ -166,9 +169,9 @@ export class DeepResearchEngine {
     } catch {
       newsArticles = [];
     }
-    const newsSources: ResearchSource[] = (newsArticles || []).slice(0, 8).map((a, idx) => ({
+    const newsSources: ResearchSource[] = (newsArticles || []).filter(a => a.url && Number.isFinite(Date.parse(a.publishedAt))).slice(0, 8).map((a, idx) => ({
       id: `src_news_${ticker.toLowerCase()}_${idx + 1}`,
-      url: a.url || 'https://www.reuters.com/markets',
+      url: a.url,
       title: a.title,
       publisher: a.source || 'Financial News Wire',
       source_type: 'FINANCIAL_NEWS',
@@ -179,7 +182,7 @@ export class DeepResearchEngine {
       symbols: [ticker],
       content_hash: `hash_news_${a.id}`,
       freshness_seconds: Math.floor((Date.now() - new Date(a.publishedAt).getTime()) / 1000),
-      verified: true,
+      verified: a.verificationStatus === 'CONFIRMED',
       excerpt: a.summary,
     }));
 
@@ -473,19 +476,10 @@ export class DeepResearchEngine {
 
     // Stage 11: AI Evidence Synthesis with Gemini (Grounding Guardrails)
     const ai = getAI();
-    let executiveSummary = `${inst.name} (${ticker}) represents a core institutional asset with strong fundamental momentum anchored by robust secular demand trends. Official SEC regulatory filings confirm accelerating revenue run-rates and healthy balance sheet liquidity, counterbalanced by valuation expansion and customer capex digestion risks.`;
-    let companyOverview = `${inst.name} is a premier enterprise operating in the ${inst.assetClass} domain. The firm designs and distributes mission-critical technologies and solutions globally.`;
-    let bullThesis = [
-      `Secular tailwinds provide structural multi-year revenue compounding visibility across core product segments [cit_1].`,
-      `Gross margin expansion and pricing resilience demonstrated in recent official SEC 10-Q disclosures [cit_2].`,
-      `Macro tailwinds from easing benchmark Treasury yields support valuation multiple stability [cit_3].`,
-      `Strong free cash flow generation enables aggressive capital return via share repurchases and strategic investments.`,
-    ];
-    let bearThesis = [
-      `High valuation multiples leave minimal margin for operational or supply-chain execution errors [cit_4].`,
-      `Potential customer capital expenditure normalization could dampen forward growth acceleration rates.`,
-      `Geopolitical trade barriers and export restrictions present periodic headline and shipment friction.`,
-    ];
+    let executiveSummary = marketOutcome?.summary || `Evidence package assembled for ${inst.name} (${ticker}); interpretation is unavailable until a verified Market Outcome is supplied.`;
+    let companyOverview = `${inst.name} (${ticker}); classification: ${inst.assetClass}.`;
+    let bullThesis = marketOutcome?.positiveCatalysts.length ? marketOutcome.positiveCatalysts : allSources.slice(0, 2).map((source, index) => `Potential positive evidence is documented by ${source.publisher}: ${source.title} [cit_${index + 1}].`);
+    let bearThesis = marketOutcome ? [...marketOutcome.negativeCatalysts, ...marketOutcome.risks] : ['No verified Market Outcome was supplied; downside interpretation remains unavailable.', 'Review source conflicts and invalidation conditions before drawing a conclusion.'];
 
     if (ai) {
       try {
@@ -548,12 +542,12 @@ User Research Question: "${job.prompt}"`,
       companyOverview,
       marketSnapshot: {
         price: refPrice,
-        changePercent: quoteData?.quote?.changePercent ?? 1.45,
+        changePercent: quote?.changePercent ?? 1.45,
         high52w: refPrice * 1.08,
         low52w: refPrice * 0.58,
         volume: 48200000,
         vwap: refPrice * 0.998,
-        marketStatus: quoteData?.quote?.marketState || 'REGULAR',
+        marketStatus: quote?.marketState || 'REGULAR',
         dataSource: marketSource.publisher,
         timestamp: now,
         isRealTime,

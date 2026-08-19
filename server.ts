@@ -33,9 +33,12 @@ import { BillingAdapterRegistry } from './src/services/billing/BillingAdapterReg
 import { LegalConsentStore } from './src/server/legalConsentStore';
 import { validateProductionEnvironment, enforceProductionPreflight } from './src/server/productionPreflight';
 import { getSupabaseAdmin } from './src/server/supabaseAdmin';
-import { multiAIOrchestrator } from './src/server/ai';
+import { multiAIConsensus, multiAIOrchestrator } from './src/server/ai';
 import { AIProviderError, publicAIError, publicMarketDataError } from './src/server/ai/errors';
 import { IntentRouter } from './src/services/ai/intentRouter';
+import { MarketMindNewsEngine } from './src/services/MarketMindNewsEngine';
+import { buildMarketOutcome } from './src/services/ai/marketOutcomeEngine';
+import { randomUUID } from 'crypto';
 
 dotenv.config();
 
@@ -157,6 +160,23 @@ app.post('/api/ai/orchestrate', requireAuth, async (req: AuthenticatedRequest, r
     if (error instanceof AIProviderError) return res.status(error.kind === 'rate_limit' ? 429 : 503).json(publicAIError());
     console.error('[AI_ORCHESTRATE] unexpected failure'); return res.status(500).json(publicAIError());
   }
+});
+
+app.post('/api/market-outcome', requireAuth, async (req: AuthenticatedRequest, res) => {
+  const ticker = typeof req.body?.ticker === 'string' ? req.body.ticker.trim().toUpperCase() : '';
+  if (!/^[A-Z0-9.\-]{1,12}$/.test(ticker)) return res.status(400).json({ error: 'A valid ticker is required.', code: 'INVALID_MARKET_OUTCOME_REQUEST' });
+  try {
+    const articles = await newsIntelligenceService.getAggregatedNews({ ticker, limit: 40 });
+    const clusters = MarketMindNewsEngine.clusterNewsEvents(articles);
+    if (!articles.length) return res.status(503).json({ status: 'UNAVAILABLE', reason: 'No attributable news evidence is available.' });
+    const quoteResponse: any = await DataProviderRouter.getQuote(ticker);
+    const quote = quoteResponse?.quote;
+    const marketVerified = Boolean(quoteResponse?.entitlementStatus?.isAvailable && quote?.metadata?.validationStatus === 'VALID' && quote?.metadata?.stale === false);
+    const intent = IntentRouter.classify(`Analyze verified market outcome for ${ticker}`, ticker);
+    const consensus = await multiAIConsensus.analyze({ query: `Analyze ${ticker} using only the supplied verified evidence. Evidence: ${JSON.stringify(clusters.slice(0, 5).map(cluster => ({ title: cluster.eventTitle, verification: cluster.verificationStatus, citations: cluster.citations.map(citation => citation.url) })))}`, intent, context: { marketData: marketVerified ? quote : undefined }, requestId: randomUUID(), maxOutputTokens: 1200 }, 2, MarketMindNewsEngine.independentSources(articles).length);
+    const outcome = buildMarketOutcome({ ticker, articles, clusters, consensus, marketReaction: { verified: marketVerified, priceMove: marketVerified && Number.isFinite(quote?.changePercent) ? quote.changePercent : null, volumeRatio: marketVerified && Number.isFinite(quote?.relativeVolume) ? quote.relativeVolume : null, vixMove: null, yieldMoveBps: null, breadthSignal: null, sectorSignal: null } });
+    return res.json({ status: 'AVAILABLE', outcome });
+  } catch (error) { console.error('[MARKET_OUTCOME] unavailable'); return res.status(503).json({ status: 'UNAVAILABLE', reason: error instanceof Error ? error.message : 'Required providers are unavailable.' }); }
 });
 
 // ==========================================

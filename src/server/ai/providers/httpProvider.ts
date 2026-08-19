@@ -6,6 +6,7 @@ export abstract class HttpProvider implements AIProvider {
   abstract readonly name: AIProviderName;
   protected readonly config = aiConfig();
   isAvailable() { return this.config.enabledProviders.includes(this.name) && Boolean(this.config.apiKey(this.name)); }
+  async getHealth() { return { provider: this.name, configured: this.isAvailable(), status: this.isAvailable() ? 'AVAILABLE' as const : 'UNAVAILABLE' as const, consecutiveFailures: 0, lastCheckedAt: new Date().toISOString() }; }
   protected async post(url: string, body: unknown, headers: Record<string, string>, request: ProviderRequest): Promise<{ json: any; latencyMs: number }> {
     if (!this.isAvailable()) throw new AIProviderError(this.name, 'unavailable', `${this.name} is not configured.`);
     const controller = new AbortController(); const timer = setTimeout(() => controller.abort(), this.config.timeoutMs); const started = Date.now();

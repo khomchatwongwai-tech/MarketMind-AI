@@ -10,7 +10,7 @@
     "clean": "rm -rf dist server.js",
     "lint": "tsc --noEmit",
     "typecheck": "tsc --noEmit",
-    "test": "tsx --test tests/**/*.test.ts",
+    "test": "tsx --test --test-force-exit tests/**/*.test.ts",
     "cap:sync": "pnpm --package=@capacitor/cli dlx cap sync",
     "cap:sync:ios": "pnpm --package=@capacitor/cli dlx cap sync ios",
     "cap:sync:android": "pnpm --package=@capacitor/cli dlx cap sync android"

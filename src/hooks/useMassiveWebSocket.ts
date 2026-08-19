@@ -5,6 +5,7 @@ import {
   CalculatedMarketSignals,
   MassiveAiInsight,
 } from '../types/massiveWs';
+import { CapacitorPlatform } from '../services/mobile/capacitorPlatform';
 
 export interface UseMassiveWebSocketReturn {
   status: MassiveWsStatus;
@@ -47,6 +48,8 @@ export function useMassiveWebSocket(initialTicker: string = 'SPY'): UseMassiveWe
 
   const wsRef = useRef<WebSocket | null>(null);
   const reconnectTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const reconnectAttemptsRef = useRef<number>(0);
+  const MAX_RECONNECT_ATTEMPTS = 5;
 
   const connect = useCallback(() => {
     try {
@@ -54,8 +57,7 @@ export function useMassiveWebSocket(initialTicker: string = 'SPY'): UseMassiveWe
         return;
       }
 
-      const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
-      const wsUrl = `${protocol}//${window.location.host}/ws/massive`;
+      const wsUrl = CapacitorPlatform.getWebSocketUrl('/ws/massive');
 
       const ws = new WebSocket(wsUrl);
       wsRef.current = ws;
@@ -63,6 +65,7 @@ export function useMassiveWebSocket(initialTicker: string = 'SPY'): UseMassiveWe
       ws.onopen = () => {
         setIsConnected(true);
         setStatus('LIVE');
+        reconnectAttemptsRef.current = 0;
         // Subscribe only to active ticker (default SPY)
         ws.send(JSON.stringify({ action: 'SUBSCRIBE', ticker }));
       };
@@ -117,14 +120,21 @@ export function useMassiveWebSocket(initialTicker: string = 'SPY'): UseMassiveWe
       ws.onclose = () => {
         setIsConnected(false);
         setStatus('RECONNECTING');
-        // Try reconnecting after 3s
-        if (reconnectTimeoutRef.current) clearTimeout(reconnectTimeoutRef.current);
-        reconnectTimeoutRef.current = setTimeout(() => {
-          connect();
-        }, 3000);
+        // Bounded exponential backoff reconnect logic
+        if (reconnectAttemptsRef.current < MAX_RECONNECT_ATTEMPTS) {
+          reconnectAttemptsRef.current += 1;
+          const delayMs = Math.min(1000 * Math.pow(2, reconnectAttemptsRef.current - 1), 30000);
+          if (reconnectTimeoutRef.current) clearTimeout(reconnectTimeoutRef.current);
+          reconnectTimeoutRef.current = setTimeout(() => {
+            connect();
+          }, delayMs);
+        } else {
+          setStatus('OFFLINE');
+        }
       };
     } catch (err) {
       console.error('[useMassiveWebSocket] Connection exception:', err);
+      setStatus('OFFLINE');
     }
   }, [ticker]);
 

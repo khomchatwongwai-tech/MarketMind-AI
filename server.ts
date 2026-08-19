@@ -52,10 +52,20 @@ app.use((req, res, next) => {
   res.setHeader('X-XSS-Protection', '1; mode=block');
   res.setHeader('Referrer-Policy', 'strict-origin-when-cross-origin');
   const origin = req.headers.origin;
-  if (origin === 'https://getmarketmindai.com' || origin === 'https://www.getmarketmindai.com') {
-    res.setHeader('Access-Control-Allow-Origin', origin);
-    res.setHeader('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS');
-    res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization, X-Requested-With');
+  if (origin) {
+    const isAllowedOrigin =
+      origin === 'https://getmarketmindai.com' ||
+      origin === 'https://www.getmarketmindai.com' ||
+      origin.endsWith('.vercel.app') ||
+      origin.startsWith('http://localhost:') ||
+      origin.startsWith('http://127.0.0.1:') ||
+      (process.env.APP_URL && origin === process.env.APP_URL.replace(/\/$/, ''));
+
+    if (isAllowedOrigin) {
+      res.setHeader('Access-Control-Allow-Origin', origin);
+      res.setHeader('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS');
+      res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization, X-Requested-With');
+    }
   }
   if (req.method === 'OPTIONS') {
     return res.sendStatus(204);

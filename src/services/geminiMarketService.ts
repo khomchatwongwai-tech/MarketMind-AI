@@ -126,10 +126,11 @@ export function buildStructuredMarketContext(data: any, tickerFallback: string =
   const orLow = technicals.openingRangeLow != null ? Number(technicals.openingRangeLow.toFixed(2)) : null;
 
   // Intermarket assets
-  const qqqAsset = intermarket.find((a: any) => a.symbol === 'QQQ');
-  const iwmAsset = intermarket.find((a: any) => a.symbol === 'IWM');
-  const vixAsset = intermarket.find((a: any) => a.symbol === 'VIX');
-  const yield10Y = intermarket.find((a: any) => a.symbol === 'TNX' || a.symbol === 'US10Y');
+  const intermarketList = Array.isArray(intermarket) ? intermarket : [];
+  const qqqAsset = intermarketList.find((a: any) => a.symbol === 'QQQ');
+  const iwmAsset = intermarketList.find((a: any) => a.symbol === 'IWM');
+  const vixAsset = intermarketList.find((a: any) => a.symbol === 'VIX');
+  const yield10Y = intermarketList.find((a: any) => a.symbol === 'TNX' || a.symbol === 'US10Y');
 
   // Top/Bottom sectors
   const topSectors = (sectors || [])
@@ -342,9 +343,9 @@ export async function executeAskMarketMind({
   const timestamp = structuredContext.timestampET || new Date().toLocaleTimeString('en-US', { timeZone: 'America/New_York' }) + ' ET';
 
   // Check if current price is unavailable
-  if (structuredContext.currentPrice === null && (!aiClient || !marketData)) {
+  if (structuredContext.currentPrice === null) {
     return {
-      answer: `Verified current market data for ${ticker} is unavailable.`,
+      answer: `MARKET_DATA_UNAVAILABLE: Verified current market data for ${ticker} is unavailable.`,
       timestamp,
       source: 'MarketMind Data Guard',
       status: 'UNAVAILABLE',
@@ -491,7 +492,7 @@ export async function executeAnalyzeMarket({
     return {
       bias: 'neutral',
       confidenceExplanation: 'Verified market price is unavailable.',
-      summary: `Verified market analysis for ${ticker} is currently unavailable due to missing real-time quote data.`,
+      summary: `MARKET_DATA_UNAVAILABLE: Verified market analysis for ${ticker} is currently unavailable due to missing real-time quote data.`,
       bullishFactors: [],
       bearishFactors: [],
       support: [],
@@ -639,7 +640,7 @@ export async function executeWhyIsItMoving({
   if (cp === null) {
     return {
       headline: `${ticker} Market Movement Analysis`,
-      summary: `Verified market price and driver information for ${ticker} is currently unavailable.`,
+      summary: `MARKET_DATA_UNAVAILABLE: Verified market price and driver information for ${ticker} is currently unavailable.`,
       drivers: [],
       keyLevels: {
         support: 'Unavailable',

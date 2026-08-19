@@ -120,8 +120,10 @@ export function validateProductionEnvironment(
   }
 
   // 4. Stripe Production Billing
+  const allowOptionalBilling = env.ALLOW_OPTIONAL_BILLING === 'true' || env.ALLOW_UNCONFIGURED_BILLING === 'true';
+
   if (!env.STRIPE_SECRET_KEY || env.STRIPE_SECRET_KEY.trim() === '') {
-    if (isProduction) {
+    if (isProduction && !allowOptionalBilling) {
       errors.push('Missing required production environment variable: STRIPE_SECRET_KEY');
     } else {
       warnings.push('STRIPE_SECRET_KEY is not configured; billing checkout will return unconfigured notice.');
@@ -129,7 +131,7 @@ export function validateProductionEnvironment(
   }
 
   if (!env.STRIPE_WEBHOOK_SECRET || env.STRIPE_WEBHOOK_SECRET.trim() === '') {
-    if (isProduction) {
+    if (isProduction && !allowOptionalBilling) {
       errors.push('Missing required production environment variable: STRIPE_WEBHOOK_SECRET');
     } else {
       warnings.push('STRIPE_WEBHOOK_SECRET is not configured.');
@@ -150,7 +152,7 @@ export function validateProductionEnvironment(
 
   for (const priceKey of requiredStripePriceKeys) {
     if (!env[priceKey] || env[priceKey]?.trim() === '') {
-      if (isProduction) {
+      if (isProduction && !allowOptionalBilling) {
         errors.push(`Missing required production environment variable: ${priceKey}`);
       } else {
         warnings.push(`Stripe price configuration missing: ${priceKey}`);

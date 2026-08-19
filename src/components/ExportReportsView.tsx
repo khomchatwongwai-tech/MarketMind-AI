@@ -13,6 +13,7 @@ import {
   Share2,
 } from 'lucide-react';
 import { ComprehensiveMarketData } from '../services/marketDataService';
+import { formatPrice, formatPercent, isFiniteMarketNumber } from '../utils/formatters';
 import { Probabilities, TickerSymbol } from '../types/market';
 
 interface ExportReportsViewProps {
@@ -52,7 +53,7 @@ export const ExportReportsView: React.FC<ExportReportsViewProps> = ({
       optionsFlow: includeOptions ? optionsFlow : undefined,
       macroBreadth: includeMacro ? breadths : undefined,
       probabilities: includeAIAnalysis ? probabilities : undefined,
-      executiveSummary: `MarketMind Institutional Quantitative Report for ${quote.ticker}. Current bias: ${probabilities.bias} (${probabilities.aiConfidence}/100 confidence). Support: $${keyLevels.primarySupport.toFixed(2)}, Resistance: $${keyLevels.primaryResistance.toFixed(2)}.`,
+      executiveSummary: `MarketMind Institutional Quantitative Report for ${quote.ticker}. Current bias: ${probabilities.bias} (${probabilities.aiConfidence}/100 confidence). Support: ${formatPrice(keyLevels.primarySupport)}, Resistance: ${formatPrice(keyLevels.primaryResistance)}.`,
     };
 
     const dataStr = 'data:text/json;charset=utf-8,' + encodeURIComponent(JSON.stringify(payload, null, 2));
@@ -70,13 +71,13 @@ export const ExportReportsView: React.FC<ExportReportsViewProps> = ({
       ['Report Type', reportType.toUpperCase()],
       ['Generated At', new Date().toLocaleString()],
       ['Ticker', quote.ticker],
-      ['Price', `$${quote.price.toFixed(2)}`],
-      ['Change %', `${quote.changePercent.toFixed(2)}%`],
-      ['VWAP', `$${technicals.vwap.toFixed(2)}`],
-      ['RSI 14', technicals.rsi14.toFixed(2)],
-      ['Primary Support', `$${keyLevels.primarySupport.toFixed(2)}`],
-      ['Primary Resistance', `$${keyLevels.primaryResistance.toFixed(2)}`],
-      ['Put / Call Ratio', optionsFlow.putCallRatio.toFixed(2)],
+      ['Price', formatPrice(quote.price)],
+      ['Change %', formatPercent(quote.changePercent)],
+      ['VWAP', formatPrice(technicals.vwap)],
+      ['RSI 14', isFiniteMarketNumber(technicals.rsi14) ? technicals.rsi14.toFixed(2) : 'N/A'],
+      ['Primary Support', formatPrice(keyLevels.primarySupport)],
+      ['Primary Resistance', formatPrice(keyLevels.primaryResistance)],
+      ['Put / Call Ratio', isFiniteMarketNumber(optionsFlow.putCallRatio) ? optionsFlow.putCallRatio.toFixed(2) : 'N/A'],
       ['Directional Bias', probabilities.bias],
       ['AI Confidence Score', `${probabilities.aiConfidence}/100`],
       ['Bullish Probability', `${probabilities.bullish}%`],
@@ -235,143 +236,43 @@ export const ExportReportsView: React.FC<ExportReportsViewProps> = ({
           </div>
         </div>
 
-        {/* Right: Live Interactive Report Preview (8 cols) */}
-        <div className="md:col-span-8 bg-[#181a1f] border border-[#2d3139] rounded-xl p-5 overflow-y-auto space-y-4">
-          {/* Printable Report Canvas */}
-          <div className="bg-[#121316] border border-[#2d3139] rounded-lg p-6 space-y-4 text-[#e2e8f0]">
-            {/* Header Document Section */}
-            <div className="flex justify-between items-start border-b border-[#2d3139] pb-4">
-              <div>
-                <div className="flex items-center gap-1.5 mb-1">
-                  <Sparkles className="w-4 h-4 text-[#818cf8]" />
-                  <span className="font-black text-sm text-[#6366f1] tracking-wider uppercase">
-                    MARKETMIND AI &bull; INSTITUTIONAL RESEARCH
-                  </span>
-                </div>
-                <h1 className="text-xl font-black text-white">
-                  {quote.ticker} &mdash; {reportType.toUpperCase()} INTELLIGENCE AUDIT
-                </h1>
-                <p className="text-xs text-slate-400 font-mono">
-                  Asset: {quote.name} &bull; Generated: {new Date().toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}
-                </p>
-              </div>
-
-              <div className="text-right">
-                <div className="text-2xl font-black font-mono text-white">${quote.price.toFixed(2)}</div>
-                <div className={`text-xs font-bold font-mono ${quote.change >= 0 ? 'text-emerald-400' : 'text-rose-400'}`}>
-                  {quote.change >= 0 ? '+' : ''}{quote.change.toFixed(2)} ({quote.changePercent.toFixed(2)}%)
-                </div>
-                <span className="text-[10px] text-slate-400 uppercase font-mono">Status: {quote.marketStatus}</span>
-              </div>
+        {/* Right: Live Document Preview (8 cols) */}
+        <div className="md:col-span-8 bg-[#181a1f] border border-[#2d3139] rounded-xl p-4 flex flex-col justify-between">
+          <div className="space-y-3">
+            <div className="flex justify-between items-center pb-2 border-b border-[#2d3139]">
+              <span className="text-[10px] font-mono text-[#818cf8] font-bold uppercase tracking-wider">
+                LIVE REPORT PREVIEW &bull; {quote.ticker}
+              </span>
+              <span className="text-[10px] text-slate-400 font-mono">
+                {new Date().toLocaleDateString()}
+              </span>
             </div>
 
-            {/* AI Executive Summary Block */}
-            {includeAIAnalysis && (
-              <div className="p-3.5 bg-[#1a1d22] border border-[#2d3139] rounded-lg space-y-2">
-                <div className="flex justify-between items-center">
-                  <span className="text-[10px] font-bold uppercase text-slate-400 font-mono flex items-center gap-1">
-                    <Sparkles className="w-3 h-3 text-[#818cf8]" />
-                    AI Quant Bias &amp; Confidence
-                  </span>
-                  <span className={`text-[10px] px-2 py-0.2 rounded font-bold uppercase font-mono ${
-                    probabilities.bias === 'BULLISH'
-                      ? 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/40'
-                      : 'bg-rose-500/20 text-rose-400 border border-rose-500/40'
-                  }`}>
-                    {probabilities.bias} &bull; {probabilities.aiConfidence}/100 CONFIDENCE
-                  </span>
-                </div>
-                <p className="text-xs text-slate-200 leading-relaxed">
-                  {quote.ticker} is trading at ${quote.price.toFixed(2)} with strong relative volume ({quote.relativeVolume}x). Intraday VWAP is currently anchored at ${technicals.vwap.toFixed(2)}. Momentum remains elevated with RSI at {technicals.rsi14.toFixed(1)}. Key resistance is pegged at ${keyLevels.primaryResistance.toFixed(2)} with downside support at ${keyLevels.primarySupport.toFixed(2)}.
+            <div className="bg-[#121417] p-3 rounded-lg border border-[#232730] font-mono text-xs text-slate-300 space-y-2">
+              <p className="font-bold text-white uppercase text-sm">
+                MARKETMIND AI &mdash; {reportType.toUpperCase()} REPORT
+              </p>
+              <p>Asset: {quote.ticker} | Price: {typeof quote.price === 'number' && !isNaN(quote.price) ? `$${quote.price.toFixed(2)}` : 'N/A'}</p>
+              {includeAIAnalysis && (
+                <p className="text-emerald-400">
+                  AI Bias: {probabilities.bias} ({probabilities.aiConfidence}/100 confidence)
                 </p>
-              </div>
-            )}
-
-            {/* Grid Metrics: Technicals & Key Levels */}
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+              )}
               {includeTechnicals && (
-                <div className="p-3 bg-[#181a1f] border border-[#2d3139] rounded-lg space-y-1.5 text-xs font-mono">
-                  <div className="font-bold text-white uppercase text-[11px] mb-1 flex items-center gap-1">
-                    <TrendingUp className="w-3.5 h-3.5 text-emerald-400" />
-                    Key Technical Indicators
-                  </div>
-                  <div className="flex justify-between text-slate-300">
-                    <span>Intraday VWAP:</span>
-                    <span className="text-white font-bold">${technicals.vwap.toFixed(2)}</span>
-                  </div>
-                  <div className="flex justify-between text-slate-300">
-                    <span>RSI (14-Period):</span>
-                    <span className="text-white font-bold">{technicals.rsi14.toFixed(1)}</span>
-                  </div>
-                  <div className="flex justify-between text-slate-300">
-                    <span>MACD Trend:</span>
-                    <span className="text-emerald-400 font-bold">{technicals.macdTrend}</span>
-                  </div>
-                  <div className="flex justify-between text-slate-300">
-                    <span>EMA 20 / EMA 50:</span>
-                    <span className="text-white font-bold">${technicals.ema20.toFixed(2)} / ${technicals.ema50.toFixed(2)}</span>
-                  </div>
-                </div>
+                <p className="text-slate-400">
+                  VWAP: {typeof technicals?.vwap === 'number' && !isNaN(technicals.vwap) ? `$${technicals.vwap.toFixed(2)}` : 'N/A'} | RSI: {typeof technicals?.rsi14 === 'number' && !isNaN(technicals.rsi14) ? technicals.rsi14.toFixed(2) : 'N/A'}
+                </p>
               )}
-
               {includeKeyLevels && (
-                <div className="p-3 bg-[#181a1f] border border-[#2d3139] rounded-lg space-y-1.5 text-xs font-mono">
-                  <div className="font-bold text-white uppercase text-[11px] mb-1 flex items-center gap-1">
-                    <Target className="w-3.5 h-3.5 text-rose-400" />
-                    Support &amp; Resistance Map
-                  </div>
-                  <div className="flex justify-between text-slate-300">
-                    <span>Resistance R2:</span>
-                    <span className="text-rose-400 font-bold">${keyLevels.secondaryResistance.toFixed(2)}</span>
-                  </div>
-                  <div className="flex justify-between text-slate-300">
-                    <span>Resistance R1:</span>
-                    <span className="text-rose-400 font-bold">${keyLevels.primaryResistance.toFixed(2)}</span>
-                  </div>
-                  <div className="flex justify-between text-slate-300">
-                    <span>Support S1:</span>
-                    <span className="text-emerald-400 font-bold">${keyLevels.primarySupport.toFixed(2)}</span>
-                  </div>
-                  <div className="flex justify-between text-slate-300">
-                    <span>Support S2:</span>
-                    <span className="text-emerald-400 font-bold">${keyLevels.secondarySupport.toFixed(2)}</span>
-                  </div>
-                </div>
+                <p className="text-amber-300">
+                  Support: {typeof keyLevels?.primarySupport === 'number' && !isNaN(keyLevels.primarySupport) ? `$${keyLevels.primarySupport.toFixed(2)}` : 'N/A'} | Resistance: {typeof keyLevels?.primaryResistance === 'number' && !isNaN(keyLevels.primaryResistance) ? `$${keyLevels.primaryResistance.toFixed(2)}` : 'N/A'}
+                </p>
               )}
             </div>
+          </div>
 
-            {/* Options Flow & Macro Section */}
-            {includeOptions && (
-              <div className="p-3 bg-[#181a1f] border border-[#2d3139] rounded-lg space-y-1.5 text-xs font-mono">
-                <div className="font-bold text-white uppercase text-[11px] mb-1 flex items-center gap-1">
-                  <Layers className="w-3.5 h-3.5 text-purple-400" />
-                  Institutional Options &amp; Liquidity Profile
-                </div>
-                <div className="grid grid-cols-2 md:grid-cols-4 gap-2 text-slate-300">
-                  <div>
-                    <span className="text-[10px] text-slate-500 block">Put/Call Ratio</span>
-                    <span className="text-white font-bold">{optionsFlow.putCallRatio.toFixed(2)}</span>
-                  </div>
-                  <div>
-                    <span className="text-[10px] text-slate-500 block">Implied Vol (IV)</span>
-                    <span className="text-white font-bold">{optionsFlow.impliedVolatility.toFixed(1)}%</span>
-                  </div>
-                  <div>
-                    <span className="text-[10px] text-slate-500 block">Net Delta Flow</span>
-                    <span className="text-emerald-400 font-bold">+${(optionsFlow.netDeltaFlow / 1000000).toFixed(1)}M</span>
-                  </div>
-                  <div>
-                    <span className="text-[10px] text-slate-500 block">Gamma Regime</span>
-                    <span className="text-emerald-400 font-bold">{optionsFlow.gammaRegime}</span>
-                  </div>
-                </div>
-              </div>
-            )}
-
-            {/* Compliance / Disclaimer Footer */}
-            <div className="pt-3 border-t border-[#2d3139] text-[9.5px] text-slate-400 leading-relaxed">
-              CONFIDENTIAL &amp; PROPRIETARY &bull; MarketMind AI Financial Technologies. This quantitative research brief is generated exclusively for algorithmic and educational analysis. Not intended as direct individual financial or investment advice.
-            </div>
+          <div className="pt-3 border-t border-[#2d3139] text-[9px] text-slate-500 uppercase font-mono">
+            CONFIDENTIAL &bull; MARKETMIND AI FINANCIAL TECHNOLOGIES
           </div>
         </div>
       </div>

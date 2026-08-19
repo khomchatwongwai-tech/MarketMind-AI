@@ -128,7 +128,7 @@ export const DataDetailsModal: React.FC<DataDetailsModalProps> = ({
                 <span>Last Verified Tick</span>
               </div>
               <p className="font-mono font-bold text-[var(--text-primary,#f9fafb)]">
-                {quote ? `$${quote.price.toFixed(2)}` : 'Awaiting Tick'}
+                {quote && typeof quote.price === 'number' && !isNaN(quote.price) ? `$${quote.price.toFixed(2)}` : 'Awaiting Tick'}
               </p>
               <span className="text-[10px] text-slate-400">
                 {quoteAgeSec !== null ? `${quoteAgeSec}s ago` : 'Session Start'}

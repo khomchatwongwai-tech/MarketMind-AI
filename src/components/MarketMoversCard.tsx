@@ -132,7 +132,7 @@ export const MarketMoversCard: React.FC<MarketMoversCardProps> = ({
 
               <div className="flex flex-col items-end shrink-0">
                 <span className="font-mono font-black text-white text-xs">
-                  ${price.toFixed(2)}
+                  {typeof price === 'number' && !isNaN(price) && price > 0 ? `$${price.toFixed(2)}` : 'N/A'}
                 </span>
                 <span
                   className={`text-[10px] font-mono font-bold px-1.5 py-0.2 rounded mt-0.5 ${
@@ -142,7 +142,7 @@ export const MarketMoversCard: React.FC<MarketMoversCardProps> = ({
                   }`}
                 >
                   {isPos ? '+' : ''}
-                  {changePct.toFixed(2)}%
+                  {typeof changePct === 'number' && !isNaN(changePct) ? `${changePct.toFixed(2)}%` : 'N/A'}
                 </span>
               </div>
             </div>

@@ -1,6 +1,7 @@
 import React from 'react';
-import { Target, AlertCircle, TrendingUp, TrendingDown, CheckCircle2, ShieldAlert, ArrowUpRight, ArrowDownRight } from 'lucide-react';
+import { Target, ArrowUpRight, ArrowDownRight } from 'lucide-react';
 import { ComprehensiveMarketData } from '../services/marketDataService';
+import { isFiniteMarketNumber } from '../utils/formatters';
 
 interface SupportResistanceViewProps {
   data: ComprehensiveMarketData;
@@ -22,33 +23,33 @@ export const SupportResistanceView: React.FC<SupportResistanceViewProps> = ({ da
 
   const breakoutSignals = [
     {
-      condition: currentPrice > supportResistance.r1,
-      text: `${quote.ticker} broke above R1 resistance ($${supportResistance.r1.toFixed(2)}) with active volume.`,
-      status: currentPrice > supportResistance.r1 ? 'ACTIVE' : 'WATCHING',
+      condition: isFiniteMarketNumber(currentPrice) && isFiniteMarketNumber(supportResistance.r1) && currentPrice > supportResistance.r1,
+      text: `${quote.ticker} broke above R1 resistance (${isFiniteMarketNumber(supportResistance.r1) ? `$${supportResistance.r1.toFixed(2)}` : 'N/A'}) with active volume.`,
+      status: isFiniteMarketNumber(currentPrice) && isFiniteMarketNumber(supportResistance.r1) && currentPrice > supportResistance.r1 ? 'ACTIVE' : 'WATCHING',
       type: 'BULLISH',
     },
     {
-      condition: currentPrice >= technicals.vwap,
-      text: `${quote.ticker} reclaimed and holds above intraday VWAP ($${technicals.vwap.toFixed(2)}).`,
-      status: currentPrice >= technicals.vwap ? 'CONFIRMED' : 'INVALIDATED',
+      condition: isFiniteMarketNumber(currentPrice) && isFiniteMarketNumber(technicals.vwap) && currentPrice >= technicals.vwap,
+      text: `${quote.ticker} reclaimed and holds above intraday VWAP (${isFiniteMarketNumber(technicals.vwap) ? `$${technicals.vwap.toFixed(2)}` : 'N/A'}).`,
+      status: isFiniteMarketNumber(currentPrice) && isFiniteMarketNumber(technicals.vwap) && currentPrice >= technicals.vwap ? 'CONFIRMED' : 'INVALIDATED',
       type: 'BULLISH',
     },
     {
-      condition: quote.dayHigh > technicals.prevDayHigh,
+      condition: isFiniteMarketNumber(quote.dayHigh) && isFiniteMarketNumber(technicals.prevDayHigh) && quote.dayHigh > technicals.prevDayHigh,
       text: `${quote.ticker} is making higher highs and higher lows on intraday structure.`,
-      status: quote.dayHigh > technicals.prevDayHigh ? 'ACTIVE' : 'WATCHING',
+      status: isFiniteMarketNumber(quote.dayHigh) && isFiniteMarketNumber(technicals.prevDayHigh) && quote.dayHigh > technicals.prevDayHigh ? 'ACTIVE' : 'WATCHING',
       type: 'BULLISH',
     },
     {
-      condition: currentPrice < supportResistance.s1,
-      text: `${quote.ticker} broke below key support S1 ($${supportResistance.s1.toFixed(2)}).`,
-      status: currentPrice < supportResistance.s1 ? 'ALERT' : 'INACTIVE',
+      condition: isFiniteMarketNumber(currentPrice) && isFiniteMarketNumber(supportResistance.s1) && currentPrice < supportResistance.s1,
+      text: `${quote.ticker} broke below key support S1 (${isFiniteMarketNumber(supportResistance.s1) ? `$${supportResistance.s1.toFixed(2)}` : 'N/A'}).`,
+      status: isFiniteMarketNumber(currentPrice) && isFiniteMarketNumber(supportResistance.s1) && currentPrice < supportResistance.s1 ? 'ALERT' : 'INACTIVE',
       type: 'BEARISH',
     },
     {
-      condition: currentPrice < technicals.prevDayLow,
-      text: `${quote.ticker} broke below previous-day low ($${technicals.prevDayLow.toFixed(2)}).`,
-      status: currentPrice < technicals.prevDayLow ? 'DANGER' : 'INACTIVE',
+      condition: isFiniteMarketNumber(currentPrice) && isFiniteMarketNumber(technicals.prevDayLow) && currentPrice < technicals.prevDayLow,
+      text: `${quote.ticker} broke below previous-day low (${isFiniteMarketNumber(technicals.prevDayLow) ? `$${technicals.prevDayLow.toFixed(2)}` : 'N/A'}).`,
+      status: isFiniteMarketNumber(currentPrice) && isFiniteMarketNumber(technicals.prevDayLow) && currentPrice < technicals.prevDayLow ? 'DANGER' : 'INACTIVE',
       type: 'BEARISH',
     },
   ];
@@ -114,17 +115,16 @@ export const SupportResistanceView: React.FC<SupportResistanceViewProps> = ({ da
         <div className="text-[10px] font-bold uppercase tracking-widest text-slate-400 pb-2 border-b border-[#2d3139] flex justify-between items-center">
           <span>Price Zone Ladder & Distance Calculations</span>
           <span className="text-[9px] font-mono text-emerald-400">
-            Most Critical Resistance: ${supportResistance.r1.toFixed(2)} | Most Critical Support: ${supportResistance.s1.toFixed(2)}
+            Most Critical Resistance: {isFiniteMarketNumber(supportResistance.r1) ? `$${supportResistance.r1.toFixed(2)}` : 'N/A'} | Most Critical Support: {isFiniteMarketNumber(supportResistance.s1) ? `$${supportResistance.s1.toFixed(2)}` : 'N/A'}
           </span>
         </div>
 
         <div className="divide-y divide-[#22262d] text-xs mt-1">
           {levels.map((lvl) => {
-            const distance = currentPrice - lvl.price;
-            const distancePct = ((distance / lvl.price) * 100).toFixed(2);
-            const isAbove = currentPrice >= lvl.price;
-
-            const isCurrentNear = Math.abs(currentPrice - lvl.price) < 1.0;
+            const hasValidDistance = isFiniteMarketNumber(currentPrice) && isFiniteMarketNumber(lvl.price) && lvl.price > 0;
+            const distance = hasValidDistance ? currentPrice - lvl.price : 0;
+            const distancePct = hasValidDistance ? ((distance / lvl.price) * 100).toFixed(2) : 'N/A';
+            const isAbove = hasValidDistance ? currentPrice >= lvl.price : true;
 
             return (
               <div
@@ -151,7 +151,9 @@ export const SupportResistanceView: React.FC<SupportResistanceViewProps> = ({ da
                   >
                     {lvl.name}
                   </span>
-                  <span className="text-sm font-black font-mono text-white">${lvl.price.toFixed(2)}</span>
+                  <span className="text-sm font-black font-mono text-white">
+                    {isFiniteMarketNumber(lvl.price) ? `$${lvl.price.toFixed(2)}` : 'N/A'}
+                  </span>
                   <span className="text-[11px] text-slate-400 hidden sm:inline">&bull; {lvl.note}</span>
                 </div>
 
@@ -159,7 +161,7 @@ export const SupportResistanceView: React.FC<SupportResistanceViewProps> = ({ da
                   <div className="flex flex-col items-end">
                     <span className="text-[9px] text-slate-500 uppercase">Distance</span>
                     <span className={`font-bold ${isAbove ? 'text-emerald-400' : 'text-rose-400'}`}>
-                      {isAbove ? '+' : ''}${Math.abs(distance).toFixed(2)} ({isAbove ? '+' : ''}{distancePct}%)
+                      {hasValidDistance ? `${isAbove ? '+' : ''}$${Math.abs(distance).toFixed(2)} (${isAbove ? '+' : ''}${distancePct}%)` : 'N/A'}
                     </span>
                   </div>
                   <span

@@ -3,6 +3,7 @@ import { fetchLiveTape } from '../services/marketDataService';
 import { TrendingUp, TrendingDown, Radio, Zap, Menu } from 'lucide-react';
 import { TickerSymbol } from '../types/market';
 import { useRealTimeWatchlist } from '../hooks/useRealTimeMarket';
+import { isFiniteMarketNumber } from '../utils/formatters';
 
 interface MarketTapeProps {
   selectedTicker: TickerSymbol;
@@ -37,6 +38,17 @@ const DEFAULT_SYMBOLS = [
   'BTC-USD',
   'ETH-USD',
 ];
+
+const QUICK_TICKERS = ['SPY', 'QQQ', 'NVDA', 'AAPL', 'MSFT', 'TSLA'];
+
+const DEFAULT_PRICES: Record<string, number | null> = {
+  SPY: 500.0,
+  QQQ: 430.0,
+  NVDA: 130.0,
+  AAPL: 220.0,
+  MSFT: 440.0,
+  TSLA: 210.0,
+};
 
 export const MarketTape: React.FC<MarketTapeProps> = ({
   selectedTicker,
@@ -101,10 +113,10 @@ export const MarketTape: React.FC<MarketTapeProps> = ({
         </div>
 
         <div className="flex items-center gap-1.5 overflow-hidden">
-          {['SPY', 'QQQ'].map((sym) => {
-            const rtQuote = rtQuotes[sym];
-            const isSel = selectedTicker.toUpperCase() === sym;
-            const price = rtQuote?.price;
+          {QUICK_TICKERS.map((sym) => {
+            const isSel = selectedTicker.toUpperCase() === sym.toUpperCase();
+            const p = rtQuotes[sym.toUpperCase()]?.price ?? DEFAULT_PRICES[sym];
+            const hasValidP = isFiniteMarketNumber(p) && p > 0;
             return (
               <button
                 key={sym}
@@ -116,7 +128,7 @@ export const MarketTape: React.FC<MarketTapeProps> = ({
                 }`}
               >
                 <span>{sym}</span>
-                <span className="text-[#E5E5E5]">{price ? `$${price.toFixed(1)}` : '--'}</span>
+                <span className="text-[#E5E5E5]">{hasValidP ? `$${p.toFixed(1)}` : '--'}</span>
               </button>
             );
           })}
@@ -162,11 +174,12 @@ export const MarketTape: React.FC<MarketTapeProps> = ({
           const rtQuote = rtQuotes[item.symbol.toUpperCase()];
           const flash = rtFlashes[item.symbol.toUpperCase()];
 
-          const currentPrice = rtQuote && rtQuote.price > 0 ? rtQuote.price : item.price;
-          const currentChange = rtQuote && rtQuote.change !== undefined ? rtQuote.change : item.change;
-          const currentChangePct = rtQuote && rtQuote.changePercent !== undefined ? rtQuote.changePercent : item.changePercent;
-          const isPos = currentChange >= 0;
-          const hasValidPrice = currentPrice > 0;
+          const currentPrice = rtQuote && isFiniteMarketNumber(rtQuote.price) && rtQuote.price > 0 ? rtQuote.price : item.price;
+          const currentChange = rtQuote && isFiniteMarketNumber(rtQuote.change) ? rtQuote.change : item.change;
+          const currentChangePct = rtQuote && isFiniteMarketNumber(rtQuote.changePercent) ? rtQuote.changePercent : item.changePercent;
+          const isPos = isFiniteMarketNumber(currentChange) ? currentChange >= 0 : true;
+          const hasValidPrice = isFiniteMarketNumber(currentPrice) && currentPrice > 0;
+          const hasValidChangePct = isFiniteMarketNumber(currentChangePct);
 
           return (
             <button
@@ -185,7 +198,7 @@ export const MarketTape: React.FC<MarketTapeProps> = ({
             >
               <span className="font-bold text-white">{item.symbol}</span>
               <span className="text-[#E5E5E5]">{hasValidPrice ? `$${currentPrice.toFixed(2)}` : '--'}</span>
-              {hasValidPrice && (
+              {hasValidChangePct && (
                 <span
                   className={`flex items-center text-[10px] font-bold ${
                     isPos ? 'text-[#22C55E]' : 'text-[#EF4444]'

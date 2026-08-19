@@ -3,25 +3,26 @@ import {
   X,
   BookOpen,
   Sparkles,
-  ShieldCheck,
   TrendingUp,
   TrendingDown,
-  AlertTriangle,
+  ShieldAlert,
+  ShieldCheck,
   HelpCircle,
-  ArrowRight,
-  CheckCircle2,
   Copy,
   Check,
+  AlertTriangle,
+  CheckCircle2,
 } from 'lucide-react';
 import { NormalizedInstrument } from '../types/instrument';
 import { ComprehensiveMarketData } from '../services/marketDataService';
 import { AnalyticsService } from '../services/analyticsService';
+import { isFiniteMarketNumber, formatPrice } from '../utils/formatters';
 
 interface ExplainSimplyModalProps {
   isOpen: boolean;
   onClose: () => void;
   instrument: NormalizedInstrument;
-  marketData?: ComprehensiveMarketData;
+  marketData?: ComprehensiveMarketData | null;
   initialMode?: 'simple' | 'bull' | 'bear' | 'risk';
 }
 
@@ -38,12 +39,16 @@ export const ExplainSimplyModal: React.FC<ExplainSimplyModalProps> = ({
   if (!isOpen) return null;
 
   const symbol = instrument.symbol.toUpperCase();
-  const price = marketData?.quote.price || instrument.price || 100;
-  const changePct = marketData?.quote.changePercent || instrument.changePercent || 0;
+  const rawPrice = marketData?.quote.price ?? instrument.price;
+  const price = isFiniteMarketNumber(rawPrice) && rawPrice > 0 ? rawPrice : 100;
+  const rawChangePct = marketData?.quote.changePercent ?? instrument.changePercent;
+  const changePct = isFiniteMarketNumber(rawChangePct) ? rawChangePct : 0;
   const isUp = changePct >= 0;
 
-  const rsi = marketData?.technicals.rsi || 58.4;
-  const vwap = marketData?.technicals.vwap || price * 0.996;
+  const rawRsi = marketData?.technicals.rsi14;
+  const rsi = isFiniteMarketNumber(rawRsi) ? rawRsi : 58.4;
+  const rawVwap = marketData?.technicals.vwap;
+  const vwap = isFiniteMarketNumber(rawVwap) ? rawVwap : price * 0.996;
   const trend = marketData?.trends.primaryTrend || 'BULLISH';
 
   // Construct grounded plain-English explanations

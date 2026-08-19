@@ -1,45 +1,102 @@
 import React, { useState } from 'react';
-import { Bell, ShieldAlert, Download, Sliders, CheckCircle2, AlertTriangle, Play, Pause, Database } from 'lucide-react';
+import { Bell, ShieldAlert, Download, Sliders, CheckCircle2, AlertTriangle, Database } from 'lucide-react';
 import { ComprehensiveMarketData } from '../services/marketDataService';
 import { MarketAlert } from '../types/market';
+import { isFiniteMarketNumber } from '../utils/formatters';
 
 interface AlertsManagerViewProps {
   data: ComprehensiveMarketData;
-  alerts: MarketAlert[];
-  onDismissAlert: (id: string) => void;
+  alerts?: MarketAlert[];
+  onDismissAlert?: (id: string) => void;
 }
 
-export const AlertsManagerView: React.FC<AlertsManagerViewProps> = ({ data, alerts, onDismissAlert }) => {
-  const { quote, technicals, options, supportResistance } = data;
+export interface SmartAlertRule {
+  id: string;
+  name: string;
+  category: string;
+  metric: string;
+  condition: 'ABOVE' | 'BELOW' | 'CROSSES_ABOVE' | 'CROSSES_BELOW';
+  targetValue: number;
+  timeframe: string;
+  enabled: boolean;
+  priority: 'CRITICAL' | 'HIGH' | 'MEDIUM';
+}
 
-  const [rules, setRules] = useState([
-    { id: 'r1', name: 'R1 Resistance Level Approaching (< $0.50 away)', enabled: true, category: 'Technical' },
-    { id: 'r2', name: 'Loss of Intraday VWAP (Invalidation Alert)', enabled: true, category: 'Technical' },
-    { id: 'r3', name: 'RSI(14) Extreme Overbought (> 75) or Oversold (< 25)', enabled: true, category: 'Momentum' },
-    { id: 'r4', name: 'Unusual Institutional Options Sweep (> $500,000)', enabled: true, category: 'Options' },
-    { id: 'r5', name: 'High-Impact Economic News Released (Score >= 8)', enabled: true, category: 'Macro' },
-    { id: 'r6', name: 'VIX Volatility Spike > 4.5% in 15 Minutes', enabled: true, category: 'Volatility' },
+export const AlertsManagerView: React.FC<AlertsManagerViewProps> = ({
+  data,
+  alerts = [],
+  onDismissAlert,
+}) => {
+  const { quote, technicals, supportResistance, options } = data;
+
+  const [rules, setRules] = useState<SmartAlertRule[]>([
+    {
+      id: 'rule-1',
+      name: 'RSI 14 Overbought (> 70)',
+      category: 'Technical Indicator',
+      metric: 'rsi14',
+      condition: 'ABOVE',
+      targetValue: 70,
+      timeframe: '15m',
+      enabled: true,
+      priority: 'HIGH',
+    },
+    {
+      id: 'rule-2',
+      name: 'Intraday VWAP Breakdown',
+      category: 'Price Action',
+      metric: 'vwap',
+      condition: 'BELOW',
+      targetValue: technicals.vwap || 0,
+      timeframe: '1m',
+      enabled: true,
+      priority: 'CRITICAL',
+    },
+    {
+      id: 'rule-3',
+      name: 'Options Put/Call Ratio Spike (> 1.25)',
+      category: 'Options Flow',
+      metric: 'putCallRatio',
+      condition: 'ABOVE',
+      targetValue: 1.25,
+      timeframe: '5m',
+      enabled: false,
+      priority: 'MEDIUM',
+    },
   ]);
 
   const toggleRule = (id: string) => {
-    setRules((prev) => prev.map((r) => (r.id === id ? { ...r, enabled: !r.enabled } : r)));
+    setRules((prev) =>
+      prev.map((r) => (r.id === id ? { ...r, enabled: !r.enabled } : r))
+    );
   };
 
-  // ML Feature Row Snapshot
+  const bollingerPctB = isFiniteMarketNumber(quote.price) && isFiniteMarketNumber(technicals.bollingerLower) && isFiniteMarketNumber(technicals.bollingerUpper) && (technicals.bollingerUpper > technicals.bollingerLower)
+    ? Number(((quote.price - technicals.bollingerLower) / (technicals.bollingerUpper - technicals.bollingerLower)).toFixed(3))
+    : 0.5;
+
+  const r1DistPct = isFiniteMarketNumber(quote.price) && quote.price > 0 && isFiniteMarketNumber(supportResistance.r1)
+    ? Number(((quote.price - supportResistance.r1) / quote.price * 100).toFixed(2))
+    : 0;
+
+  const s1DistPct = isFiniteMarketNumber(quote.price) && quote.price > 0 && isFiniteMarketNumber(supportResistance.s1)
+    ? Number(((quote.price - supportResistance.s1) / quote.price * 100).toFixed(2))
+    : 0;
+
   const mlFeatures = {
     timestamp: new Date().toISOString(),
     ticker: quote.ticker,
-    price: quote.price,
-    change_pct: quote.changePercent,
-    rel_vol: quote.relativeVolume,
-    vwap: technicals.vwap,
-    rsi_14: technicals.rsi14,
-    macd: technicals.macd,
-    adx_14: technicals.adx,
-    atr_14: technicals.atr14,
-    bollinger_pct_b: Number(((quote.price - technicals.bollingerLower) / (technicals.bollingerUpper - technicals.bollingerLower)).toFixed(3)),
-    r1_dist_pct: Number(((quote.price - supportResistance.r1) / quote.price * 100).toFixed(2)),
-    s1_dist_pct: Number(((quote.price - supportResistance.s1) / quote.price * 100).toFixed(2)),
+    price: quote.price ?? 0,
+    change_pct: quote.changePercent ?? 0,
+    rel_vol: quote.relativeVolume ?? 1,
+    vwap: technicals.vwap ?? 0,
+    rsi_14: technicals.rsi14 ?? 50,
+    macd: technicals.macd ?? 0,
+    adx_14: technicals.adx ?? 20,
+    atr_14: technicals.atr14 ?? 1.5,
+    bollinger_pct_b: bollingerPctB,
+    r1_dist_pct: r1DistPct,
+    s1_dist_pct: s1DistPct,
     put_call_ratio: options.putCallRatio,
     iv_percentile: options.ivPercentile,
     sp500_adv_dec_ratio: data.breadth.sp500AdvDecRatio,
@@ -152,7 +209,7 @@ export const AlertsManagerView: React.FC<AlertsManagerViewProps> = ({ data, aler
                   </div>
 
                   <button
-                    onClick={() => onDismissAlert(al.id)}
+                    onClick={() => onDismissAlert?.(al.id)}
                     className="text-[10px] text-slate-500 hover:text-slate-300 font-mono"
                   >
                     Dismiss

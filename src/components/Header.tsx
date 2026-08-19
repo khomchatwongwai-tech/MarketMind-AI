@@ -34,6 +34,7 @@ import { LanguageSelector } from './LanguageSelector';
 import { ThemeToggle } from './ThemeToggle';
 import { AppConfig } from '../config/environment';
 import { ActiveTab } from './Navigation';
+import { isFiniteMarketNumber, formatPrice, formatPercent, formatVolume } from '../utils/formatters';
 
 interface HeaderProps {
   quote: MarketQuote;
@@ -537,7 +538,7 @@ export const Header: React.FC<HeaderProps> = ({
                     : 'text-[#EF4444]'
                 }`}
               >
-                ${quote.price.toFixed(2)}
+                {formatPrice(quote.price, 2, 'Unavailable')}
               </div>
               <div
                 className={`text-xs font-bold font-mono flex items-center gap-1 ${
@@ -545,24 +546,23 @@ export const Header: React.FC<HeaderProps> = ({
                 }`}
               >
                 {isPositive ? <TrendingUp className="w-3.5 h-3.5" /> : <TrendingDown className="w-3.5 h-3.5" />}
-                {isPositive ? '+' : ''}
-                {quote.change.toFixed(2)} ({isPositive ? '+' : ''}
-                {quote.changePercent.toFixed(2)}%)
+                {isFiniteMarketNumber(quote.change) ? `${isPositive ? '+' : ''}${quote.change.toFixed(2)}` : 'N/A'} (
+                {formatPercent(quote.changePercent, 2, true, 'N/A')})
               </div>
             </div>
 
             {/* Mobile Session Stats (Right of Price on Mobile: High, Low, Vol) */}
             <div className="flex flex-col items-end sm:hidden text-[10px] font-mono text-[#9CA3AF] space-y-0.5">
               <div>
-                High: <span className="text-white font-bold">${quote.dayHigh.toFixed(2)}</span>
+                High: <span className="text-white font-bold">{isFiniteMarketNumber(quote.dayHigh) ? `$${quote.dayHigh.toFixed(2)}` : 'N/A'}</span>
               </div>
               <div>
-                Low: <span className="text-white font-bold">${quote.dayLow.toFixed(2)}</span>
+                Low: <span className="text-white font-bold">{isFiniteMarketNumber(quote.dayLow) ? `$${quote.dayLow.toFixed(2)}` : 'N/A'}</span>
               </div>
               <div>
                 Vol:{' '}
                 <span className="text-white font-bold">
-                  {quote.volume > 1000000 ? `${(quote.volume / 1000000).toFixed(1)}M` : quote.volume.toLocaleString()}
+                  {formatVolume(quote.volume)}
                 </span>
               </div>
             </div>
@@ -573,18 +573,18 @@ export const Header: React.FC<HeaderProps> = ({
           {/* Desktop Session Metrics Bar */}
           <div className="hidden sm:grid xl:grid grid-cols-3 gap-x-4 gap-y-0.5 text-[10px] text-[#9CA3AF] uppercase tracking-wider pl-2 border-l border-[#242424]">
             <div>
-              Day High: <span className="text-white font-mono font-semibold">${quote.dayHigh.toFixed(2)}</span>
+              Day High: <span className="text-white font-mono font-semibold">{isFiniteMarketNumber(quote.dayHigh) ? `$${quote.dayHigh.toFixed(2)}` : 'N/A'}</span>
             </div>
             <div>
-              Day Low: <span className="text-white font-mono font-semibold">${quote.dayLow.toFixed(2)}</span>
+              Day Low: <span className="text-white font-mono font-semibold">{isFiniteMarketNumber(quote.dayLow) ? `$${quote.dayLow.toFixed(2)}` : 'N/A'}</span>
             </div>
             <div>
-              Prev Close: <span className="text-white font-mono font-semibold">${quote.previousClose.toFixed(2)}</span>
+              Prev Close: <span className="text-white font-mono font-semibold">{isFiniteMarketNumber(quote.previousClose) ? `$${quote.previousClose.toFixed(2)}` : 'N/A'}</span>
             </div>
             <div>
               Vol:{' '}
               <span className="text-white font-mono font-semibold">
-                {quote.volume > 1000000 ? `${(quote.volume / 1000000).toFixed(1)}M` : quote.volume.toLocaleString()}
+                {formatVolume(quote.volume)}
               </span>
             </div>
             <div>

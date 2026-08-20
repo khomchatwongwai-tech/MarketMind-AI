@@ -32,7 +32,7 @@ import { BillingAdapterRegistry } from './src/services/billing/BillingAdapterReg
 import { LegalConsentStore } from './src/server/legalConsentStore.js';
 import { validateProductionEnvironment, enforceProductionPreflight } from './src/server/productionPreflight.js';
 import { getSupabaseAdmin } from './src/server/supabaseAdmin.js';
-import { multiAIConsensus, multiAIOrchestrator } from './src/server/ai/index.js';
+import { getAIHealthReport, multiAIConsensus, multiAIOrchestrator } from './src/server/ai/index.js';
 import { AIProviderError, publicAIError, publicMarketDataError } from './src/server/ai/errors.js';
 import { IntentRouter } from './src/services/ai/intentRouter.js';
 import { MarketMindNewsEngine } from './src/services/MarketMindNewsEngine.js';
@@ -214,6 +214,15 @@ app.get('/api/preflight', (req, res) => {
     preflight: result,
     timestamp: new Date().toISOString(),
   });
+});
+
+app.get('/api/ai/health', async (req, res) => {
+  try {
+    const report = await getAIHealthReport();
+    return res.json(report);
+  } catch (error) {
+    return res.status(500).json({ error: 'Failed to retrieve AI health report' });
+  }
 });
 
 app.post('/api/ai/orchestrate', requireAuth, async (req: AuthenticatedRequest, res) => {

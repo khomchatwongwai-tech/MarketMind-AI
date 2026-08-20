@@ -3,7 +3,7 @@
  * Provides high-precision financial number, date, time, and exchange timezone formatting
  */
 
-import { LanguageCode, RegionCode } from './types';
+import { LanguageCode, RegionCode } from './types.js';
 
 /**
  * Format a financial number with locale-aware thousand separators and decimal places

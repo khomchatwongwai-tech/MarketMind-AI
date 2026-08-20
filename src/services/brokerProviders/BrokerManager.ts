@@ -6,18 +6,18 @@ import {
   PortfolioTransaction,
   UnifiedPortfolioSummary,
   BrokerProviderMetadata,
-} from '../../types/portfolio';
-import { BrokerProvider, BrokerAuthCredentials, ConnectAccountResult } from './BrokerProvider';
-import { DemoInstitutionalBrokerProvider } from './DemoInstitutionalBrokerProvider';
-import { AlpacaBrokerProvider } from './AlpacaBrokerProvider';
-import { InteractiveBrokersProvider } from './InteractiveBrokersProvider';
+} from '../../types/portfolio.js';
+import { BrokerProvider, BrokerAuthCredentials, ConnectAccountResult } from './BrokerProvider.js';
+import { DemoInstitutionalBrokerProvider } from './DemoInstitutionalBrokerProvider.js';
+import { AlpacaBrokerProvider } from './AlpacaBrokerProvider.js';
+import { InteractiveBrokersProvider } from './InteractiveBrokersProvider.js';
 import {
   TradierBrokerProvider,
   RobinhoodBrokerProvider,
   SchwabBrokerProvider,
   FidelityBrokerProvider,
   PlaidAggregatorProvider,
-} from './OtherProviders';
+} from './OtherProviders.js';
 
 const LOCAL_STORAGE_KEY_ACCOUNTS = 'marketmind_connected_broker_accounts_v1';
 const LOCAL_STORAGE_KEY_CONNECTED_INIT = 'marketmind_broker_init_done';

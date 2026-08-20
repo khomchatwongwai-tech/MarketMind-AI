@@ -1,5 +1,5 @@
 import { GoogleGenAI } from '@google/genai';
-import { getLanguageInstruction } from './aiLanguageHelper';
+import { getLanguageInstruction } from './aiLanguageHelper.js';
 
 export interface MarketAnalysisResponse {
   bias: 'bullish' | 'bearish' | 'neutral';

@@ -3,8 +3,8 @@ import {
   UniversalAssetClass,
   InstrumentSearchResultGroup,
   ProviderSymbolMap,
-} from '../../types/instrument';
-import { ADDITIONAL_INSTRUMENTS } from './additionalInstrumentCatalog';
+} from '../../types/instrument.js';
+import { ADDITIONAL_INSTRUMENTS } from './additionalInstrumentCatalog.js';
 
 // ==========================================
 // Base Universal Multi-Asset Reference List

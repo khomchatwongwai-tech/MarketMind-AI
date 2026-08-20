@@ -7,7 +7,7 @@ import {
   ProviderHealth,
   EconomicReleaseItem,
   EarningsIntelligenceItem,
-} from '../../types/newsIntelligence';
+} from '../../types/newsIntelligence.js';
 
 export interface ProviderQueryOptions {
   limit?: number;

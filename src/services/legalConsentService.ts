@@ -2,7 +2,7 @@
  * Client-side Legal Consent Service
  */
 
-import { CANONICAL_LEGAL_VERSIONS } from '../server/legalConsentStore';
+import { CANONICAL_LEGAL_VERSIONS } from '../server/legalConsentStore.js';
 
 async function getAuthHeaders(): Promise<Record<string, string>> {
   const headers: Record<string, string> = {

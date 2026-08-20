@@ -2,13 +2,13 @@
  * Client-side Billing & Subscription Service
  */
 
-import { UserProfile } from '../types/user';
+import { UserProfile } from '../types/user.js';
 import {
   BillingInvoice,
   PlanFeatureConfig,
   SubscriptionPlanId,
   AdminSubscriptionMetrics,
-} from '../types/subscription';
+} from '../types/subscription.js';
 
 async function getAuthHeaders(): Promise<Record<string, string>> {
   const headers: Record<string, string> = {

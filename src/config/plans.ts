@@ -1,4 +1,4 @@
-import { PlanFeatureConfig, SubscriptionPlanId } from '../types/subscription';
+import { PlanFeatureConfig, SubscriptionPlanId } from '../types/subscription.js';
 
 export const TRIAL_DURATION_DAYS = 15;
 

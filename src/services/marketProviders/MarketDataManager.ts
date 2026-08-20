@@ -4,11 +4,11 @@ import {
   MarketDataProvider,
   MarketStatusInfo,
   OptionsChainData,
-} from '../../types/marketProviders';
-import { MarketQuote } from '../../types/market';
-import { InstitutionalMarketDataProvider } from './InstitutionalMarketDataProvider';
-import { YahooMarketDataProvider } from './YahooMarketDataProvider';
-import { MassiveWsMarketDataProvider } from './MassiveWsMarketDataProvider';
+} from '../../types/marketProviders.js';
+import { MarketQuote } from '../../types/market.js';
+import { InstitutionalMarketDataProvider } from './InstitutionalMarketDataProvider.js';
+import { YahooMarketDataProvider } from './YahooMarketDataProvider.js';
+import { MassiveWsMarketDataProvider } from './MassiveWsMarketDataProvider.js';
 
 export class MarketDataManager {
   private static instance: MarketDataManager;

@@ -1,4 +1,4 @@
-import { NewsProvider, ProviderQueryOptions } from './NewsProvider';
+import { NewsProvider, ProviderQueryOptions } from './NewsProvider.js';
 import {
   NewsItem,
   ProviderHealth,
@@ -6,8 +6,8 @@ import {
   NewsCategory,
   GlobalRegion,
   NewsSentiment,
-} from '../../types/newsIntelligence';
-import { SafeFeedParser } from './safeFeedParser';
+} from '../../types/newsIntelligence.js';
+import { SafeFeedParser } from './safeFeedParser.js';
 
 export class YahooFinanceNewsProvider implements NewsProvider {
   readonly id = 'yahoo_finance';

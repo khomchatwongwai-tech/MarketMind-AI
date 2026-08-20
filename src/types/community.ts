@@ -1,5 +1,5 @@
-import { TickerSymbol } from './market';
-import { SubscriptionPlanTier } from './user';
+import { TickerSymbol } from './market.js';
+import { SubscriptionPlanTier } from './user.js';
 
 export type PositionDisclosure = 'NONE' | 'LONG' | 'SHORT' | 'NEUTRAL' | 'NO_POSITION';
 

@@ -3,8 +3,8 @@ import {
   ChartLevels,
   ChartTimeframe,
   AIChartAnalysisResult,
-} from '../types/chart';
-import { CapacitorPlatform } from './mobile/capacitorPlatform';
+} from '../types/chart.js';
+import { CapacitorPlatform } from './mobile/capacitorPlatform.js';
 
 export interface CandleResponse {
   source: string;

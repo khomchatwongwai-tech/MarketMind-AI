@@ -6,7 +6,7 @@
  *  3. Google Play / Android App (Google Play Billing Library)
  */
 
-import { SubscriptionPlanId, SubscriptionStatus } from '../../types/subscription';
+import { SubscriptionPlanId, SubscriptionStatus } from '../../types/subscription.js';
 
 export type BillingProviderType = 'stripe' | 'apple' | 'google' | 'none';
 

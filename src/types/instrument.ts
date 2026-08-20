@@ -2,7 +2,7 @@
 // MarketMind AI - Universal Multi-Asset Instrument Model
 // ==========================================
 
-import { MarketDataMetadata } from './market';
+import { MarketDataMetadata } from './market.js';
 
 export type UniversalAssetClass =
   | 'STOCK'

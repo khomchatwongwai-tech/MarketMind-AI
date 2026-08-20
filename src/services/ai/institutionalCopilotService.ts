@@ -5,11 +5,11 @@
  */
 
 import { GoogleGenAI } from '@google/genai';
-import { MarketMindIntelligenceContextBuilder, UnifiedIntelligenceContext } from './MarketMindIntelligenceContext';
-import { IntentRouter, ClassifiedIntent } from './intentRouter';
-import { ConversationMemoryManager } from './conversationMemory';
-import { HoldingPosition } from '../../types/portfolio';
-import { getLanguageInstruction } from '../aiLanguageHelper';
+import { MarketMindIntelligenceContextBuilder, UnifiedIntelligenceContext } from './MarketMindIntelligenceContext.js';
+import { IntentRouter, ClassifiedIntent } from './intentRouter.js';
+import { ConversationMemoryManager } from './conversationMemory.js';
+import { HoldingPosition } from '../../types/portfolio.js';
+import { getLanguageInstruction } from '../aiLanguageHelper.js';
 
 export interface CopilotResponse {
   answer: string;

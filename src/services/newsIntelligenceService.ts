@@ -1,23 +1,23 @@
-import { NewsProvider, ProviderQueryOptions } from './newsProviders/NewsProvider';
-import { AlpacaNewsProvider } from './newsProviders/AlpacaNewsProvider';
-import { BenzingaNewsProvider } from './newsProviders/BenzingaNewsProvider';
-import { MassiveNewsProvider } from './newsProviders/MassiveNewsProvider';
-import { FinnhubNewsProvider } from './newsProviders/FinnhubNewsProvider';
-import { CnbcNewsProvider } from './newsProviders/CnbcNewsProvider';
-import { YahooFinanceNewsProvider } from './newsProviders/YahooFinanceNewsProvider';
-import { BloombergNewsProvider } from './newsProviders/BloombergNewsProvider';
-import { FoxNewsProvider } from './newsProviders/FoxNewsProvider';
-import { CnnNewsProvider } from './newsProviders/CnnNewsProvider';
-import { SECProvider } from './newsProviders/SECProvider';
-import { FederalReserveProvider } from './newsProviders/FederalReserveProvider';
-import { GovernmentEconomicProvider } from './newsProviders/GovernmentEconomicProvider';
-import { CompanyIRProvider } from './newsProviders/CompanyIRProvider';
-import { PrimaryOfficialProvider } from './newsProviders/PrimaryOfficialProvider';
-import { FinancialNewsApiProvider } from './newsProviders/FinancialNewsApiProvider';
-import { SpecializedIndustryProvider } from './newsProviders/SpecializedIndustryProvider';
-import { SocialSentimentProvider } from './newsProviders/SocialSentimentProvider';
-import { reputablePublisherProviders } from './newsProviders/ReputablePublisherProvider';
-import { MarketMindNewsEngine } from './MarketMindNewsEngine';
+import { NewsProvider, ProviderQueryOptions } from './newsProviders/NewsProvider.js';
+import { AlpacaNewsProvider } from './newsProviders/AlpacaNewsProvider.js';
+import { BenzingaNewsProvider } from './newsProviders/BenzingaNewsProvider.js';
+import { MassiveNewsProvider } from './newsProviders/MassiveNewsProvider.js';
+import { FinnhubNewsProvider } from './newsProviders/FinnhubNewsProvider.js';
+import { CnbcNewsProvider } from './newsProviders/CnbcNewsProvider.js';
+import { YahooFinanceNewsProvider } from './newsProviders/YahooFinanceNewsProvider.js';
+import { BloombergNewsProvider } from './newsProviders/BloombergNewsProvider.js';
+import { FoxNewsProvider } from './newsProviders/FoxNewsProvider.js';
+import { CnnNewsProvider } from './newsProviders/CnnNewsProvider.js';
+import { SECProvider } from './newsProviders/SECProvider.js';
+import { FederalReserveProvider } from './newsProviders/FederalReserveProvider.js';
+import { GovernmentEconomicProvider } from './newsProviders/GovernmentEconomicProvider.js';
+import { CompanyIRProvider } from './newsProviders/CompanyIRProvider.js';
+import { PrimaryOfficialProvider } from './newsProviders/PrimaryOfficialProvider.js';
+import { FinancialNewsApiProvider } from './newsProviders/FinancialNewsApiProvider.js';
+import { SpecializedIndustryProvider } from './newsProviders/SpecializedIndustryProvider.js';
+import { SocialSentimentProvider } from './newsProviders/SocialSentimentProvider.js';
+import { reputablePublisherProviders } from './newsProviders/ReputablePublisherProvider.js';
+import { MarketMindNewsEngine } from './MarketMindNewsEngine.js';
 import {
   NewsItem,
   MarketMindEventCluster,
@@ -33,7 +33,7 @@ import {
   AIMarketBrief,
   AdminNewsSourceConfig,
   SavedArticle,
-} from '../types/newsIntelligence';
+} from '../types/newsIntelligence.js';
 
 export class NewsIntelligenceService {
   private providers: NewsProvider[] = [];

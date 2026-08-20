@@ -2,7 +2,7 @@ import {
   HoldingPosition,
   OptionsPosition,
   StressTestScenario,
-} from '../types/portfolio';
+} from '../types/portfolio.js';
 
 export class PortfolioStressTestEngine {
   /**

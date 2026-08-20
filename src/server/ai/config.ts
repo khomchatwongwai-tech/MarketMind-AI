@@ -1,4 +1,4 @@
-import type { AIProviderName } from './types';
+import type { AIProviderName } from './types.js';
 const names: AIProviderName[] = ['openai', 'gemini', 'anthropic', 'perplexity'];
 const keyByProvider: Record<AIProviderName, string> = { openai: 'OPENAI_API_KEY', gemini: 'GEMINI_API_KEY', anthropic: 'ANTHROPIC_API_KEY', perplexity: 'PERPLEXITY_API_KEY' };
 const modelByProvider: Record<AIProviderName, string> = { openai: 'gpt-4.1-mini', gemini: 'gemini-2.5-flash', anthropic: 'claude-sonnet-4-20250514', perplexity: 'sonar' };

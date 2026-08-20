@@ -1,11 +1,11 @@
-import { NewsProvider, ProviderQueryOptions } from './NewsProvider';
+import { NewsProvider, ProviderQueryOptions } from './NewsProvider.js';
 import {
   NewsArticle,
   ProviderHealth,
   SourceTier,
-} from '../../types/newsIntelligence';
-import { MarketMindNewsEngine } from '../MarketMindNewsEngine';
-import { SafeFeedParser } from './safeFeedParser';
+} from '../../types/newsIntelligence.js';
+import { MarketMindNewsEngine } from '../MarketMindNewsEngine.js';
+import { SafeFeedParser } from './safeFeedParser.js';
 
 export class FederalReserveProvider implements NewsProvider {
   readonly id = 'provider_federal_reserve';

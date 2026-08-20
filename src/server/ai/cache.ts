@@ -1,4 +1,4 @@
-import type { OrchestratedResponse } from './types';
+import type { OrchestratedResponse } from './types.js';
 type Entry = { value: OrchestratedResponse; expiresAt: number; userId?: string };
 const entries = new Map<string, Entry>();
 export function cacheKey(parts: { query: string; intent: string; symbol?: string; contextVersion?: string; userId?: string }) { return JSON.stringify({ q: parts.query.trim().toLowerCase(), i: parts.intent, s: parts.symbol, c: parts.contextVersion, u: parts.userId }); }

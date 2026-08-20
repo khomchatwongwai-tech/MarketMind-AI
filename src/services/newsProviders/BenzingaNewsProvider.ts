@@ -1,9 +1,9 @@
-import { NewsProvider, ProviderQueryOptions } from './NewsProvider';
+import { NewsProvider, ProviderQueryOptions } from './NewsProvider.js';
 import {
   NewsItem,
   ProviderHealth,
   SourceTier,
-} from '../../types/newsIntelligence';
+} from '../../types/newsIntelligence.js';
 
 export class BenzingaNewsProvider implements NewsProvider {
   readonly id = 'provider_benzinga_news';

@@ -1,4 +1,4 @@
-import { AlpacaProviderError } from './alpacaMarketDataService';
+import { AlpacaProviderError } from './alpacaMarketDataService.js';
 
 export class AlpacaRateLimiter {
   private static instance: AlpacaRateLimiter;

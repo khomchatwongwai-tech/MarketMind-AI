@@ -5,7 +5,7 @@ import {
   ProviderDiagnosticMetrics,
   NormalizedQuote,
   NormalizedTrade,
-} from '../../../types/realtime';
+} from '../../../types/realtime.js';
 
 export abstract class BaseRealTimeAdapter implements RealTimeProvider {
   public abstract id: string;

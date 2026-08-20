@@ -5,8 +5,8 @@ import {
   OptionsPosition,
   PortfolioTransaction,
   BrokerProviderMetadata,
-} from '../../types/portfolio';
-import { BrokerProvider, BrokerAuthCredentials, ConnectAccountResult } from './BrokerProvider';
+} from '../../types/portfolio.js';
+import { BrokerProvider, BrokerAuthCredentials, ConnectAccountResult } from './BrokerProvider.js';
 
 // -------------------------------------------------------------
 // 1. TRADIER BROKERAGE

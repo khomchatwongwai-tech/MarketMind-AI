@@ -1,4 +1,4 @@
-import { ChartCandle, ChartLevels, MarketStructureInfo, BreakoutAlert } from '../types/chart';
+import { ChartCandle, ChartLevels, MarketStructureInfo, BreakoutAlert } from '../types/chart.js';
 
 /**
  * Calculates Simple Moving Average (SMA)

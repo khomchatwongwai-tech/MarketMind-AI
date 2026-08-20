@@ -5,10 +5,10 @@ import {
   MarketDataProvider,
   MarketStatusInfo,
   OptionsChainData,
-} from '../../types/marketProviders';
-import { MarketQuote } from '../../types/market';
-import { InstitutionalMarketDataProvider } from './InstitutionalMarketDataProvider';
-import { CapacitorPlatform } from '../mobile/capacitorPlatform';
+} from '../../types/marketProviders.js';
+import { MarketQuote } from '../../types/market.js';
+import { InstitutionalMarketDataProvider } from './InstitutionalMarketDataProvider.js';
+import { CapacitorPlatform } from '../mobile/capacitorPlatform.js';
 
 export class YahooMarketDataProvider implements MarketDataProvider {
   readonly id = 'yahoo_finance';

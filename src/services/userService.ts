@@ -7,10 +7,10 @@ import {
   SystemServiceStatus,
   SubscriptionPlanTier,
   ApiKeyRecord,
-} from '../types/user';
-import { TickerSymbol } from '../types/market';
-import { FirestoreService } from './firestoreService';
-import { auth } from '../config/firebase';
+} from '../types/user.js';
+import { TickerSymbol } from '../types/market.js';
+import { FirestoreService } from './firestoreService.js';
+import { auth } from '../config/firebase.js';
 
 const STORAGE_KEYS = {
   USER: 'marketmind_user_profile',

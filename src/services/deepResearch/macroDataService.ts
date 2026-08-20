@@ -1,4 +1,4 @@
-import { ResearchSource, FinancialMetricRow, ScenarioAnalysis, ClaimConfidence } from '../../types/deepResearch';
+import { ResearchSource, FinancialMetricRow, ScenarioAnalysis, ClaimConfidence } from '../../types/deepResearch.js';
 
 export interface MacroIndicatorSnapshot {
   name: string;

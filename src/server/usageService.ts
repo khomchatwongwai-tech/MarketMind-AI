@@ -3,9 +3,9 @@
  * Manages daily AI query quotas, monthly Deep Research allocations, and resource guardrails.
  */
 
-import { SubscriptionPlanId, UserUsageRecord } from '../types/subscription';
-import { SUBSCRIPTION_PLANS, normalizePlanId } from '../config/plans';
-import { getFirebaseFirestore } from './firebaseAdmin';
+import { SubscriptionPlanId, UserUsageRecord } from '../types/subscription.js';
+import { SUBSCRIPTION_PLANS, normalizePlanId } from '../config/plans.js';
+import { getFirebaseFirestore } from './firebaseAdmin.js';
 
 interface StoredUserUsage {
   userId: string;

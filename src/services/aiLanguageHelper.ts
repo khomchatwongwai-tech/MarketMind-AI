@@ -1,4 +1,4 @@
-import { LanguageCode } from '../i18n/types';
+import { LanguageCode } from '../i18n/types.js';
 
 export interface LanguageLocaleMeta {
   code: LanguageCode;

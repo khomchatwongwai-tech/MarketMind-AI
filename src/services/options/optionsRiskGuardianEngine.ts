@@ -3,7 +3,7 @@ import {
   OptionsRiskGuardianScore,
   RiskGuardianTier,
   OptionsOrderLeg,
-} from '../../types/optionsTrader';
+} from '../../types/optionsTrader.js';
 
 export interface EvaluateOptionsRiskParams {
   contract: OptionContract;

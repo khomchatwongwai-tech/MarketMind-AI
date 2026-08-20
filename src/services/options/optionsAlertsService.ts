@@ -1,4 +1,4 @@
-import { OptionsAlertRule, OptionAlertCondition } from '../../types/optionsTrader';
+import { OptionsAlertRule, OptionAlertCondition } from '../../types/optionsTrader.js';
 
 const STORAGE_KEY = 'marketmind_options_alert_rules_v1';
 

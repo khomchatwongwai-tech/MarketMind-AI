@@ -1,11 +1,11 @@
-import { NewsProvider, ProviderQueryOptions } from './NewsProvider';
+import { NewsProvider, ProviderQueryOptions } from './NewsProvider.js';
 import {
   NewsItem,
   ProviderHealth,
   SourceTier,
   EarningsIntelligenceItem,
-} from '../../types/newsIntelligence';
-import { SafeFeedParser } from './safeFeedParser';
+} from '../../types/newsIntelligence.js';
+import { SafeFeedParser } from './safeFeedParser.js';
 
 export class CompanyIRProvider implements NewsProvider {
   readonly id = 'provider_company_ir';

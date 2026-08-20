@@ -1,4 +1,4 @@
-import type { AIProviderName, ProviderUsage } from './types';
+import type { AIProviderName, ProviderUsage } from './types.js';
 export class CostController {
   private readonly requests = new Map<string, { day: string; count: number }>();
   private readonly providerSpend = new Map<AIProviderName, { day: string; usd: number }>();

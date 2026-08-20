@@ -2,8 +2,8 @@
  * Client-side Authentication & Session Service
  */
 
-import { UserProfile } from '../types/user';
-import { SubscriptionPlanId } from '../types/subscription';
+import { UserProfile } from '../types/user.js';
+import { SubscriptionPlanId } from '../types/subscription.js';
 
 export interface RegisterPayload {
   email: string;

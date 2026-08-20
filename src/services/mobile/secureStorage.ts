@@ -4,7 +4,7 @@
  * CRITICAL RULE: Provider secret keys (Alpaca / Polygon / Stripe / Gemini) must NEVER be written to storage.
  */
 
-import { CapacitorPlatform } from './capacitorPlatform';
+import { CapacitorPlatform } from './capacitorPlatform.js';
 
 export class SecureStorage {
   private static memoryFallback: Map<string, string> = new Map();

@@ -1,5 +1,5 @@
-import { createClient, SupabaseClient } from '../server/supabaseAdmin';
-import { auth } from './firebase';
+import { createClient, SupabaseClient } from '../server/supabaseAdmin.js';
+import { auth } from './firebase.js';
 
 const env = (import.meta as any).env || {};
 const url = String(env.VITE_SUPABASE_URL || '');

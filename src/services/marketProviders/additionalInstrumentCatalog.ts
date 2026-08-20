@@ -1,4 +1,4 @@
-import { NormalizedInstrument, UniversalAssetClass } from '../../types/instrument';
+import { NormalizedInstrument, UniversalAssetClass } from '../../types/instrument.js';
 
 type CatalogSpec = {
   symbol: string; display?: string; name: string; assetClass: UniversalAssetClass;

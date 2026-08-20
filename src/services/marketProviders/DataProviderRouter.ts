@@ -3,11 +3,11 @@ import {
   ProviderCapability,
   MultiAssetQuoteResponse,
   MultiAssetChartCandle,
-} from '../../types/instrument';
-import { MarketDataMetadata, MarketDataMode } from '../../types/market';
-import { InstrumentDirectoryService } from './InstrumentDirectoryService';
-import { InstrumentResolver } from './InstrumentResolver';
-import { AppConfig } from '../../config/environment';
+} from '../../types/instrument.js';
+import { MarketDataMetadata, MarketDataMode } from '../../types/market.js';
+import { InstrumentDirectoryService } from './InstrumentDirectoryService.js';
+import { InstrumentResolver } from './InstrumentResolver.js';
+import { AppConfig } from '../../config/environment.js';
 
 // ==========================================
 // MarketMind AI — Provider Architecture & Neutral Data Router

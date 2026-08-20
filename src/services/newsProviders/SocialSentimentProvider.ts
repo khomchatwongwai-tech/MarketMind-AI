@@ -1,5 +1,5 @@
-import { NewsProvider, ProviderQueryOptions } from './NewsProvider';
-import { NewsItem, ProviderHealth } from '../../types/newsIntelligence';
+import { NewsProvider, ProviderQueryOptions } from './NewsProvider.js';
+import { NewsItem, ProviderHealth } from '../../types/newsIntelligence.js';
 
 export class SocialSentimentProvider implements NewsProvider {
   readonly id = 'provider_tier4_social_sentiment';

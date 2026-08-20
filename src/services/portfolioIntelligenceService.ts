@@ -7,7 +7,7 @@ import {
   SmartPortfolioAlertRule,
   DailyPortfolioBrief,
   EndOfDayPortfolioBrief,
-} from '../types/portfolio';
+} from '../types/portfolio.js';
 
 const LOCAL_STORAGE_KEY_ALERTS = 'marketmind_portfolio_alerts_rules_v1';
 

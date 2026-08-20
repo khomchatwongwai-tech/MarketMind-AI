@@ -1,8 +1,8 @@
 import Stripe from 'stripe';
-import { SubscriptionPlanId } from '../types/subscription';
-import { SUBSCRIPTION_PLANS, normalizePlanId } from '../config/plans';
-import { ServerUserStore } from '../services/serverUserStore';
-import { getFirebaseFirestore } from './firebaseAdmin';
+import { SubscriptionPlanId } from '../types/subscription.js';
+import { SUBSCRIPTION_PLANS, normalizePlanId } from '../config/plans.js';
+import { ServerUserStore } from '../services/serverUserStore.js';
+import { getFirebaseFirestore } from './firebaseAdmin.js';
 
 let stripeClient: Stripe | null = null;
 

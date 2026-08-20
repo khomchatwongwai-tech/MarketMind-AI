@@ -1,5 +1,5 @@
-import { AlpacaRateLimiter } from './alpacaRateLimiter';
-import { MarketDataCache } from './marketDataCache';
+import { AlpacaRateLimiter } from './alpacaRateLimiter.js';
+import { MarketDataCache } from './marketDataCache.js';
 
 export type AlpacaFailureCode =
   | 'NOT_CONFIGURED'

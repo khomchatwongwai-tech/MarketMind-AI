@@ -4,9 +4,9 @@
  * Identity and authentication are strictly authoritative through Firebase Authentication.
  */
 
-import { UserProfile, UserRole } from '../types/user';
-import { UserSubscriptionRecord, BillingInvoice, SubscriptionPlanId, AdminSubscriptionMetrics } from '../types/subscription';
-import { SUBSCRIPTION_PLANS, TRIAL_DURATION_DAYS } from '../config/plans';
+import { UserProfile, UserRole } from '../types/user.js';
+import { UserSubscriptionRecord, BillingInvoice, SubscriptionPlanId, AdminSubscriptionMetrics } from '../types/subscription.js';
+import { SUBSCRIPTION_PLANS, TRIAL_DURATION_DAYS } from '../config/plans.js';
 
 export interface StoredUserAccount {
   id: string; // Firebase UID

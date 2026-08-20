@@ -4,7 +4,7 @@ import {
   PortfolioRiskAssessment,
   CorrelationPair,
   RiskRating,
-} from '../types/portfolio';
+} from '../types/portfolio.js';
 
 export class PortfolioRiskGuardianEngine {
   /**

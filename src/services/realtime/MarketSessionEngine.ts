@@ -1,4 +1,4 @@
-import { MarketSessionType, RealTimeDataMode } from '../../types/realtime';
+import { MarketSessionType, RealTimeDataMode } from '../../types/realtime.js';
 
 export interface MarketSessionInfo {
   session: MarketSessionType;

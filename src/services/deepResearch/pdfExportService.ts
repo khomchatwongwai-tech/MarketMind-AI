@@ -1,4 +1,4 @@
-import { ResearchReport } from '../../types/deepResearch';
+import { ResearchReport } from '../../types/deepResearch.js';
 
 export class PdfExportService {
   /**

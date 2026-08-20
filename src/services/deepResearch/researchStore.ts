@@ -4,7 +4,7 @@ import {
   ResearchNote,
   ResearchWatchlistItem,
   ResearchMode,
-} from '../../types/deepResearch';
+} from '../../types/deepResearch.js';
 
 // Server-side & client-side unified memory store
 class ResearchStoreSingleton {

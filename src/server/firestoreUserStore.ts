@@ -1,8 +1,8 @@
-import { getSupabaseAdmin } from './supabaseAdmin';
-import { ServerUserStore, StoredUserAccount } from '../services/serverUserStore';
-import { BillingInvoice, SubscriptionPlanId, AdminSubscriptionMetrics } from '../types/subscription';
-import { SUBSCRIPTION_PLANS } from '../config/plans';
-import { UserProfile, UserRole } from '../types/user';
+import { getSupabaseAdmin } from './supabaseAdmin.js';
+import { ServerUserStore, StoredUserAccount } from '../services/serverUserStore.js';
+import { BillingInvoice, SubscriptionPlanId, AdminSubscriptionMetrics } from '../types/subscription.js';
+import { SUBSCRIPTION_PLANS } from '../config/plans.js';
+import { UserProfile, UserRole } from '../types/user.js';
 
 export class FirestoreUserStore {
   private static databaseProvider: (() => any) | null = null;

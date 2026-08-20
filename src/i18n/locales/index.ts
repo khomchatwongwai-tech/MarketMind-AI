@@ -12,7 +12,7 @@ import pt from './pt.json';
 import ar from './ar.json';
 import it from './it.json';
 import hi from './hi.json';
-import { LanguageCode } from '../types';
+import { LanguageCode } from '../types.js';
 
 export const LOCALE_DICTIONARIES: Record<LanguageCode, Record<string, any>> = {
   en,

@@ -4,7 +4,7 @@
  * CRITICAL RULE: Never fabricate or estimate portfolio numbers. All calculations must be 100% deterministic.
  */
 
-import { HoldingPosition } from '../../types/portfolio';
+import { HoldingPosition } from '../../types/portfolio.js';
 
 export interface PortfolioRiskMetrics {
   totalPortfolioValue: number;

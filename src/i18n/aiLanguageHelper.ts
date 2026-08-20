@@ -1,1 +1,1 @@
-export * from '../services/aiLanguageHelper';
+export * from '../services/aiLanguageHelper.js';

@@ -1,5 +1,5 @@
-import { TickerSymbol } from './market';
-import { SubscriptionPlanId, SubscriptionStatus, UserSubscriptionRecord, UserUsageRecord } from './subscription';
+import { TickerSymbol } from './market.js';
+import { SubscriptionPlanId, SubscriptionStatus, UserSubscriptionRecord, UserUsageRecord } from './subscription.js';
 
 export type { TickerSymbol };
 

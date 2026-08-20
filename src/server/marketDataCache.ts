@@ -1,4 +1,4 @@
-import { AlpacaStockQuote, AlpacaBar } from './alpacaMarketDataService';
+import { AlpacaStockQuote, AlpacaBar } from './alpacaMarketDataService.js';
 
 interface CacheEntry<T> {
   data: T;

@@ -6,12 +6,12 @@ import {
   RealTimeDiagnosticsInfo,
   ProviderDiagnosticMetrics,
   RealTimeDataMode,
-} from '../../types/realtime';
-import { SymbolSubscriptionRegistry } from './SymbolSubscriptionRegistry';
-import { MarketSessionEngine } from './MarketSessionEngine';
-import { ServerStreamAdapter } from './adapters/ServerStreamAdapter';
-import { Crypto24_7Adapter } from './adapters/Crypto24_7Adapter';
-import { AppConfig } from '../../config/environment';
+} from '../../types/realtime.js';
+import { SymbolSubscriptionRegistry } from './SymbolSubscriptionRegistry.js';
+import { MarketSessionEngine } from './MarketSessionEngine.js';
+import { ServerStreamAdapter } from './adapters/ServerStreamAdapter.js';
+import { Crypto24_7Adapter } from './adapters/Crypto24_7Adapter.js';
+import { AppConfig } from '../../config/environment.js';
 
 export class RealTimeMarketManager {
   private static instance: RealTimeMarketManager;

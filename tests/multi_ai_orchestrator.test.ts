@@ -9,7 +9,32 @@ import { requireAuthoritativeMarketData } from '../src/server/ai/marketDataGuard
 import { validateProductionEnvironment } from '../src/server/productionPreflight';
 import type { AIProvider, ProviderRequest, ProviderResponse } from '../src/server/ai/types';
 
-const provider = (name: AIProvider['name'], available = true): AIProvider => ({ name, isAvailable: () => available, generate: async (_request: ProviderRequest): Promise<ProviderResponse> => ({ provider: name, model: 'test', text: 'ok', citations: [], latencyMs: 1, finishStatus: 'completed', warnings: [] }) });
+const provider = (name: AIProvider['name'], available = true): AIProvider => ({
+  id: name,
+  name,
+  supportsCitations: true,
+  supportsStructuredOutput: true,
+  timeoutMs: 1000,
+  isAvailable: () => available,
+  getHealth: async () => ({
+    provider: name,
+    status: available ? 'HEALTHY' : 'OFFLINE',
+    configured: available,
+    enabled: available,
+    healthy: available,
+    consecutiveFailures: 0,
+    lastCheckedAt: new Date().toISOString(),
+  }),
+  generate: async (_request: ProviderRequest): Promise<ProviderResponse> => ({
+    provider: name,
+    model: 'test',
+    text: 'ok',
+    citations: [],
+    latencyMs: 1,
+    finishStatus: 'completed',
+    warnings: [],
+  }),
+});
 
 test('intent routing assigns research, market-data, and long-context requirements deterministically', () => {
   const moving = IntentRouter.classify('Why is NVDA moving today?');

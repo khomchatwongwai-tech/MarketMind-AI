@@ -4,6 +4,10 @@
     {
       "source": "/ws/(.*)",
       "destination": "https://marketmind-ai.onrender.com/ws/$1"
+    },
+    {
+      "source": "/api/(.*)",
+      "destination": "/api"
     }
   ]
 }

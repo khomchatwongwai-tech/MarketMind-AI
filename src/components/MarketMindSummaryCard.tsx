@@ -11,7 +11,6 @@ import {
   BotMessageSquare,
   Crown,
   Info,
-  Layers,
   ChevronDown,
   ChevronUp,
 } from 'lucide-react';

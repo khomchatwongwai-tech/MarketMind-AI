@@ -26,8 +26,8 @@ test('Production API Routing - vercel.json & api/index.ts configured for Serverl
 });
 
 test('Production API Routing - Serverless handler normalizes stripped req.url to start with /api', async () => {
-  const { normalizeApiUrl } = await import('../api/index.js');
-  assert.equal(typeof normalizeApiUrl, 'function', 'api/index.ts must export normalizeApiUrl helper');
+  const { normalizeApiUrl } = await import('../src/utils/apiUrlNormalizer.js');
+  assert.equal(typeof normalizeApiUrl, 'function', 'apiUrlNormalizer must export normalizeApiUrl helper');
 
   assert.equal(normalizeApiUrl('/market/live/SPY'), '/api/market/live/SPY', 'Must prepend /api to stripped subpaths');
   assert.equal(normalizeApiUrl('market/live/SPY'), '/api/market/live/SPY', 'Must format clean relative paths');

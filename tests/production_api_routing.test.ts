@@ -4,9 +4,9 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
-import { CapacitorPlatform } from '../src/services/mobile/capacitorPlatform';
-import { ApiClient } from '../src/services/apiClient';
-import app from '../server';
+import { CapacitorPlatform } from '../src/services/mobile/capacitorPlatform.js';
+import { ApiClient } from '../src/services/apiClient.js';
+import app from '../server.js';
 
 test('Production API Routing - vercel.json & api/index.ts configured for Serverless API execution', () => {
   const vercelJsonPath = path.join(process.cwd(), 'vercel.json');
@@ -19,6 +19,15 @@ test('Production API Routing - vercel.json & api/index.ts configured for Serverl
 
   const apiSlugPath = path.join(process.cwd(), 'api', '[...slug].ts');
   assert.equal(fs.existsSync(apiSlugPath), true, 'api/[...slug].ts catch-all serverless function entrypoint must exist');
+});
+
+test('Production API Routing - Serverless handler normalizes stripped req.url to start with /api', async () => {
+  const { normalizeApiUrl } = await import('../api/index.js');
+  assert.equal(typeof normalizeApiUrl, 'function', 'api/index.ts must export normalizeApiUrl helper');
+
+  assert.equal(normalizeApiUrl('/market/live/SPY'), '/api/market/live/SPY', 'Must prepend /api to stripped subpaths');
+  assert.equal(normalizeApiUrl('market/live/SPY'), '/api/market/live/SPY', 'Must format clean relative paths');
+  assert.equal(normalizeApiUrl('/api/market/live/SPY'), '/api/market/live/SPY', 'Must preserve existing /api prefix');
 });
 
 test('Production API Routing - CapacitorPlatform returns clean relative URL on web', () => {

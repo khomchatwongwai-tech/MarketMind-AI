@@ -1,11 +1,11 @@
-import { NewsProvider, ProviderQueryOptions } from './NewsProvider';
+import { NewsProvider, ProviderQueryOptions } from './NewsProvider.js';
 import {
   NewsItem,
   ProviderHealth,
   EconomicReleaseItem,
   EarningsIntelligenceItem,
-} from '../../types/newsIntelligence';
-import { SafeFeedParser } from './safeFeedParser';
+} from '../../types/newsIntelligence.js';
+import { SafeFeedParser } from './safeFeedParser.js';
 
 export class PrimaryOfficialProvider implements NewsProvider {
   readonly id = 'provider_tier1_primary_official';

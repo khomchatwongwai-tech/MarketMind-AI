@@ -1,8 +1,8 @@
-import { ChartCandle, ChartTimeframe } from '../../types/chart';
-import { RealTimeMarketManager } from './RealTimeMarketManager';
-import { RealtimeCandleAggregator } from './RealtimeCandleAggregator';
-import { fetchCandles, CandleResponse } from '../candleDataService';
-import { NormalizedQuote, NormalizedTrade } from '../../types/realtime';
+import { ChartCandle, ChartTimeframe } from '../../types/chart.js';
+import { RealTimeMarketManager } from './RealTimeMarketManager.js';
+import { RealtimeCandleAggregator } from './RealtimeCandleAggregator.js';
+import { fetchCandles, CandleResponse } from '../candleDataService.js';
+import { NormalizedQuote, NormalizedTrade } from '../../types/realtime.js';
 
 export interface TradingViewSymbolInfo {
   name: string;

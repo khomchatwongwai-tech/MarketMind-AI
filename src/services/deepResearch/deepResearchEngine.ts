@@ -11,15 +11,15 @@ import {
   FinancialMetricRow,
   CompanyComparisonRow,
   PortfolioExposureResearch,
-} from '../../types/deepResearch';
-import { SecEdgarService } from './secEdgarService';
-import { MacroDataService } from './macroDataService';
-import { DataProviderRouter } from '../marketProviders/DataProviderRouter';
-import { MASTER_INSTRUMENTS, InstrumentDirectoryService } from '../marketProviders/InstrumentDirectoryService';
-import { newsIntelligenceService } from '../newsIntelligenceService';
-import { NormalizedInstrument } from '../../types/instrument';
-import { getLanguageInstruction } from '../aiLanguageHelper';
-import type { MarketOutcome } from '../ai/marketOutcomeEngine';
+} from '../../types/deepResearch.js';
+import { SecEdgarService } from './secEdgarService.js';
+import { MacroDataService } from './macroDataService.js';
+import { DataProviderRouter } from '../marketProviders/DataProviderRouter.js';
+import { MASTER_INSTRUMENTS, InstrumentDirectoryService } from '../marketProviders/InstrumentDirectoryService.js';
+import { newsIntelligenceService } from '../newsIntelligenceService.js';
+import { NormalizedInstrument } from '../../types/instrument.js';
+import { getLanguageInstruction } from '../aiLanguageHelper.js';
+import type { MarketOutcome } from '../ai/marketOutcomeEngine.js';
 
 export class DeepResearchEngine {
   /**

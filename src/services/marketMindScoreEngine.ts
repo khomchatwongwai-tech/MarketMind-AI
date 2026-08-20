@@ -1,5 +1,5 @@
-import { MarketMindScoreBreakdown } from '../types/marketProviders';
-import { ComprehensiveMarketData } from './marketDataService';
+import { MarketMindScoreBreakdown } from '../types/marketProviders.js';
+import { ComprehensiveMarketData } from './marketDataService.js';
 
 export function calculateMarketMindScore(data: ComprehensiveMarketData): MarketMindScoreBreakdown {
   const { quote, technicals, supportResistance, trends, breadth, sectors, options } = data;

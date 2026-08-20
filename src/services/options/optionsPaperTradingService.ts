@@ -4,7 +4,7 @@ import {
   OptionsOrderResult,
   OptionsPositionSummary,
   OptionsJournalEntry,
-} from '../../types/optionsTrader';
+} from '../../types/optionsTrader.js';
 
 const STORAGE_KEY = 'marketmind_options_paper_account_v1';
 const INITIAL_BALANCE = 100000; // $100,000 virtual balance

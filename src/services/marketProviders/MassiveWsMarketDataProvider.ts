@@ -5,9 +5,9 @@ import {
   MarketDataProvider,
   MarketStatusInfo,
   OptionsChainData,
-} from '../../types/marketProviders';
-import { MarketQuote } from '../../types/market';
-import { InstitutionalMarketDataProvider } from './InstitutionalMarketDataProvider';
+} from '../../types/marketProviders.js';
+import { MarketQuote } from '../../types/market.js';
+import { InstitutionalMarketDataProvider } from './InstitutionalMarketDataProvider.js';
 
 export class MassiveWsMarketDataProvider implements MarketDataProvider {
   readonly id = 'massive_ws';

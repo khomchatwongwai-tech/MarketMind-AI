@@ -1,5 +1,5 @@
-import { TickerSymbol } from './market';
-import { BrokerId } from './portfolio';
+import { TickerSymbol } from './market.js';
+import { BrokerId } from './portfolio.js';
 
 export type OptionType = 'CALL' | 'PUT';
 

@@ -6,7 +6,7 @@ import {
   VerificationResult,
   SubscriptionEntitlement,
   ProviderProductConfig,
-} from './BillingProvider';
+} from './BillingProvider.js';
 
 export class GoogleBillingProvider implements IBillingProvider {
   readonly providerType: BillingProviderType = 'google';

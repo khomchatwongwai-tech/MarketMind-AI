@@ -1,5 +1,5 @@
-import { RealTimeMarketManager } from './RealTimeMarketManager';
-import { NormalizedQuote, NormalizedTrade, ProviderConnectionStatus, RealTimeDiagnosticsInfo } from '../../types/realtime';
+import { RealTimeMarketManager } from './RealTimeMarketManager.js';
+import { NormalizedQuote, NormalizedTrade, ProviderConnectionStatus, RealTimeDiagnosticsInfo } from '../../types/realtime.js';
 
 export type StoreListener = () => void;
 

@@ -4,8 +4,8 @@ import {
   MassiveWsClientMessage,
   CalculatedMarketSignals,
   MassiveAiInsight,
-} from '../types/massiveWs';
-import { CapacitorPlatform } from '../services/mobile/capacitorPlatform';
+} from '../types/massiveWs.js';
+import { CapacitorPlatform } from '../services/mobile/capacitorPlatform.js';
 
 export interface UseMassiveWebSocketReturn {
   status: MassiveWsStatus;

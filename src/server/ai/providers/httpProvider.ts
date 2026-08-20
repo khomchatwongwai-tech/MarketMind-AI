@@ -1,6 +1,6 @@
-import { aiConfig } from '../config';
-import { AIProviderError } from '../errors';
-import type { AIProvider, AIProviderName, ProviderRequest, ProviderResponse } from '../types';
+import { aiConfig } from '../config.js';
+import { AIProviderError } from '../errors.js';
+import type { AIProvider, AIProviderName, ProviderRequest, ProviderResponse } from '../types.js';
 
 export abstract class HttpProvider implements AIProvider {
   abstract readonly name: AIProviderName;

@@ -1,4 +1,4 @@
-import { InstrumentStore, DatabaseInstrument } from './instrumentStore';
+import { InstrumentStore, DatabaseInstrument } from './instrumentStore.js';
 
 export interface AlpacaRawAsset {
   id: string;

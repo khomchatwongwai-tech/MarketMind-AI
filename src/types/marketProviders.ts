@@ -1,4 +1,4 @@
-import { MarketQuote } from './market';
+import { MarketQuote } from './market.js';
 
 export type AssetClass =
   | 'STOCK'

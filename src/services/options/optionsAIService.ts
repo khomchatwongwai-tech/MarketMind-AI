@@ -4,9 +4,9 @@ import {
   OptionStrategyType,
   StrategyAnalysis,
   StrategyLeg,
-} from '../../types/optionsTrader';
-import { optionsRiskGuardianEngine } from './optionsRiskGuardianEngine';
-import { calculateBlackScholes } from './blackScholesEngine';
+} from '../../types/optionsTrader.js';
+import { optionsRiskGuardianEngine } from './optionsRiskGuardianEngine.js';
+import { calculateBlackScholes } from './blackScholesEngine.js';
 
 export class OptionsAIService {
   /**

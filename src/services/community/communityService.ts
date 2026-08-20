@@ -15,7 +15,7 @@ import {
   increment,
   Unsubscribe,
 } from 'firebase/firestore';
-import { db, auth, handleFirestoreError, OperationType } from '../../config/firebase';
+import { db, auth, handleFirestoreError, OperationType } from '../../config/firebase.js';
 import {
   CommunityUserProfile,
   CommunityPost,
@@ -32,10 +32,10 @@ import {
   FeedFilterType,
   PositionDisclosure,
   ContentMediaType,
-} from '../../types/community';
-import { UserProfile } from '../../types/user';
-import { TickerSymbol } from '../../types/market';
-import { CommunitySafetyGuard, FINANCIAL_DISCLAIMER_TEXT } from './safetyGuard';
+} from '../../types/community.js';
+import { UserProfile } from '../../types/user.js';
+import { TickerSymbol } from '../../types/market.js';
+import { CommunitySafetyGuard, FINANCIAL_DISCLAIMER_TEXT } from './safetyGuard.js';
 
 const STORAGE_PREFIX = 'marketmind_social_';
 

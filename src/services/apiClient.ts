@@ -4,9 +4,9 @@
  * Enforces base URL resolution, Firebase auth token attachment, offline caching, and fail-closed integrity.
  */
 
-import { CapacitorPlatform } from './mobile/capacitorPlatform';
-import { SecureStorage } from './mobile/secureStorage';
-import { NormalizedInstrument, UniversalAssetClass, MultiAssetQuoteResponse } from '../types/instrument';
+import { CapacitorPlatform } from './mobile/capacitorPlatform.js';
+import { SecureStorage } from './mobile/secureStorage.js';
+import { NormalizedInstrument, UniversalAssetClass, MultiAssetQuoteResponse } from '../types/instrument.js';
 
 export interface ApiClientOptions {
   headers?: Record<string, string>;

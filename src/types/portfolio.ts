@@ -1,4 +1,4 @@
-import { TickerSymbol } from './market';
+import { TickerSymbol } from './market.js';
 
 export type BrokerId =
   | 'alpaca'

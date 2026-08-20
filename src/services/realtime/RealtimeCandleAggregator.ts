@@ -1,4 +1,4 @@
-import { ChartCandle, ChartTimeframe } from '../../types/chart';
+import { ChartCandle, ChartTimeframe } from '../../types/chart.js';
 
 export class RealtimeCandleAggregator {
   private static instance: RealtimeCandleAggregator;

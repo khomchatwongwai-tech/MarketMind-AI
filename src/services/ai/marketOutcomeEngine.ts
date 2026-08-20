@@ -1,6 +1,6 @@
-import type { ConsensusResult, ProviderOpinion } from '../../server/ai/types';
-import type { MarketMindEventCluster, NewsArticle, VerificationStatus } from '../../types/newsIntelligence';
-import { MarketMindNewsEngine } from '../MarketMindNewsEngine';
+import type { ConsensusResult, ProviderOpinion } from '../../server/ai/types.js';
+import type { MarketMindEventCluster, NewsArticle, VerificationStatus } from '../../types/newsIntelligence.js';
+import { MarketMindNewsEngine } from '../MarketMindNewsEngine.js';
 
 export type MarketOutcome = {
   ticker?: string; market?: string; direction: 'BULLISH' | 'NEUTRAL' | 'BEARISH'; confidence: number;

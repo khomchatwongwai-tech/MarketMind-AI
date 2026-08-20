@@ -1,5 +1,5 @@
 import { GoogleGenAI } from '@google/genai';
-import { NormalizedInstrument } from '../types/instrument';
+import { NormalizedInstrument } from '../types/instrument.js';
 
 export interface MultiAssetAIAnalysis {
   instrumentId: string;

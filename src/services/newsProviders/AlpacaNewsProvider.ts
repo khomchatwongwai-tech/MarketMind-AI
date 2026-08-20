@@ -1,10 +1,10 @@
-import { NewsProvider, ProviderQueryOptions } from './NewsProvider';
+import { NewsProvider, ProviderQueryOptions } from './NewsProvider.js';
 import {
   NewsArticle,
   ProviderHealth,
   SourceTier,
-} from '../../types/newsIntelligence';
-import { MarketMindNewsEngine } from '../MarketMindNewsEngine';
+} from '../../types/newsIntelligence.js';
+import { MarketMindNewsEngine } from '../MarketMindNewsEngine.js';
 
 export class AlpacaNewsProvider implements NewsProvider {
   readonly id = 'provider_alpaca_news';

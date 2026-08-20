@@ -3,8 +3,8 @@ import {
   UniversalAssetClass,
   ProviderSymbolMap,
   TradingSessionType,
-} from '../../types/instrument';
-import { InstrumentDirectoryService } from './InstrumentDirectoryService';
+} from '../../types/instrument.js';
+import { InstrumentDirectoryService } from './InstrumentDirectoryService.js';
 
 // ==========================================
 // MarketMind AI — Centralized Instrument Resolver

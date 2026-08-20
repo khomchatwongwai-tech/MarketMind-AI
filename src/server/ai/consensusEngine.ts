@@ -1,4 +1,4 @@
-import type { AIProvider, AIProviderName, ConsensusResult, ProviderOpinion, ProviderRequest } from './types';
+import type { AIProvider, AIProviderName, ConsensusResult, ProviderOpinion, ProviderRequest } from './types.js';
 
 const directions: ProviderOpinion['direction'][] = ['BULLISH', 'NEUTRAL', 'BEARISH'];
 const horizon = new Set<ProviderOpinion['timeHorizon']>(['INTRADAY', '1_3_DAYS', '1_2_WEEKS', 'LONGER_TERM']);

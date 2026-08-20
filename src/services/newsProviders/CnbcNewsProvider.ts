@@ -1,4 +1,4 @@
-import { NewsProvider, ProviderQueryOptions } from './NewsProvider';
+import { NewsProvider, ProviderQueryOptions } from './NewsProvider.js';
 import {
   NewsItem,
   ProviderHealth,
@@ -7,8 +7,8 @@ import {
   GlobalRegion,
   NewsSentiment,
   NewsImpact,
-} from '../../types/newsIntelligence';
-import { SafeFeedParser } from './safeFeedParser';
+} from '../../types/newsIntelligence.js';
+import { SafeFeedParser } from './safeFeedParser.js';
 
 export class CnbcNewsProvider implements NewsProvider {
   readonly id = 'cnbc';

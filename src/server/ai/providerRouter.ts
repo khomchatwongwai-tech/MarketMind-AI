@@ -1,2 +1,2 @@
-import type { ClassifiedIntent } from '../../services/ai/intentRouter'; import type { AIProvider, AIProviderName } from './types';
+import type { ClassifiedIntent } from '../../services/ai/intentRouter.js'; import type { AIProvider, AIProviderName } from './types.js';
 export class ProviderRouter { constructor(private readonly providers: AIProvider[]) {} route(intent: ClassifiedIntent, maximum: number): AIProvider[] { const order: AIProviderName[] = [intent.preferredProvider, ...intent.allowedFallbackProviders]; return [...new Map(order.map(name => [name, this.providers.find(provider => provider.name === name)])).values()].filter((provider): provider is AIProvider => Boolean(provider?.isAvailable())).slice(0, maximum); } }

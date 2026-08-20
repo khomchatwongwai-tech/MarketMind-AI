@@ -2,7 +2,7 @@ import {
   HoldingPosition,
   TopAttributionContributor,
   WhyIsMyPortfolioMovingAnalysis,
-} from '../types/portfolio';
+} from '../types/portfolio.js';
 
 export class PortfolioMovementEngine {
   /**

@@ -1,6 +1,6 @@
-import type { NewsArticle, ProviderHealth, SourceTier, SourceType } from '../../types/newsIntelligence';
-import { MarketMindNewsEngine } from '../MarketMindNewsEngine';
-import type { NewsProvider, ProviderQueryOptions } from './NewsProvider';
+import type { NewsArticle, ProviderHealth, SourceTier, SourceType } from '../../types/newsIntelligence.js';
+import { MarketMindNewsEngine } from '../MarketMindNewsEngine.js';
+import type { NewsProvider, ProviderQueryOptions } from './NewsProvider.js';
 
 export type PublisherConfig = { id: string; name: string; tier: SourceTier; sourceType: Extract<SourceType, 'LICENSED_API' | 'RSS' | 'METADATA_ONLY'>; endpointEnv: string; credentialEnv?: string; licensingMode: string; reliabilityScore: number };
 

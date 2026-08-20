@@ -1,6 +1,6 @@
-import { UserProfile } from '../types/user';
-import { FeatureEntitlements, SubscriptionPlanId, SubscriptionStatus } from '../types/subscription';
-import { SUBSCRIPTION_PLANS, normalizePlanId } from '../config/plans';
+import { UserProfile } from '../types/user.js';
+import { FeatureEntitlements, SubscriptionPlanId, SubscriptionStatus } from '../types/subscription.js';
+import { SUBSCRIPTION_PLANS, normalizePlanId } from '../config/plans.js';
 
 export class EntitlementService {
   /**

@@ -1,6 +1,6 @@
-import { BaseRealTimeAdapter } from './BaseRealTimeAdapter';
-import { NormalizedQuote, NormalizedTrade, ProviderConnectionStatus } from '../../../types/realtime';
-import { MarketSessionEngine } from '../MarketSessionEngine';
+import { BaseRealTimeAdapter } from './BaseRealTimeAdapter.js';
+import { NormalizedQuote, NormalizedTrade, ProviderConnectionStatus } from '../../../types/realtime.js';
+import { MarketSessionEngine } from '../MarketSessionEngine.js';
 
 export class ServerStreamAdapter extends BaseRealTimeAdapter {
   public id = 'marketmind_stream';

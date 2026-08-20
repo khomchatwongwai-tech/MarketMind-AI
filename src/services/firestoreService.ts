@@ -12,8 +12,8 @@ import {
   where,
   Unsubscribe,
 } from 'firebase/firestore';
-import { db, auth, handleFirestoreError, OperationType } from '../config/firebase';
-import { UserProfile, Watchlist, SavedAlert, HistoricalPrediction, SupportTicket } from '../types/user';
+import { db, auth, handleFirestoreError, OperationType } from '../config/firebase.js';
+import { UserProfile, Watchlist, SavedAlert, HistoricalPrediction, SupportTicket } from '../types/user.js';
 
 export class FirestoreService {
   // --- USER PROFILE ---

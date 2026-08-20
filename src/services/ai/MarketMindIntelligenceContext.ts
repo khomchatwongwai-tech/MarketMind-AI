@@ -4,9 +4,9 @@
  * CRITICAL PRINCIPLE: Only include fields backed by verified provider data. Attach freshness metadata.
  */
 
-import { PortfolioRiskEngine, PortfolioRiskMetrics } from './portfolioRiskEngine';
-import { MarketRegimeEngine, MarketRegimeEvaluation } from './marketRegimeEngine';
-import { HoldingPosition } from '../../types/portfolio';
+import { PortfolioRiskEngine, PortfolioRiskMetrics } from './portfolioRiskEngine.js';
+import { MarketRegimeEngine, MarketRegimeEvaluation } from './marketRegimeEngine.js';
+import { HoldingPosition } from '../../types/portfolio.js';
 
 export interface VerifiedQuoteContext {
   symbol: string;

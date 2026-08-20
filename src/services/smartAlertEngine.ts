@@ -3,8 +3,8 @@
  * Enforces deduplication, cooldowns, verified triggers, and severity classification.
  */
 
-import { MarketQuote } from '../types/market';
-import { NormalizedInstrument } from '../types/instrument';
+import { MarketQuote } from '../types/market.js';
+import { NormalizedInstrument } from '../types/instrument.js';
 
 export type AlertSeverity = 'INFO' | 'IMPORTANT' | 'HIGH' | 'CRITICAL';
 export type AlertCategory =

@@ -1,4 +1,4 @@
-import { TickerSymbol } from '../../types/market';
+import { TickerSymbol } from '../../types/market.js';
 
 export const FINANCIAL_DISCLAIMER_TEXT =
   'Community posts represent the opinions of individual users and may be inaccurate, misleading or incomplete. MarketMind AI does not endorse community content. Nothing posted in the community constitutes personalized investment advice or a guarantee of future performance. Conduct your own research before making financial decisions.';

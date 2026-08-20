@@ -1,5 +1,5 @@
-import { BaseRealTimeAdapter } from './BaseRealTimeAdapter';
-import { NormalizedQuote, NormalizedTrade } from '../../../types/realtime';
+import { BaseRealTimeAdapter } from './BaseRealTimeAdapter.js';
+import { NormalizedQuote, NormalizedTrade } from '../../../types/realtime.js';
 
 export class Crypto24_7Adapter extends BaseRealTimeAdapter {
   public id = 'crypto_247';

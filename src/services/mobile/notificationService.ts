@@ -4,7 +4,7 @@
  * Never fabricates notifications; all alerts originate from verified backend data.
  */
 
-import { CapacitorPlatform } from './capacitorPlatform';
+import { CapacitorPlatform } from './capacitorPlatform.js';
 
 export interface MarketNotification {
   id: string;

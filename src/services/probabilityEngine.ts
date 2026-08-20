@@ -1,4 +1,4 @@
-import { MarketBias, Probabilities, RiskLevel, SetupQuality } from '../types/market';
+import { MarketBias, Probabilities, RiskLevel, SetupQuality } from '../types/market.js';
 
 export interface FactorWeights {
   technicals: number; // e.g. 25

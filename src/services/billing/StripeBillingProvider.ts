@@ -6,8 +6,8 @@ import {
   VerificationResult,
   SubscriptionEntitlement,
   ProviderProductConfig,
-} from './BillingProvider';
-import { SUBSCRIPTION_PLANS } from '../../config/plans';
+} from './BillingProvider.js';
+import { SUBSCRIPTION_PLANS } from '../../config/plans.js';
 
 export class StripeBillingProvider implements IBillingProvider {
   readonly providerType: BillingProviderType = 'stripe';

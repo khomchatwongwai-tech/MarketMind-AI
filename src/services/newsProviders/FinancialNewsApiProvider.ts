@@ -1,5 +1,5 @@
-import { NewsProvider, ProviderQueryOptions } from './NewsProvider';
-import { NewsItem, ProviderHealth } from '../../types/newsIntelligence';
+import { NewsProvider, ProviderQueryOptions } from './NewsProvider.js';
+import { NewsItem, ProviderHealth } from '../../types/newsIntelligence.js';
 
 export class FinancialNewsApiProvider implements NewsProvider {
   readonly id = 'provider_tier2_financial_news';

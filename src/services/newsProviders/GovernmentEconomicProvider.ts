@@ -1,12 +1,12 @@
-import { NewsProvider, ProviderQueryOptions } from './NewsProvider';
+import { NewsProvider, ProviderQueryOptions } from './NewsProvider.js';
 import {
   NewsArticle,
   ProviderHealth,
   SourceTier,
   EconomicReleaseItem,
-} from '../../types/newsIntelligence';
-import { MarketMindNewsEngine } from '../MarketMindNewsEngine';
-import { SafeFeedParser } from './safeFeedParser';
+} from '../../types/newsIntelligence.js';
+import { MarketMindNewsEngine } from '../MarketMindNewsEngine.js';
+import { SafeFeedParser } from './safeFeedParser.js';
 
 export class GovernmentEconomicProvider implements NewsProvider {
   readonly id = 'provider_gov_economic_agencies';

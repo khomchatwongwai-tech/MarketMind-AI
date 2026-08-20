@@ -17,9 +17,9 @@ import {
   TechnicalIndicators,
   TickerSymbol,
   TrendTimeframe,
-} from '../types/market';
-import { calculateWeightedProbability, FactorScores, FactorWeights } from './probabilityEngine';
-import { AppConfig } from '../config/environment';
+} from '../types/market.js';
+import { calculateWeightedProbability, FactorScores, FactorWeights } from './probabilityEngine.js';
+import { AppConfig } from '../config/environment.js';
 
 export interface ComprehensiveMarketData {
   quote: MarketQuote;
@@ -893,7 +893,7 @@ export function generateMarketData(
 
 export const getComprehensiveMarketData = generateMarketData;
 
-import { CapacitorPlatform } from './mobile/capacitorPlatform';
+import { CapacitorPlatform } from './mobile/capacitorPlatform.js';
 
 // Fetch live quote and intraday data from backend
 export async function fetchLiveMarketData(

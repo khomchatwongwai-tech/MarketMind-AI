@@ -1,7 +1,7 @@
 import { useState, useEffect, useMemo, useRef } from 'react';
-import { RealTimeMarketStore } from '../services/realtime/RealTimeMarketStore';
-import { NormalizedQuote, ProviderConnectionStatus, RealTimeDiagnosticsInfo, RealTimeDataMode } from '../types/realtime';
-import { MarketSessionEngine } from '../services/realtime/MarketSessionEngine';
+import { RealTimeMarketStore } from '../services/realtime/RealTimeMarketStore.js';
+import { NormalizedQuote, ProviderConnectionStatus, RealTimeDiagnosticsInfo, RealTimeDataMode } from '../types/realtime.js';
+import { MarketSessionEngine } from '../services/realtime/MarketSessionEngine.js';
 
 export function useRealTimeQuote(symbol: string, consumerIdPrefix: string = 'component') {
   const store = useMemo(() => RealTimeMarketStore.getInstance(), []);

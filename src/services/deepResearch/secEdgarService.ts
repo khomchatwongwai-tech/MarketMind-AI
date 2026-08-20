@@ -1,4 +1,4 @@
-import { SECFilingExcerpt, FinancialMetricRow, ResearchSource } from '../../types/deepResearch';
+import { SECFilingExcerpt, FinancialMetricRow, ResearchSource } from '../../types/deepResearch.js';
 
 export interface CompanySecProfile {
   cik: string;

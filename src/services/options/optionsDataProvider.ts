@@ -4,8 +4,8 @@ import {
   ExpirationMeta,
   UnusualOptionFlow,
   OptionType,
-} from '../../types/optionsTrader';
-import { calculateBlackScholes } from './blackScholesEngine';
+} from '../../types/optionsTrader.js';
+import { calculateBlackScholes } from './blackScholesEngine.js';
 
 export interface OptionsDataProvider {
   getExpirations(symbol: string): Promise<ExpirationMeta[]>;

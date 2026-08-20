@@ -1,4 +1,4 @@
-import type { AIProviderName } from './types';
+import type { AIProviderName } from './types.js';
 export class AIProviderError extends Error {
   constructor(public readonly provider: AIProviderName, public readonly kind: 'unavailable' | 'timeout' | 'rate_limit' | 'transient' | 'invalid_response', message: string) { super(message); this.name = 'AIProviderError'; }
 }

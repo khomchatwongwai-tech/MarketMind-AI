@@ -1,4 +1,4 @@
-import type { ClassifiedIntent } from '../../services/ai/intentRouter';
+import type { ClassifiedIntent } from '../../services/ai/intentRouter.js';
 
 export type AIProviderName = 'openai' | 'gemini' | 'anthropic' | 'perplexity';
 export interface Citation { url: string; title?: string; provider: AIProviderName; evidenceType?: 'web' | 'internal-data'; }

@@ -1,9 +1,9 @@
 import { Request, Response, NextFunction } from 'express';
-import { getFirebaseAuth } from './firebaseAdmin';
-import { UserRole, SubscriptionPlanTier } from '../types/user';
-import { ServerUserStore } from '../services/serverUserStore';
-import { FirestoreUserStore } from './firestoreUserStore';
-import { EntitlementService } from '../services/entitlementService';
+import { getFirebaseAuth } from './firebaseAdmin.js';
+import { UserRole, SubscriptionPlanTier } from '../types/user.js';
+import { ServerUserStore } from '../services/serverUserStore.js';
+import { FirestoreUserStore } from './firestoreUserStore.js';
+import { EntitlementService } from '../services/entitlementService.js';
 
 export interface AuthenticatedUser {
   uid: string;

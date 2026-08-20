@@ -5,10 +5,10 @@ import {
   NativePurchasePayload,
   VerificationResult,
   SubscriptionEntitlement,
-} from './BillingProvider';
-import { StripeBillingProvider } from './StripeBillingProvider';
-import { AppleBillingProvider } from './AppleBillingProvider';
-import { GoogleBillingProvider } from './GoogleBillingProvider';
+} from './BillingProvider.js';
+import { StripeBillingProvider } from './StripeBillingProvider.js';
+import { AppleBillingProvider } from './AppleBillingProvider.js';
+import { GoogleBillingProvider } from './GoogleBillingProvider.js';
 
 export class BillingAdapterRegistry {
   private static stripe = new StripeBillingProvider();

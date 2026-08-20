@@ -1,4 +1,4 @@
-import { OptionType, OptionPLScenario } from '../../types/optionsTrader';
+import { OptionType, OptionPLScenario } from '../../types/optionsTrader.js';
 
 /**
  * Standard Normal Probability Density Function (PDF)

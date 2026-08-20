@@ -1,4 +1,4 @@
-import { UserProfile } from './user';
+import { UserProfile } from './user.js';
 
 export type SubscriptionPlanId = 'free' | 'basic' | 'pro' | 'premium' | 'ultra';
 

@@ -1,6 +1,6 @@
-import { WebSocketConnectionState, WebSocketMetrics } from '../types/marketProviders';
-import { MarketQuote } from '../types/market';
-import { CapacitorPlatform } from './mobile/capacitorPlatform';
+import { WebSocketConnectionState, WebSocketMetrics } from '../types/marketProviders.js';
+import { MarketQuote } from '../types/market.js';
+import { CapacitorPlatform } from './mobile/capacitorPlatform.js';
 
 export type QuoteUpdateCallback = (quote: MarketQuote) => void;
 export type StateChangeCallback = (state: WebSocketConnectionState, metrics: WebSocketMetrics) => void;

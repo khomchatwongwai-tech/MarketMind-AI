@@ -5,10 +5,10 @@ import {
   MarketDataProvider,
   MarketStatusInfo,
   OptionsChainData,
-} from '../../types/marketProviders';
-import { MarketQuote } from '../../types/market';
-import { AppConfig } from '../../config/environment';
-import { CapacitorPlatform } from '../mobile/capacitorPlatform';
+} from '../../types/marketProviders.js';
+import { MarketQuote } from '../../types/market.js';
+import { AppConfig } from '../../config/environment.js';
+import { CapacitorPlatform } from '../mobile/capacitorPlatform.js';
 
 export class InstitutionalMarketDataProvider implements MarketDataProvider {
   readonly id = 'institutional_multi_provider';

@@ -1,4 +1,4 @@
-import type { AIProviderName, ProviderHealth } from './types';
+import type { AIProviderName, ProviderHealth } from './types.js';
 
 type State = { failures: number; circuitOpenedAt?: number; lastSuccessAt?: string; latencyMs?: number };
 

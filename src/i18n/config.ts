@@ -1,4 +1,4 @@
-import { LanguageCode, LanguageInfo, RegionCode, RegionInfo } from './types';
+import { LanguageCode, LanguageInfo, RegionCode, RegionInfo } from './types.js';
 
 export const SUPPORTED_LANGUAGES: Record<LanguageCode, LanguageInfo> = {
   en: {

@@ -1,8 +1,8 @@
 import { WebSocket, WebSocketServer } from 'ws';
 import type { Server as HttpServer } from 'http';
 import https from 'https';
-import { StreamSubscriptionManager, StreamPriorityLevel } from './streamSubscriptionManager';
-import { MarketDataCache } from './marketDataCache';
+import { StreamSubscriptionManager, StreamPriorityLevel } from './streamSubscriptionManager.js';
+import { MarketDataCache } from './marketDataCache.js';
 
 export interface UpstreamProviderStatus {
   id: string;

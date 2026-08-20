@@ -11,8 +11,8 @@ import {
   GlobalRegion,
   VerifiedSourceCitation,
   PortfolioNewsExposure,
-} from '../types/newsIntelligence';
-import { ProviderQueryOptions } from './newsProviders/NewsProvider';
+} from '../types/newsIntelligence.js';
+import { ProviderQueryOptions } from './newsProviders/NewsProvider.js';
 
 export class MarketMindNewsEngine {
   /**

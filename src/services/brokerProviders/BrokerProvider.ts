@@ -5,11 +5,11 @@ import {
   OptionsPosition,
   PortfolioTransaction,
   BrokerProviderMetadata,
-} from '../../types/portfolio';
+} from '../../types/portfolio.js';
 import {
   OptionsOrderRequest,
   OptionsOrderResult,
-} from '../../types/optionsTrader';
+} from '../../types/optionsTrader.js';
 
 export interface BrokerAuthCredentials {
   accessToken?: string;

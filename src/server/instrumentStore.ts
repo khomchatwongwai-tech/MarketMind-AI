@@ -1,6 +1,6 @@
-import { getSupabaseAdmin } from './supabaseAdmin';
-import { buildUniverseSeed } from '../services/marketProviders/universeCatalog';
-import { NormalizedInstrument, UniversalAssetClass } from '../types/instrument';
+import { getSupabaseAdmin } from './supabaseAdmin.js';
+import { buildUniverseSeed } from '../services/marketProviders/universeCatalog.js';
+import { NormalizedInstrument, UniversalAssetClass } from '../types/instrument.js';
 
 export interface DatabaseInstrument {
   id: string;

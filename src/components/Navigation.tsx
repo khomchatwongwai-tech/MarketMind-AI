@@ -33,6 +33,7 @@ import { UserProfile } from '../types/user';
 
 export type ActiveTab =
   | 'overview'
+  | 'scanner'
   | 'research'
   | 'multi_asset_markets'
   | 'connected_portfolio'
@@ -99,6 +100,7 @@ export const Navigation: React.FC<NavigationProps> = ({
 
   const tabs: { id: ActiveTab; label: string; icon: React.ElementType; badge?: string; category: string; adminOnly?: boolean }[] = [
     { id: 'overview', label: t('nav.overview'), icon: LayoutDashboard, category: 'Core' },
+    { id: 'scanner', label: 'Market Scanner', icon: Search, badge: '5000+ UNIVERSE', category: 'Markets' },
     { id: 'research', label: 'Deep Research', icon: Sparkles, badge: 'NEW AI', category: 'Core' },
     { id: 'multi_asset_markets', label: 'Multi-Asset Markets', icon: Globe2, badge: 'UNIVERSAL', category: 'Markets' },
     { id: 'connected_portfolio', label: 'Connected Accounts', icon: Briefcase, badge: 'PORTFOLIO', category: 'Portfolio' },

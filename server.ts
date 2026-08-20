@@ -2645,24 +2645,33 @@ app.post('/api/options/order/paper-submit', requireAuth, (req: AuthenticatedRequ
   });
 });
 
-// Global Massive WebSocket Manager & Realtime Server Manager
-const massiveWsManager = new MassiveWebSocketManager(getAI);
-const realtimeServerManager = RealtimeServerManager.getInstance();
+// Global Massive WebSocket Manager & Realtime Server Manager (Lazy-Initialized)
+let massiveWsManagerInstance: MassiveWebSocketManager | null = null;
+function getMassiveWsManager(): MassiveWebSocketManager {
+  if (!massiveWsManagerInstance) {
+    massiveWsManagerInstance = new MassiveWebSocketManager(getAI);
+  }
+  return massiveWsManagerInstance;
+}
+
+function getRealtimeServerManager(): RealtimeServerManager {
+  return RealtimeServerManager.getInstance();
+}
 
 // Endpoint to inspect or trigger active Massive stream
 app.get('/api/market/massive/signals', (req, res) => {
-  res.json(massiveWsManager.getCalculatedSignals());
+  res.json(getMassiveWsManager().getCalculatedSignals());
 });
 
 app.post('/api/market/massive/subscribe', (req, res) => {
   const { ticker = 'SPY' } = req.body;
-  massiveWsManager.setTicker(ticker);
+  getMassiveWsManager().setTicker(ticker);
   res.json({ status: 'OK', subscribedTicker: ticker });
 });
 
 // Real-Time Server Diagnostics Endpoint
 app.get('/api/realtime/diagnostics', (req, res) => {
-  res.json(realtimeServerManager.getDiagnostics());
+  res.json(getRealtimeServerManager().getDiagnostics());
 });
 
 // Real-Time Connection Test Endpoint
@@ -3003,8 +3012,8 @@ async function startServer() {
   const server = http.createServer(app);
 
   // Initialize Realtime Server Stream & Massive WebSocket Engine
-  realtimeServerManager.init(server);
-  massiveWsManager.init(server);
+  getRealtimeServerManager().init(server);
+  getMassiveWsManager().init(server);
 
   if (process.env.NODE_ENV !== 'production' && !process.env.VERCEL) {
     const { createServer: createViteServer } = await import('vite');

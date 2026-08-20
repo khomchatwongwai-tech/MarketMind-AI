@@ -4,7 +4,6 @@ import {
   Bell,
   FileText,
   Play,
-  Pause,
   RefreshCw,
   Sparkles,
   TrendingUp,
@@ -26,7 +25,7 @@ import {
   AlertTriangle,
   ChevronDown,
 } from 'lucide-react';
-import { MarketQuote, Probabilities, TickerSymbol, LiveMarketDataSource } from '../types/market';
+import { MarketQuote, Probabilities, TickerSymbol } from '../types/market';
 import { UserProfile } from '../types/user';
 import { searchMarketSymbols } from '../services/marketDataService';
 import { useI18n } from '../i18n/I18nContext';
@@ -50,8 +49,6 @@ interface HeaderProps {
   onOpenChat?: () => void;
   onOpenUniversalSearch?: () => void;
   onOpenReportIssue?: () => void;
-  dataSource: LiveMarketDataSource;
-  onChangeDataSource: (source: LiveMarketDataSource) => void;
   tickSpeed: number;
   onChangeTickSpeed: (speed: number) => void;
   isLoadingLive?: boolean;
@@ -80,8 +77,6 @@ export const Header: React.FC<HeaderProps> = ({
   onOpenChat,
   onOpenUniversalSearch,
   onOpenReportIssue,
-  dataSource,
-  onChangeDataSource,
   tickSpeed,
   onChangeTickSpeed,
   isLoadingLive = false,
@@ -143,9 +138,15 @@ export const Header: React.FC<HeaderProps> = ({
     }
   };
 
-  const isPositive = quote.change >= 0;
-  const bias =
-    probabilities.bullish >= probabilities.bearish && probabilities.bullish >= probabilities.neutral
+  const isPositive = isFiniteMarketNumber(quote.change) && quote.change >= 0;
+  const hasProbabilities = [
+    probabilities.bullish,
+    probabilities.bearish,
+    probabilities.neutral,
+  ].every(isFiniteMarketNumber);
+  const bias = !hasProbabilities
+    ? 'UNAVAILABLE'
+    : probabilities.bullish >= probabilities.bearish && probabilities.bullish >= probabilities.neutral
       ? 'BULLISH'
       : probabilities.bearish >= probabilities.bullish && probabilities.bearish >= probabilities.neutral
       ? 'BEARISH'
@@ -201,9 +202,9 @@ export const Header: React.FC<HeaderProps> = ({
           </div>
 
           <div className="flex items-center gap-1.5">
-            <div className="flex items-center gap-1 px-2 py-1 bg-[#101010] border border-[#242424] rounded-lg text-[10px] font-mono text-[#22C55E]">
-              <Radio className="w-2.5 h-2.5 animate-pulse" />
-              <span>LIVE</span>
+            <div className={`flex items-center gap-1 px-2 py-1 bg-[#101010] border border-[#242424] rounded-lg text-[10px] font-mono ${isLive ? 'text-[#22C55E]' : 'text-rose-400'}`}>
+              <Radio className={`w-2.5 h-2.5 ${isLive ? 'animate-pulse' : ''}`} />
+              <span>{isLive ? 'LIVE' : 'UNAVAILABLE'}</span>
             </div>
             <button
               onClick={onToggleLive}
@@ -212,9 +213,9 @@ export const Header: React.FC<HeaderProps> = ({
                   ? 'bg-[#22C55E]/15 text-[#22C55E] border-[#22C55E]/40'
                   : 'bg-[#101010] text-[#9CA3AF] border-[#242424]'
               }`}
-              title="Toggle Live Stream"
+              title="Refresh live market data"
             >
-              {isLive ? <Pause className="w-3 h-3" /> : <Play className="w-3 h-3" />}
+              {isLive ? <RefreshCw className="w-3 h-3" /> : <Play className="w-3 h-3" />}
             </button>
             <button
               onClick={onManualRefresh}
@@ -308,27 +309,12 @@ export const Header: React.FC<HeaderProps> = ({
 
           <div className="h-6 w-[1px] bg-[#242424] hidden sm:block" />
 
-          {/* Real-time Data Source Selector */}
+          {/* Server-selected verified provider */}
           <div className="flex items-center bg-[#101010] border border-[#242424] hover:border-[rgba(212,175,55,0.4)] rounded-lg px-2.5 py-1 text-xs transition">
-            <Radio className="w-3 h-3 text-[#22C55E] mr-1.5 animate-pulse" />
-            <select
-              value={dataSource}
-              onChange={(e) => onChangeDataSource(e.target.value as LiveMarketDataSource)}
-              className="bg-transparent text-[#E5E5E5] font-mono text-[11px] font-semibold focus:outline-none cursor-pointer"
-            >
-              <option value="Massive WebSocket (Real-Time Live Feed)" className="bg-[#101010] text-[#E5E5E5]">
-                ⚡ Massive WebSocket (Live Stream)
-              </option>
-              <option value="Yahoo Finance (Real-Time)" className="bg-[#101010] text-[#E5E5E5]">
-                📈 Yahoo Finance (Real-Time)
-              </option>
-              <option value="Google Finance Feed" className="bg-[#101010] text-[#E5E5E5]">
-                🌐 Google Finance Gateway
-              </option>
-              <option value="Robinhood Multi-Feed" className="bg-[#101010] text-[#E5E5E5]">
-                📱 Multi-Exchange Stream
-              </option>
-            </select>
+            <Radio className={`w-3 h-3 mr-1.5 ${isLive ? 'text-[#22C55E] animate-pulse' : 'text-rose-400'}`} />
+            <span className="text-[#E5E5E5] font-mono text-[11px] font-semibold">
+              {quote.dataSource || 'Verified provider unavailable'}
+            </span>
           </div>
 
           {/* Refresh Rate Selector */}
@@ -517,7 +503,7 @@ export const Header: React.FC<HeaderProps> = ({
                 {quote.name}
               </span>
               <span className="text-[10px] text-[#9CA3AF] font-mono">
-                {quote.exchange || 'US Market'} • <span className="text-[#D4AF37]">{quote.dataSource || 'Live Feed'}</span>
+                {quote.exchange || 'Exchange unavailable'} • <span className="text-[#D4AF37]">{quote.dataSource || 'Provider unavailable'}</span>
               </span>
             </div>
           </div>
@@ -588,10 +574,10 @@ export const Header: React.FC<HeaderProps> = ({
               </span>
             </div>
             <div>
-              Rel Vol: <span className="text-[#D4AF37] font-mono font-semibold">{quote.relativeVolume}x</span>
+              Rel Vol: <span className="text-[#D4AF37] font-mono font-semibold">{isFiniteMarketNumber(quote.relativeVolume) ? `${quote.relativeVolume}x` : 'N/A'}</span>
             </div>
             <div>
-              Latency: <span className="text-[#F2D675] font-mono font-semibold">{quote.latencyMs ?? 35}ms</span>
+              Latency: <span className="text-[#F2D675] font-mono font-semibold">{isFiniteMarketNumber(quote.latencyMs) ? `${quote.latencyMs}ms` : 'N/A'}</span>
             </div>
           </div>
         </div>
@@ -612,35 +598,36 @@ export const Header: React.FC<HeaderProps> = ({
               {bias === 'BULLISH' && <TrendingUp className="w-3.5 h-3.5" />}
               {bias === 'BEARISH' && <TrendingDown className="w-3.5 h-3.5" />}
               {bias === 'NEUTRAL' && <Minus className="w-3.5 h-3.5" />}
-              {bias} BIAS
+              {bias === 'UNAVAILABLE' && <AlertTriangle className="w-3.5 h-3.5" />}
+              {bias === 'UNAVAILABLE' ? 'BIAS UNAVAILABLE' : `${bias} BIAS`}
             </div>
             <div className="text-[10px] text-[#9CA3AF] uppercase tracking-wider font-mono">
-              AI: <span className="font-bold text-[#F2D675]">{probabilities.aiConfidence}%</span>
+              AI: <span className="font-bold text-[#F2D675]">{isFiniteMarketNumber(probabilities.aiConfidence) ? `${probabilities.aiConfidence}%` : 'N/A'}</span>
             </div>
           </div>
 
           {/* Probabilities Multi-Bar */}
           <div className="flex flex-col bg-[#101010] rounded-lg p-1.5 md:p-2 min-w-[140px] md:min-w-[170px] border border-[#242424]">
             <div className="flex justify-between text-[9px] md:text-[10px] mb-1 font-mono font-bold">
-              <span className="text-[#22C55E]">BULL: {probabilities.bullish}%</span>
-              <span className="text-[#A3A3A3]">NEUT: {probabilities.neutral}%</span>
-              <span className="text-[#EF4444]">BEAR: {probabilities.bearish}%</span>
+              <span className="text-[#22C55E]">BULL: {isFiniteMarketNumber(probabilities.bullish) ? `${probabilities.bullish}%` : 'N/A'}</span>
+              <span className="text-[#A3A3A3]">NEUT: {isFiniteMarketNumber(probabilities.neutral) ? `${probabilities.neutral}%` : 'N/A'}</span>
+              <span className="text-[#EF4444]">BEAR: {isFiniteMarketNumber(probabilities.bearish) ? `${probabilities.bearish}%` : 'N/A'}</span>
             </div>
             <div className="h-1.5 md:h-2 w-full bg-[#1C1C1C] rounded-full overflow-hidden flex">
               <div
                 className="bg-[#22C55E] h-full transition-all duration-500"
-                style={{ width: `${probabilities.bullish}%` }}
-                title={`Bullish: ${probabilities.bullish}%`}
+                style={{ width: `${isFiniteMarketNumber(probabilities.bullish) ? probabilities.bullish : 0}%` }}
+                title={isFiniteMarketNumber(probabilities.bullish) ? `Bullish: ${probabilities.bullish}%` : 'Bullish probability unavailable'}
               />
               <div
                 className="bg-[#A3A3A3] h-full transition-all duration-500"
-                style={{ width: `${probabilities.neutral}%` }}
-                title={`Neutral: ${probabilities.neutral}%`}
+                style={{ width: `${isFiniteMarketNumber(probabilities.neutral) ? probabilities.neutral : 0}%` }}
+                title={isFiniteMarketNumber(probabilities.neutral) ? `Neutral: ${probabilities.neutral}%` : 'Neutral probability unavailable'}
               />
               <div
                 className="bg-[#EF4444] h-full transition-all duration-500"
-                style={{ width: `${probabilities.bearish}%` }}
-                title={`Bearish: ${probabilities.bearish}%`}
+                style={{ width: `${isFiniteMarketNumber(probabilities.bearish) ? probabilities.bearish : 0}%` }}
+                title={isFiniteMarketNumber(probabilities.bearish) ? `Bearish: ${probabilities.bearish}%` : 'Bearish probability unavailable'}
               />
             </div>
           </div>

@@ -74,12 +74,15 @@ export class MassiveWebSocketManager {
       (i) => i.symbol.toUpperCase() === cleanTicker || i.displaySymbol.toUpperCase() === cleanTicker
     );
 
-    const refPrice = inst?.price ?? (cleanTicker === 'SPY' ? 542.80 : cleanTicker === 'QQQ' ? 478.50 : 150.00);
-    const refOpen = inst?.open ?? refPrice * 0.998;
-    const refHigh = inst?.high ?? refPrice * 1.006;
-    const refLow = inst?.low ?? refPrice * 0.994;
-    const refVol = inst?.volume ?? 45000000;
-    const refVwap = Number((refPrice * 0.9985).toFixed(2));
+    const simulationAllowed = AppConfig.allowSimulatedMarketData;
+    const refPrice = simulationAllowed
+      ? inst?.price ?? (cleanTicker === 'SPY' ? 542.8 : cleanTicker === 'QQQ' ? 478.5 : 150)
+      : 0;
+    const refOpen = simulationAllowed ? inst?.open ?? refPrice * 0.998 : 0;
+    const refHigh = simulationAllowed ? inst?.high ?? refPrice * 1.006 : 0;
+    const refLow = simulationAllowed ? inst?.low ?? refPrice * 0.994 : 0;
+    const refVol = simulationAllowed ? inst?.volume ?? 45000000 : 0;
+    const refVwap = simulationAllowed ? Number((refPrice * 0.9985).toFixed(2)) : 0;
 
     return {
       ticker: cleanTicker,
@@ -122,12 +125,10 @@ export class MassiveWebSocketManager {
         })
       );
 
-      ws.send(
-        JSON.stringify({
-          type: 'SIGNALS',
-          signals: this.getCalculatedSignals(),
-        })
-      );
+      const verifiedSignals = this.getVerifiedSignals();
+      if (verifiedSignals) {
+        ws.send(JSON.stringify({ type: 'SIGNALS', signals: verifiedSignals }));
+      }
 
       if (this.state.lastAiInsight) {
         ws.send(
@@ -196,10 +197,10 @@ export class MassiveWebSocketManager {
       ticker: this.state.ticker,
       isDelayed: this.state.isDelayed,
     });
-    this.broadcast({
-      type: 'SIGNALS',
-      signals: this.getCalculatedSignals(),
-    });
+    const verifiedSignals = this.getVerifiedSignals();
+    if (verifiedSignals) {
+      this.broadcast({ type: 'SIGNALS', signals: verifiedSignals });
+    }
 
     // Run AI analysis for new ticker
     setTimeout(() => {
@@ -382,18 +383,31 @@ export class MassiveWebSocketManager {
         time: Math.floor((timestamp || Date.now()) / 1000),
         formattedTime,
       },
-      signals: this.getCalculatedSignals(),
+      signals: this.getVerifiedSignals() || undefined,
     });
   }
 
   // Receive live aggregates & Update Chart without replacing full dataset
   private processLiveAggregate(agg: any) {
-    const time = Math.floor((agg.s || Date.now()) / 1000);
-    const o = agg.o ?? this.state.price;
-    const h = agg.h ?? this.state.price;
-    const l = agg.l ?? this.state.price;
-    const c = agg.c ?? this.state.price;
-    const v = agg.v ?? 1000;
+    const timestamp = Number(agg.s);
+    const o = Number(agg.o);
+    const h = Number(agg.h);
+    const l = Number(agg.l);
+    const c = Number(agg.c);
+    const v = Number(agg.v);
+    if (
+      !Number.isFinite(timestamp) ||
+      timestamp <= 0 ||
+      ![o, h, l, c].every((value) => Number.isFinite(value) && value > 0) ||
+      !Number.isFinite(v) ||
+      v < 0 ||
+      h < Math.max(o, c, l) ||
+      l > Math.min(o, c, h)
+    ) {
+      return;
+    }
+    const time = Math.floor(timestamp / 1000);
+    this.state.lastTradeTime = timestamp;
 
     this.state.price = c;
     this.state.high = Math.max(this.state.high, h);
@@ -437,7 +451,7 @@ export class MassiveWebSocketManager {
         volume: v,
         vwap: this.state.vwap,
       },
-      signals: this.getCalculatedSignals(),
+      signals: this.getVerifiedSignals() || undefined,
     });
   }
 
@@ -524,7 +538,7 @@ export class MassiveWebSocketManager {
       momentum,
       lastUpdated: new Date().toLocaleTimeString('en-US', { timeZone: 'America/New_York' }) + ' ET',
       source: this.isUsingSimulatedStream
-        ? 'Massive Resilient Stream'
+        ? 'Simulated Demo Stream'
         : this.state.isDelayed
         ? 'Massive Delayed Feed'
         : 'Massive Real-Time WebSocket',
@@ -532,8 +546,17 @@ export class MassiveWebSocketManager {
     };
   }
 
+  public getVerifiedSignals(): CalculatedMarketSignals | null {
+    // This legacy signal engine is demo-only because its EMA/RSI seed values are
+    // synthetic. Production may still consume verified TRADE/AGGREGATE events,
+    // but it must not expose derived indicators from this state machine.
+    if (!AppConfig.allowSimulatedMarketData || !this.state.lastTradeTime) return null;
+    return this.getCalculatedSignals();
+  }
+
   // Feed calculated signals to Gemini AI (strictly interpreting market data, never guessing prices)
   public async triggerGeminiSignalFeed(force: boolean = false) {
+    if (!this.getVerifiedSignals()) return;
     const now = Date.now();
     // Enforce rate limit cooldown if previously hit 429
     if (now < this.aiCooldownUntil && !force) {
@@ -764,4 +787,3 @@ Return a strictly valid JSON object matching this schema:
     }
   }
 }
-

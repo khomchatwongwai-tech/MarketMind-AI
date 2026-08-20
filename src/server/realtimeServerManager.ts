@@ -1,8 +1,8 @@
 import { WebSocket, WebSocketServer } from 'ws';
 import type { Server as HttpServer } from 'http';
-import https from 'https';
 import { StreamSubscriptionManager, StreamPriorityLevel } from './streamSubscriptionManager.js';
 import { MarketDataCache } from './marketDataCache.js';
+import { DataProviderRouter } from '../services/marketProviders/DataProviderRouter.js';
 
 export interface UpstreamProviderStatus {
   id: string;
@@ -663,54 +663,57 @@ export class RealtimeServerManager {
 
       if (allToPoll.length === 0) return;
 
-      try {
-        const url = `https://query1.finance.yahoo.com/v7/finance/quote?symbols=${encodeURIComponent(
-          allToPoll.join(',')
-        )}`;
-        https
-          .get(url, { headers: { 'User-Agent': 'Mozilla/5.0' }, timeout: 4000 }, (res) => {
-            let body = '';
-            res.on('data', (c) => (body += c));
-            res.on('end', () => {
-              try {
-                const data = JSON.parse(body);
-                const results = data?.quoteResponse?.result || [];
-                for (const r of results) {
-                  const sym = r.symbol?.toUpperCase();
-                  if (sym && r.regularMarketPrice) {
-                    const quote = {
-                      type: 'QUOTE',
-                      symbol: sym,
-                      price: r.regularMarketPrice,
-                      bid: r.bid,
-                      ask: r.ask,
-                      high: r.regularMarketDayHigh,
-                      low: r.regularMarketDayLow,
-                      open: r.regularMarketOpen,
-                      previousClose: r.regularMarketPreviousClose,
-                      change: r.regularMarketChange,
-                      changePercent: r.regularMarketChangePercent,
-                      volume: r.regularMarketVolume,
-                      timestamp: (r.regularMarketTime || Math.floor(Date.now() / 1000)) * 1000,
-                      provider: 'Yahoo Finance Real-Time Gateway',
-                      mode: r.marketState === 'REGULAR' ? 'REAL_TIME' : 'CLOSED',
-                    };
-                    this.latestQuotes.set(sym, quote);
-                    this.broadcast(quote);
-                  }
-                }
-              } catch (e) {
-                // ignore parse errors
-              }
-            });
-          })
-          .on('error', () => {
-            // ignore network errors
-          });
-      } catch (err) {
-        // quiet fallback
+      const results = await Promise.allSettled(
+        allToPoll.map((symbol) => DataProviderRouter.getQuote(symbol))
+      );
+      for (const result of results) {
+        if (result.status !== 'fulfilled' || !result.value) continue;
+        const response = result.value;
+        const providerQuote = response.quote;
+        const timestamp = Date.parse(providerQuote.timestamp);
+        const required = [
+          providerQuote.price,
+          providerQuote.previousClose,
+          providerQuote.change,
+          providerQuote.changePercent,
+          providerQuote.dayHigh,
+          providerQuote.dayLow,
+          providerQuote.openPrice,
+          providerQuote.volume,
+        ];
+        if (
+          !response.entitlementStatus.isAvailable ||
+          providerQuote.metadata?.validationStatus !== 'VALID' ||
+          providerQuote.metadata?.stale !== false ||
+          !required.every((value) => typeof value === 'number' && Number.isFinite(value)) ||
+          !Number.isFinite(timestamp) ||
+          timestamp <= 0
+        ) {
+          continue;
+        }
+        const quote = {
+          type: 'QUOTE',
+          symbol: response.instrument.symbol,
+          price: providerQuote.price,
+          bid: providerQuote.bid,
+          ask: providerQuote.ask,
+          high: providerQuote.dayHigh,
+          low: providerQuote.dayLow,
+          open: providerQuote.openPrice,
+          previousClose: providerQuote.previousClose,
+          change: providerQuote.change,
+          changePercent: providerQuote.changePercent,
+          volume: providerQuote.volume,
+          vwap: providerQuote.vwap,
+          timestamp,
+          provider: providerQuote.metadata?.provider || providerQuote.dataSource,
+          mode: providerQuote.metadata?.mode || 'UNAVAILABLE',
+          marketStatus: providerQuote.metadata?.marketStatus,
+        };
+        this.latestQuotes.set(response.instrument.symbol, quote);
+        this.broadcast(quote);
       }
-    }, 4000);
+    }, 15000);
   }
 
   public getDiagnostics() {

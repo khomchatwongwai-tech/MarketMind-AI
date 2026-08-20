@@ -65,64 +65,55 @@ const TICKER_DEFAULTS: Record<TickerSymbol, { name: string; basePrice: number; p
 
 export function generateEmptyMarketData(ticker: TickerSymbol = 'SPY'): ComprehensiveMarketData {
   const meta = TICKER_DEFAULTS[ticker] || TICKER_DEFAULTS.SPY;
-  const currentPrice = Number(meta.basePrice.toFixed(2));
-  const change = Number((currentPrice - meta.prevClose).toFixed(2));
-  const changePercent = Number(((change / meta.prevClose) * 100).toFixed(2));
-  const dayHigh = Number((Math.max(currentPrice, meta.basePrice * 1.008)).toFixed(2));
-  const dayLow = Number((Math.min(currentPrice, meta.basePrice * 0.992)).toFixed(2));
-  const vwap = Number((meta.prevClose * 1.0035).toFixed(2));
-  const rsi = Number(Math.min(88, Math.max(18, 50 + changePercent * 12)).toFixed(1));
+  const unavailable = null as any;
 
   const technicals: TechnicalIndicators = {
-    vwap,
-    rsi14: rsi,
-    rsiStatus: rsi > 70 ? 'Overbought' : rsi < 30 ? 'Oversold' : 'Neutral',
-    macd: Number((0.45 + changePercent * 0.3).toFixed(2)),
-    macdSignal: 0.22,
-    macdHistogram: Number((0.23 + changePercent * 0.2).toFixed(2)),
-    macdTrend: changePercent >= 0 ? 'Bullish Crossover' : 'Bearish Crossover',
-    ema9: Number((currentPrice * 0.998).toFixed(2)),
-    ema20: Number((currentPrice * 0.994).toFixed(2)),
-    ema50: Number((currentPrice * 0.988).toFixed(2)),
-    ema100: Number((currentPrice * 0.975).toFixed(2)),
-    ema200: Number((currentPrice * 0.952).toFixed(2)),
-    sma20: Number((currentPrice * 0.993).toFixed(2)),
-    sma50: Number((currentPrice * 0.986).toFixed(2)),
-    sma200: Number((currentPrice * 0.950).toFixed(2)),
-    atr14: Number((currentPrice * 0.008).toFixed(2)),
-    bollingerUpper: Number((currentPrice * 1.012).toFixed(2)),
-    bollingerMiddle: Number((currentPrice * 0.995).toFixed(2)),
-    bollingerLower: Number((currentPrice * 0.978).toFixed(2)),
-    bollingerBandwidth: 3.4,
-    momentum: Number((change * 1.2).toFixed(2)),
-    rateOfChange: changePercent,
-    adx: 24.8,
-    adxStrength: 'Moderate',
-    stochRsiK: Number(Math.min(99, Math.max(1, rsi * 1.1)).toFixed(1)),
-    stochRsiD: Number(Math.min(99, Math.max(1, rsi * 0.95)).toFixed(1)),
-    prevDayHigh: Number((meta.prevClose * 1.006).toFixed(2)),
-    prevDayLow: Number((meta.prevClose * 0.991).toFixed(2)),
-    prevDayClose: meta.prevClose,
-    preMarketHigh: Number((meta.basePrice * 1.004).toFixed(2)),
-    preMarketLow: Number((meta.basePrice * 0.996).toFixed(2)),
-    openingRangeHigh: Number((meta.basePrice * 1.005).toFixed(2)),
-    openingRangeLow: Number((meta.basePrice * 0.994).toFixed(2)),
+    vwap: unavailable,
+    rsi14: unavailable,
+    rsiStatus: 'DATA UNAVAILABLE' as any,
+    macd: unavailable,
+    macdSignal: unavailable,
+    macdHistogram: unavailable,
+    macdTrend: 'DATA UNAVAILABLE' as any,
+    ema9: unavailable,
+    ema20: unavailable,
+    ema50: unavailable,
+    ema100: unavailable,
+    ema200: unavailable,
+    sma20: unavailable,
+    sma50: unavailable,
+    sma200: unavailable,
+    atr14: unavailable,
+    bollingerUpper: unavailable,
+    bollingerMiddle: unavailable,
+    bollingerLower: unavailable,
+    bollingerBandwidth: unavailable,
+    momentum: unavailable,
+    rateOfChange: unavailable,
+    adx: unavailable,
+    adxStrength: 'DATA UNAVAILABLE' as any,
+    stochRsiK: unavailable,
+    stochRsiD: unavailable,
+    prevDayHigh: unavailable,
+    prevDayLow: unavailable,
+    prevDayClose: unavailable,
+    preMarketHigh: unavailable,
+    preMarketLow: unavailable,
+    openingRangeHigh: unavailable,
+    openingRangeLow: unavailable,
   };
 
-  const pivot = (technicals.prevDayHigh + technicals.prevDayLow + technicals.prevDayClose) / 3;
-  const r1 = Number((2 * pivot - technicals.prevDayLow).toFixed(2));
-  const s1 = Number((2 * pivot - technicals.prevDayHigh).toFixed(2));
-  const r2 = Number((pivot + (technicals.prevDayHigh - technicals.prevDayLow)).toFixed(2));
-  const s2 = Number((pivot - (technicals.prevDayHigh - technicals.prevDayLow)).toFixed(2));
-  const r3 = Number((technicals.prevDayHigh + 2 * (pivot - technicals.prevDayLow)).toFixed(2));
-  const s3 = Number((technicals.prevDayLow - 2 * (technicals.prevDayHigh - pivot)).toFixed(2));
-
   const supportResistance: SupportResistanceLevels = {
-    current: currentPrice,
-    pivot: Number(pivot.toFixed(2)),
-    r1, r2, r3, s1, s2, s3,
-    keyResistance: r1,
-    keySupport: s1,
+    current: unavailable,
+    pivot: unavailable,
+    r1: unavailable,
+    r2: unavailable,
+    r3: unavailable,
+    s1: unavailable,
+    s2: unavailable,
+    s3: unavailable,
+    keyResistance: unavailable,
+    keySupport: unavailable,
     breakoutStatus: 'DATA UNAVAILABLE',
     breakoutType: 'CONSOLIDATING',
   };
@@ -130,45 +121,46 @@ export function generateEmptyMarketData(ticker: TickerSymbol = 'SPY'): Comprehen
   const quote: MarketQuote = {
     ticker,
     name: meta.name,
-    price: null as any,
-    change: null as any,
-    changePercent: null as any,
-    dayHigh: null as any,
-    dayLow: null as any,
-    openPrice: null as any,
-    previousClose: null as any,
-    preMarketPrice: null as any,
-    preMarketChangePercent: null as any,
-    afterHoursPrice: null as any,
-    afterHoursChangePercent: null as any,
-    volume: 0,
-    avgVolume: 58900000,
-    relativeVolume: 0,
-    fiftyTwoWeekHigh: null as any,
-    fiftyTwoWeekLow: null as any,
-    timestamp: new Date().toLocaleTimeString('en-US', { timeZone: 'America/New_York' }) + ' ET',
+    price: unavailable,
+    change: unavailable,
+    changePercent: unavailable,
+    dayHigh: unavailable,
+    dayLow: unavailable,
+    openPrice: unavailable,
+    previousClose: unavailable,
+    preMarketPrice: unavailable,
+    preMarketChangePercent: unavailable,
+    afterHoursPrice: unavailable,
+    afterHoursChangePercent: unavailable,
+    volume: unavailable,
+    avgVolume: unavailable,
+    relativeVolume: unavailable,
+    fiftyTwoWeekHigh: unavailable,
+    fiftyTwoWeekLow: unavailable,
+    timestamp: new Date().toISOString(),
     marketStatus: 'LIVE DATA UNAVAILABLE' as any,
+    dataStatus: 'UNAVAILABLE',
     dataSource: 'DATA UNAVAILABLE',
   };
 
   const factorScores: FactorScores = {
-    technicals: 0,
-    priceAction: 0,
-    marketBreadth: 0,
-    optionsSentiment: 0,
-    macroEconomics: 0,
-    newsSentiment: 0,
-    intermarket: 0,
+    technicals: unavailable,
+    priceAction: unavailable,
+    marketBreadth: unavailable,
+    optionsSentiment: unavailable,
+    macroEconomics: unavailable,
+    newsSentiment: unavailable,
+    intermarket: unavailable,
   };
 
   const probabilities: Probabilities = {
-    bullish: 50,
-    bearish: 50,
-    neutral: 0,
-    aiConfidence: 0,
-    setupScore: 0,
-    setupQuality: 'B' as any,
-    riskLevel: 'MODERATE' as any,
+    bullish: unavailable,
+    bearish: unavailable,
+    neutral: unavailable,
+    aiConfidence: unavailable,
+    setupScore: unavailable,
+    setupQuality: 'DATA UNAVAILABLE' as any,
+    riskLevel: 'DATA UNAVAILABLE' as any,
     primaryDriver: 'DATA UNAVAILABLE',
     secondaryDriver: 'DATA UNAVAILABLE',
     mainRisk: 'Verified market data is unavailable.',
@@ -177,26 +169,26 @@ export function generateEmptyMarketData(ticker: TickerSymbol = 'SPY'): Comprehen
     aiSummary: 'Verified market data is unavailable.',
   };
 
-  const unavailableSector: SectorData = { symbol: 'N/A', name: 'DATA UNAVAILABLE', changePercent: 0, weight: 0, sentiment: 'Neutral', volumeRelative: 0 };
+  const unavailableSector: SectorData = { symbol: 'N/A', name: 'DATA UNAVAILABLE', changePercent: unavailable, weight: unavailable, sentiment: 'Neutral', volumeRelative: unavailable };
 
   return {
     quote,
     technicals,
     supportResistance,
     trends: [],
-    trendAlignmentScore: 0,
-    breadth: { sp500Adv: 0, sp500Dec: 0, sp500AdvDecRatio: 0, nasdaqAdv: 0, nasdaqDec: 0, nyseAdv: 0, nyseDec: 0, pctAbove20SMA: 0, pctAbove50SMA: 0, pctAbove200SMA: 0, newHighs: 0, newLows: 0, upVolumeRatio: 0, breadthScore: 0, breadthStatus: 'Weak Breadth' },
+    trendAlignmentScore: unavailable,
+    breadth: { sp500Adv: unavailable, sp500Dec: unavailable, sp500AdvDecRatio: unavailable, nasdaqAdv: unavailable, nasdaqDec: unavailable, nyseAdv: unavailable, nyseDec: unavailable, pctAbove20SMA: unavailable, pctAbove50SMA: unavailable, pctAbove200SMA: unavailable, newHighs: unavailable, newLows: unavailable, upVolumeRatio: unavailable, breadthScore: unavailable, breadthStatus: 'DATA UNAVAILABLE' as any },
     intermarket: [],
     sectors: [],
     strongestSector: unavailableSector,
     weakestSector: unavailableSector,
-    options: { callVolume: 0, putVolume: 0, totalVolume: 0, putCallRatio: 1, totalOpenInterest: 0, impliedVolatility: 0, ivPercentile: 0, ivRank: 0, expectedDailyMove: { low: 0, high: 0, rangePoints: 0 }, largestCallOIStrike: 0, largestPutOIStrike: 0, gammaResistance: 0, gammaSupport: 0, sentiment: 'Neutral', hedgingContext: 'DATA UNAVAILABLE', unusualSweeps: [] },
+    options: { callVolume: unavailable, putVolume: unavailable, totalVolume: unavailable, putCallRatio: unavailable, totalOpenInterest: unavailable, impliedVolatility: unavailable, ivPercentile: unavailable, ivRank: unavailable, expectedDailyMove: { low: unavailable, high: unavailable, rangePoints: unavailable }, largestCallOIStrike: unavailable, largestPutOIStrike: unavailable, gammaResistance: unavailable, gammaSupport: unavailable, sentiment: 'Neutral', hedgingContext: 'DATA UNAVAILABLE', unusualSweeps: [] },
     economicEvents: [],
     news: [],
-    fed: { targetRange: 'DATA UNAVAILABLE', nextMeetingDate: 'DATA UNAVAILABLE', daysUntilMeeting: 0, cutProbability: 0, holdProbability: 0, hikeProbability: 0, recentCommentary: 'DATA UNAVAILABLE', hawkishDovishStance: 'Neutral', fedSentimentScore: 50, treasury10Y: 0, treasury2Y: 0, yieldCurveInversion: 0 },
-    scenarios: { bullish: { probability: 0, confirmationPrice: 0, target1: 0, target2: 0, target3: 0, invalidationLevel: 0, requiredVolume: 'DATA UNAVAILABLE', reasoning: 'DATA UNAVAILABLE' }, bearish: { probability: 0, confirmationPrice: 0, target1: 0, target2: 0, target3: 0, invalidationLevel: 0, requiredVolume: 'DATA UNAVAILABLE', reasoning: 'DATA UNAVAILABLE' }, neutral: { probability: 100, confirmationPrice: 0, target1: 0, target2: 0, target3: 0, invalidationLevel: 0, requiredVolume: 'DATA UNAVAILABLE', reasoning: 'DATA UNAVAILABLE' } },
+    fed: { targetRange: 'DATA UNAVAILABLE', nextMeetingDate: 'DATA UNAVAILABLE', daysUntilMeeting: unavailable, cutProbability: unavailable, holdProbability: unavailable, hikeProbability: unavailable, recentCommentary: 'DATA UNAVAILABLE', hawkishDovishStance: 'Neutral', fedSentimentScore: unavailable, treasury10Y: unavailable, treasury2Y: unavailable, yieldCurveInversion: unavailable },
+    scenarios: { bullish: { probability: unavailable, confirmationPrice: unavailable, target1: unavailable, target2: unavailable, target3: unavailable, invalidationLevel: unavailable, requiredVolume: 'DATA UNAVAILABLE', reasoning: 'DATA UNAVAILABLE' }, bearish: { probability: unavailable, confirmationPrice: unavailable, target1: unavailable, target2: unavailable, target3: unavailable, invalidationLevel: unavailable, requiredVolume: 'DATA UNAVAILABLE', reasoning: 'DATA UNAVAILABLE' }, neutral: { probability: unavailable, confirmationPrice: unavailable, target1: unavailable, target2: unavailable, target3: unavailable, invalidationLevel: unavailable, requiredVolume: 'DATA UNAVAILABLE', reasoning: 'DATA UNAVAILABLE' } },
     predictions: [],
-    backtest: { totalPredictions: 0, correctPredictions: 0, incorrectPredictions: 0, accuracy: 0, bullishAccuracy: 0, bearishAccuracy: 0, neutralAccuracy: 0, fifteenMinAccuracy: 0, oneHourAccuracy: 0, dailyAccuracy: 0, weeklyAccuracy: 0, avgPredictedProbability: 0, actualSuccessRate: 0, calibrationAdjustment: 0 },
+    backtest: { totalPredictions: unavailable, correctPredictions: unavailable, incorrectPredictions: unavailable, accuracy: unavailable, bullishAccuracy: unavailable, bearishAccuracy: unavailable, neutralAccuracy: unavailable, fifteenMinAccuracy: unavailable, oneHourAccuracy: unavailable, dailyAccuracy: unavailable, weeklyAccuracy: unavailable, avgPredictedProbability: unavailable, actualSuccessRate: unavailable, calibrationAdjustment: unavailable },
     alerts: [],
     mlFeatures: [],
     factorScores,
@@ -897,23 +889,56 @@ import { CapacitorPlatform } from './mobile/capacitorPlatform.js';
 
 // Fetch live quote and intraday data from backend
 export async function fetchLiveMarketData(
-  ticker: string,
-  source: string = 'Massive API'
+  ticker: string
 ): Promise<any> {
   const startTime = Date.now();
   try {
     const baseUrl = CapacitorPlatform.getApiBaseUrl();
-    const res = await fetch(`${baseUrl}/api/market/live/${encodeURIComponent(ticker)}`);
-    if (!res.ok) throw new Error('Live endpoint error');
-    const data = await res.json();
+    const res = await fetch(`${baseUrl}/api/market/quote/${encodeURIComponent(ticker)}`);
+    const data = await res.json().catch(() => null);
+    if (!res.ok) throw new Error(data?.error?.code || 'LIVE_MARKET_DATA_UNAVAILABLE');
+    const quote = data?.quote;
+    const instrument = data?.instrument;
+    const required = [
+      quote?.price,
+      quote?.previousClose,
+      quote?.change,
+      quote?.changePercent,
+      quote?.dayHigh,
+      quote?.dayLow,
+      quote?.openPrice,
+      quote?.volume,
+    ];
+    if (
+      !data?.entitlementStatus?.isAvailable ||
+      quote?.metadata?.validationStatus !== 'VALID' ||
+      quote?.metadata?.stale !== false ||
+      !required.every((value) => typeof value === 'number' && Number.isFinite(value))
+    ) {
+      throw new Error('MALFORMED_LIVE_QUOTE_RESPONSE');
+    }
     const latencyMs = Date.now() - startTime;
     return {
-      ...data,
+      ticker: instrument.symbol,
+      name: instrument.name,
+      currency: quote.currency,
+      exchangeName: instrument.exchange,
+      price: quote.price,
+      change: quote.change,
+      changePercent: quote.changePercent,
+      previousClose: quote.previousClose,
+      dayHigh: quote.dayHigh,
+      dayLow: quote.dayLow,
+      openPrice: quote.openPrice,
+      volume: quote.volume,
+      marketState: quote.marketState,
+      timestamp: quote.timestamp,
+      metadata: quote.metadata,
       latencyMs,
-      dataSource: data.source || `${source} (Real-Time)`,
+      dataSource: quote.dataSource,
     };
   } catch (err) {
-    console.warn(`[LiveMarket] Fallback for ${ticker}:`, err);
+    console.warn(`[LiveMarket] Verified quote unavailable for ${ticker}:`, err);
     return null;
   }
 }
@@ -966,13 +991,27 @@ export function mergeLiveQuoteIntoComprehensiveData(
 ): ComprehensiveMarketData {
   if (!live || !live.price) return prevData;
 
-  const currentPrice = Number(live.price.toFixed(2));
-  const prevClose = live.previousClose ?? prevData.quote.previousClose ?? currentPrice;
-  const change = Number((currentPrice - prevClose).toFixed(2));
-  const changePercent = Number(((change / prevClose) * 100).toFixed(2));
-  const dayHigh = Number((live.dayHigh ?? Math.max(prevData.quote.dayHigh, currentPrice)).toFixed(2));
-  const dayLow = Number((live.dayLow ?? Math.min(prevData.quote.dayLow, currentPrice)).toFixed(2));
-  const volume = live.volume ?? prevData.quote.volume;
+  const required = [
+    live.price,
+    live.previousClose,
+    live.change,
+    live.changePercent,
+    live.dayHigh,
+    live.dayLow,
+    live.openPrice,
+    live.volume,
+  ];
+  if (!required.every((value) => typeof value === 'number' && Number.isFinite(value))) {
+    return prevData;
+  }
+
+  const currentPrice = live.price;
+  const prevClose = live.previousClose;
+  const change = live.change;
+  const changePercent = live.changePercent;
+  const dayHigh = live.dayHigh;
+  const dayLow = live.dayLow;
+  const volume = live.volume;
 
   const updatedQuote: MarketQuote = {
     ...prevData.quote,
@@ -984,71 +1023,22 @@ export function mergeLiveQuoteIntoComprehensiveData(
     previousClose: prevClose,
     dayHigh,
     dayLow,
+    openPrice: live.openPrice,
     volume,
-    relativeVolume: Number((volume / (prevData.quote.avgVolume || 45000000)).toFixed(2)),
-    timestamp: live.lastSyncTime || (new Date().toLocaleTimeString('en-US', { timeZone: 'America/New_York' }) + ' ET'),
-    marketStatus: (live.marketState === 'PRE' ? 'PRE_MARKET' : live.marketState === 'POST' ? 'AFTER_HOURS' : live.marketState === 'CLOSED' ? 'CLOSED' : 'REGULAR'),
-    dataSource: live.dataSource || live.source || 'Yahoo Finance (Real-Time)',
-    latencyMs: live.latencyMs ?? 42,
-    currency: live.currency || 'USD',
-    exchange: live.exchangeName || 'US Equities',
+    relativeVolume: null as any,
+    timestamp: live.timestamp,
+    marketStatus: live.marketState,
+    dataStatus: live.metadata?.mode,
+    dataSource: live.dataSource,
+    latencyMs: live.latencyMs,
+    currency: live.currency,
+    exchange: live.exchangeName,
+    metadata: live.metadata,
   };
-
-  // Recalculate indicators with live price
-  const vwap = Number((prevClose * 1.002).toFixed(2));
-  const rsi = Number(Math.min(88, Math.max(18, 50 + changePercent * 10)).toFixed(1));
-
-  // Dynamic Support & Resistance based on live High/Low/PrevClose
-  const pivot = (dayHigh + dayLow + prevClose) / 3;
-  const r1 = Number((2 * pivot - dayLow).toFixed(2));
-  const s1 = Number((2 * pivot - dayHigh).toFixed(2));
-  const r2 = Number((pivot + (dayHigh - dayLow)).toFixed(2));
-  const s2 = Number((pivot - (dayHigh - dayLow)).toFixed(2));
-  const r3 = Number((dayHigh + 2 * (pivot - dayLow)).toFixed(2));
-  const s3 = Number((dayLow - 2 * (dayHigh - pivot)).toFixed(2));
-
-  const updatedScores: FactorScores = {
-    ...prevData.factorScores,
-    technicals: changePercent >= 0 ? 58 : -42,
-    priceAction: currentPrice >= vwap ? 65 : -50,
-  };
-
-  const updatedProbabilities = calculateWeightedProbability(
-    updatedScores,
-    undefined,
-    14.15,
-    currentPrice >= vwap,
-    rsi
-  );
 
   return {
     ...prevData,
     quote: updatedQuote,
-    technicals: {
-      ...prevData.technicals,
-      vwap,
-      rsi14: rsi,
-      rsiStatus: rsi > 70 ? 'Overbought' : rsi < 30 ? 'Oversold' : 'Neutral',
-      ema9: Number((currentPrice * 0.998).toFixed(2)),
-      ema20: Number((currentPrice * 0.994).toFixed(2)),
-      bollingerUpper: Number((currentPrice * 1.012).toFixed(2)),
-      bollingerLower: Number((currentPrice * 0.988).toFixed(2)),
-    },
-    supportResistance: {
-      ...prevData.supportResistance,
-      current: currentPrice,
-      pivot: Number(pivot.toFixed(2)),
-      r1,
-      r2,
-      r3,
-      s1,
-      s2,
-      s3,
-      keyResistance: r1,
-      keySupport: s1,
-    },
-    factorScores: updatedScores,
-    probabilities: updatedProbabilities,
   };
 }
 

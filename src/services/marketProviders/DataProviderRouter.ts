@@ -5,9 +5,12 @@ import {
   MultiAssetChartCandle,
 } from '../../types/instrument.js';
 import { MarketDataMetadata, MarketDataMode } from '../../types/market.js';
-import { InstrumentDirectoryService } from './InstrumentDirectoryService.js';
 import { InstrumentResolver } from './InstrumentResolver.js';
 import { AppConfig } from '../../config/environment.js';
+import {
+  getLiveMarketDataService,
+  MarketDataUnavailableError,
+} from '../../server/liveMarketDataService.js';
 
 // ==========================================
 // MarketMind AI — Provider Architecture & Neutral Data Router
@@ -41,7 +44,6 @@ export class DataProviderRouter {
   // Multi-tier Verified Memory Cache
   private static quoteCache: Map<string, CachedQuoteEntry> = new Map();
   private static readonly QUOTE_TTL_MS = 15 * 1000; // 15s quote TTL
-  private static readonly STALE_THRESHOLD_MS = 60 * 1000; // >60s considered STALE
 
   // Provider Health Tracking
   private static providerHealthMap: Map<string, ProviderHealthMetrics> = new Map([
@@ -50,7 +52,7 @@ export class DataProviderRouter {
       {
         providerId: 'massive',
         name: 'Massive / Polygon.io',
-        status: process.env.MASSIVE_API_KEY || process.env.POLYGON_API_KEY ? 'ONLINE' : 'CONFIGURATION_REQUIRED',
+        status: process.env.MASSIVE_API_KEY || process.env.POLYGON_API_KEY ? 'DEGRADED' : 'CONFIGURATION_REQUIRED',
         supportedAssetClasses: ['STOCK', 'ETF', 'INDEX', 'OPTION', 'FOREX', 'CRYPTO'],
         latencyMs: 24,
         successCount: 0,
@@ -78,12 +80,12 @@ export class DataProviderRouter {
       {
         providerId: 'alpaca',
         name: 'Alpaca Market Data v2',
-        status: process.env.ALPACA_API_KEY ? 'ONLINE' : 'CONFIGURATION_REQUIRED',
+        status: process.env.ALPACA_API_KEY && process.env.ALPACA_API_SECRET ? 'DEGRADED' : 'CONFIGURATION_REQUIRED',
         supportedAssetClasses: ['STOCK', 'ETF', 'CRYPTO', 'OPTION'],
         latencyMs: 38,
         successCount: 0,
         failureCount: 0,
-        isConfigured: Boolean(process.env.ALPACA_API_KEY),
+        isConfigured: Boolean(process.env.ALPACA_API_KEY && process.env.ALPACA_API_SECRET),
         entitlementTier: 'PRO',
       },
     ],
@@ -119,13 +121,13 @@ export class DataProviderRouter {
       'yahoo',
       {
         providerId: 'yahoo',
-        name: 'Universal Multi-Asset Gateway',
-        status: 'ONLINE',
+        name: 'Yahoo Finance',
+        status: process.env.YAHOO_MARKET_DATA_ENABLED === 'false' ? 'CONFIGURATION_REQUIRED' : 'DEGRADED',
         supportedAssetClasses: ['STOCK', 'ETF', 'INDEX', 'FOREX', 'CRYPTO', 'FUTURES', 'MUTUAL_FUND'],
         latencyMs: 45,
         successCount: 0,
         failureCount: 0,
-        isConfigured: true,
+        isConfigured: process.env.YAHOO_MARKET_DATA_ENABLED !== 'false',
         entitlementTier: 'BASIC',
       },
     ],
@@ -153,7 +155,7 @@ export class DataProviderRouter {
         providerId: 'massive',
         name: 'Massive / Polygon.io',
         isConfigured: Boolean(process.env.MASSIVE_API_KEY || process.env.POLYGON_API_KEY),
-        healthStatus: 'HEALTHY',
+        healthStatus: 'DEGRADED',
         supportedAssetClasses: ['STOCK', 'ETF', 'INDEX', 'OPTION', 'FOREX', 'CRYPTO'],
         dataTypes: ['REAL_TIME_QUOTES', 'HISTORICAL_CANDLES', 'OPTIONS_CHAIN', 'GREEKS', 'FOREX_STREAM', 'CRYPTO_TRADES'],
         rateLimitPerMinute: 1200,
@@ -167,7 +169,7 @@ export class DataProviderRouter {
         providerId: 'finnhub',
         name: 'Finnhub Institutional Feed',
         isConfigured: Boolean(process.env.FINNHUB_API_KEY),
-        healthStatus: 'HEALTHY',
+        healthStatus: 'DEGRADED',
         supportedAssetClasses: ['STOCK', 'ETF', 'FOREX', 'CRYPTO', 'ECONOMIC_INDICATOR'],
         dataTypes: ['REAL_TIME_QUOTES', 'HISTORICAL_CANDLES', 'FOREX_STREAM', 'NEWS_INTELLIGENCE', 'SEC_FILINGS'],
         rateLimitPerMinute: 600,
@@ -181,7 +183,7 @@ export class DataProviderRouter {
         providerId: 'alpaca',
         name: 'Alpaca Market Data v2',
         isConfigured: Boolean(process.env.ALPACA_API_KEY && process.env.ALPACA_API_SECRET),
-        healthStatus: 'HEALTHY',
+        healthStatus: 'DEGRADED',
         supportedAssetClasses: ['STOCK', 'ETF', 'CRYPTO', 'OPTION'],
         dataTypes: ['REAL_TIME_QUOTES', 'HISTORICAL_CANDLES', 'CRYPTO_TRADES', 'NEWS_INTELLIGENCE'],
         rateLimitPerMinute: 200,
@@ -193,9 +195,9 @@ export class DataProviderRouter {
       'yahoo',
       {
         providerId: 'yahoo',
-        name: 'Universal Multi-Asset Gateway',
-        isConfigured: true,
-        healthStatus: 'HEALTHY',
+        name: 'Yahoo Finance',
+        isConfigured: process.env.YAHOO_MARKET_DATA_ENABLED !== 'false',
+        healthStatus: 'DEGRADED',
         supportedAssetClasses: ['STOCK', 'ETF', 'INDEX', 'FOREX', 'CRYPTO', 'FUTURES', 'MUTUAL_FUND'],
         dataTypes: ['REAL_TIME_QUOTES', 'HISTORICAL_CANDLES', 'OPTIONS_CHAIN'],
         rateLimitPerMinute: 1800,
@@ -223,6 +225,10 @@ export class DataProviderRouter {
       };
     }
     return statusMap;
+  }
+
+  public static resetForTests(): void {
+    this.quoteCache.clear();
   }
 
   /**
@@ -303,7 +309,6 @@ export class DataProviderRouter {
     // Check Verified Cache
     const cached = this.quoteCache.get(cacheKey);
     if (cached && now < cached.expiresAt) {
-      const isStale = now - cached.providerTimestamp > this.STALE_THRESHOLD_MS;
       return {
         ...cached.quote,
         quote: {
@@ -311,41 +316,39 @@ export class DataProviderRouter {
           metadata: {
             ...cached.quote.quote.metadata!,
             mode: 'CACHED',
-            stale: isStale,
+            stale: false,
             receivedAt: now,
           },
         },
       };
     }
 
-    const provider = this.routeProvider(instrument);
-
     // Verify licensing / entitlement tier
     if (!instrument.isEntitled) {
       return {
         instrument,
         quote: {
-          price: 0,
-          change: 0,
-          changePercent: 0,
-          bid: 0,
-          ask: 0,
-          spread: 0,
-          volume: 0,
-          dayHigh: 0,
-          dayLow: 0,
-          openPrice: 0,
-          previousClose: 0,
+          price: null as any,
+          change: null as any,
+          changePercent: null as any,
+          bid: null as any,
+          ask: null as any,
+          spread: null as any,
+          volume: null as any,
+          dayHigh: null as any,
+          dayLow: null as any,
+          openPrice: null as any,
+          previousClose: null as any,
           marketState: 'CLOSED',
           timestamp: new Date().toISOString(),
-          dataSource: `${provider.name} (Unlicensed)`,
+          dataSource: 'Unavailable (Unlicensed)',
           isRealTime: false,
           feedDelayMinutes: 0,
           latencyMs: 0,
           currency: instrument.currency,
           metadata: {
-            provider: provider.name,
-            source: provider.providerId,
+            provider: 'Unavailable',
+            source: 'unlicensed',
             timestamp: now,
             receivedAt: now,
             mode: 'UNAVAILABLE',
@@ -363,16 +366,28 @@ export class DataProviderRouter {
 
     // Try Provider Resolution
     try {
-      const liveData = await this.fetchLiveQuote(instrument, provider);
+      const liveData = await this.fetchLiveQuote(instrument);
 
       if (liveData) {
         const validation = this.validateQuoteValues(liveData);
-        if (validation.isValid) {
-          const marketState = this.determineMarketState(instrument);
-          const mode: MarketDataMode = instrument.realTimeStatus === 'REAL_TIME' ? 'REAL_TIME' : 'DELAYED';
+        if (!validation.isValid || validation.isOutlier) {
+          throw new MarketDataUnavailableError(instrument.symbol, [
+            {
+              provider: liveData.providerId,
+              category: 'malformed_payload',
+              configured: true,
+              timeout: false,
+              latencyMs: liveData.latencyMs,
+              timestamp: new Date().toISOString(),
+            },
+          ]);
+        }
 
-          const activeProviderId = (liveData as any).providerId || provider.providerId;
-          const activeProviderName = activeProviderId === 'alpaca' ? 'Alpaca IEX' : provider.name;
+          const marketState = liveData.marketSession;
+          const mode: MarketDataMode = liveData.isRealTime ? 'REAL_TIME' : 'DELAYED';
+
+          const activeProviderId = liveData.providerId;
+          const activeProviderName = liveData.providerName;
 
           const metadata: MarketDataMetadata = {
             provider: activeProviderName,
@@ -380,11 +395,11 @@ export class DataProviderRouter {
             timestamp: liveData.timestamp || now,
             receivedAt: now,
             mode,
-            delayMinutes: instrument.feedDelayMinutes || 0,
+            delayMinutes: liveData.feedDelayMinutes,
             stale: false,
             marketStatus: marketState === 'REGULAR' ? 'OPEN' : marketState === 'PRE_MARKET' ? 'PRE' : marketState === 'AFTER_HOURS' ? 'AFTER' : 'CLOSED',
-            outlierFlag: validation.isOutlier,
-            validationStatus: validation.isOutlier ? 'SUSPECT_DATA' : 'VALID',
+            outlierFlag: false,
+            validationStatus: 'VALID',
           };
 
           const response: MultiAssetQuoteResponse = {
@@ -405,7 +420,10 @@ export class DataProviderRouter {
               changePercent: liveData.changePercent,
               bid: liveData.bid,
               ask: liveData.ask,
-              spread: liveData.spread || 0.02,
+              spread:
+                liveData.bid !== undefined && liveData.ask !== undefined
+                  ? Number((liveData.ask - liveData.bid).toFixed(6))
+                  : (null as any),
               volume: liveData.volume,
               dayHigh: liveData.dayHigh,
               dayLow: liveData.dayLow,
@@ -413,11 +431,11 @@ export class DataProviderRouter {
               previousClose: liveData.previousClose,
               vwap: liveData.vwap,
               marketState,
-              timestamp: new Date(liveData.timestamp || now).toLocaleTimeString('en-US', { timeZone: instrument.marketTimezone }) + ' ' + (instrument.marketTimezone.includes('New_York') ? 'ET' : 'UTC'),
-              dataSource: `${provider.name} (${mode === 'REAL_TIME' ? 'Real-Time' : '15-min Delayed'})`,
+              timestamp: new Date(liveData.timestamp).toISOString(),
+              dataSource: `${activeProviderName} (${mode === 'REAL_TIME' ? 'Real-Time' : `${liveData.feedDelayMinutes}-min Delayed`})`,
               isRealTime: mode === 'REAL_TIME',
-              feedDelayMinutes: instrument.feedDelayMinutes,
-              latencyMs: provider.averageLatencyMs,
+              feedDelayMinutes: liveData.feedDelayMinutes,
+              latencyMs: liveData.latencyMs,
               currency: instrument.currency,
               metadata,
             },
@@ -443,76 +461,26 @@ export class DataProviderRouter {
           });
 
           // Record Health Success
-          this.recordProviderSuccess(provider.providerId, provider.averageLatencyMs);
+          this.recordProviderSuccess(activeProviderId, liveData.latencyMs);
 
           return response;
-        }
       }
     } catch (err: any) {
-      this.recordProviderFailure(provider.providerId, err?.message || 'Provider fetch error');
+      if (err instanceof MarketDataUnavailableError) {
+        for (const diagnostic of err.diagnostics) {
+          this.recordProviderFailure(
+            diagnostic.provider,
+            `${diagnostic.category}${diagnostic.httpStatus ? `:${diagnostic.httpStatus}` : ''}`
+          );
+        }
+        throw err;
+      }
+      throw err;
     }
-
-    // Fallback: If live fetch fails, check if stale cache exists
-    if (cached) {
-      return {
-        ...cached.quote,
-        quote: {
-          ...cached.quote.quote,
-          metadata: {
-            ...cached.quote.quote.metadata!,
-            mode: 'CACHED',
-            stale: true,
-            receivedAt: now,
-          },
-        },
-      };
-    }
-
-    // Return UNAVAILABLE State — NEVER invent numbers with Math.random() or return static sample prices as live
-    const marketState = this.determineMarketState(instrument);
-    const safePrice = 0;
-    const safePrevClose = 0;
-    return {
-      instrument,
-      quote: {
-        price: safePrice,
-        change: AppConfig.allowSimulatedMarketData ? 0 : (null as any),
-        changePercent: AppConfig.allowSimulatedMarketData ? 0 : (null as any),
-        bid: 0,
-        ask: 0,
-        spread: 0,
-        volume: 0,
-        dayHigh: safePrice,
-        dayLow: safePrice,
-        openPrice: safePrice,
-        previousClose: safePrevClose,
-        marketState,
-        timestamp: new Date().toISOString(),
-        dataSource: `${provider.name} (Data Unavailable)`,
-        isRealTime: false,
-        feedDelayMinutes: 0,
-        latencyMs: 0,
-        currency: instrument.currency,
-        metadata: {
-          provider: provider.name,
-          source: provider.providerId,
-          timestamp: now,
-          receivedAt: now,
-          mode: 'UNAVAILABLE',
-          stale: true,
-          validationStatus: 'UNAVAILABLE',
-        },
-      },
-      entitlementStatus: {
-        isAvailable: false,
-        unavailabilityReason: 'Live market data currently unavailable from authorized providers.',
-      },
-    };
   }
 
   private static async fetchLiveQuote(
-    instrument: NormalizedInstrument,
-    provider: ProviderCapability
+    instrument: NormalizedInstrument
   ): Promise<{
     price: number;
     change: number;
@@ -526,166 +494,20 @@ export class DataProviderRouter {
     bid?: number;
     ask?: number;
     spread?: number;
-    timestamp?: number;
-    providerId?: string;
-  } | null> {
-    const symbol = instrument.symbol;
-    const providerSymbol = instrument.providerSymbols?.[provider.providerId as keyof typeof instrument.providerSymbols] || symbol;
-
-    // 1. Massive / Polygon
-    if (provider.providerId === 'massive') {
-      const apiKey = process.env.MASSIVE_API_KEY || process.env.POLYGON_API_KEY;
-      try {
-        const url = apiKey
-          ? `https://api.polygon.io/v2/snapshot/locale/us/markets/stocks/tickers/${encodeURIComponent(
-              providerSymbol
-            )}?apiKey=${encodeURIComponent(apiKey)}`
-          : `https://api.polygon.io/v2/snapshot/locale/us/markets/stocks/tickers/${encodeURIComponent(
-              providerSymbol
-            )}`;
-        const snapRes = await fetch(url);
-        if (snapRes.ok) {
-          const json = await snapRes.json();
-          const t = json.ticker;
-          if (t && (t.lastTrade?.p || t.day?.c || t.min?.c)) {
-            const price = t.lastTrade?.p || t.day?.c || t.min?.c;
-            const prevClose = t.prevDay?.c || price;
-            const change = t.todaysChange || Number((price - prevClose).toFixed(2));
-            const changePercent = t.todaysChangePerc || Number(((change / prevClose) * 100).toFixed(2));
-            return {
-              price,
-              change,
-              changePercent,
-              dayHigh: t.day?.h || price,
-              dayLow: t.day?.l || price,
-              openPrice: t.day?.o || prevClose,
-              previousClose: prevClose,
-              volume: t.day?.v || 0,
-              vwap: t.day?.vw,
-              bid: t.lastQuote?.p,
-              ask: t.lastQuote?.P,
-              timestamp: t.updated ? Math.floor(t.updated / 1000000) : Date.now(),
-              providerId: 'massive',
-            };
-          }
-        }
-      } catch (massiveErr) {
-        // Massive failed, proceed to verified Alpaca fallback
-      }
-
-      // Fallback from Massive to Alpaca if Alpaca credentials are configured
-      if (process.env.ALPACA_API_KEY && process.env.ALPACA_API_SECRET) {
-        try {
-          const { AlpacaMarketDataService } = await import('../../server/alpacaMarketDataService');
-          const alpacaService = new AlpacaMarketDataService(
-            process.env.ALPACA_API_KEY,
-            process.env.ALPACA_API_SECRET
-          );
-          const alpacaQuote = await alpacaService.getSnapshot(providerSymbol || symbol);
-          if (alpacaQuote && alpacaQuote.price > 0) {
-            const prevClose = alpacaQuote.previousClose || alpacaQuote.price;
-            const change = Number((alpacaQuote.price - prevClose).toFixed(2));
-            const changePercent = prevClose > 0 ? Number(((change / prevClose) * 100).toFixed(2)) : 0;
-            return {
-              price: alpacaQuote.price,
-              change,
-              changePercent,
-              dayHigh: alpacaQuote.high || alpacaQuote.price,
-              dayLow: alpacaQuote.low || alpacaQuote.price,
-              openPrice: alpacaQuote.open || alpacaQuote.price,
-              previousClose: prevClose,
-              volume: alpacaQuote.volume || 0,
-              bid: alpacaQuote.bid,
-              ask: alpacaQuote.ask,
-              timestamp: alpacaQuote.timestamp || Date.now(),
-              providerId: 'alpaca',
-            };
-          }
-        } catch (alpacaErr) {
-          // Alpaca fallback error
-        }
-      }
-    }
-
-    // 2. Alpaca Direct
-    if (provider.providerId === 'alpaca') {
-      if (process.env.ALPACA_API_KEY && process.env.ALPACA_API_SECRET) {
-        try {
-          const { AlpacaMarketDataService } = await import('../../server/alpacaMarketDataService');
-          const alpacaService = new AlpacaMarketDataService(
-            process.env.ALPACA_API_KEY,
-            process.env.ALPACA_API_SECRET
-          );
-          const alpacaQuote = await alpacaService.getSnapshot(providerSymbol || symbol);
-          if (alpacaQuote && alpacaQuote.price > 0) {
-            const prevClose = alpacaQuote.previousClose || alpacaQuote.price;
-            const change = Number((alpacaQuote.price - prevClose).toFixed(2));
-            const changePercent = prevClose > 0 ? Number(((change / prevClose) * 100).toFixed(2)) : 0;
-            return {
-              price: alpacaQuote.price,
-              change,
-              changePercent,
-              dayHigh: alpacaQuote.high || alpacaQuote.price,
-              dayLow: alpacaQuote.low || alpacaQuote.price,
-              openPrice: alpacaQuote.open || alpacaQuote.price,
-              previousClose: prevClose,
-              volume: alpacaQuote.volume || 0,
-              bid: alpacaQuote.bid,
-              ask: alpacaQuote.ask,
-              timestamp: alpacaQuote.timestamp || Date.now(),
-              providerId: 'alpaca',
-            };
-          }
-        } catch (alpacaErr) {}
-      }
-    }
-
-    // 3. Finnhub
-    if (provider.providerId === 'finnhub') {
-      const apiKey = process.env.FINNHUB_API_KEY;
-      if (apiKey) {
-        const quoteRes = await fetch(
-          `https://finnhub.io/api/v1/quote?symbol=${encodeURIComponent(providerSymbol)}&token=${encodeURIComponent(apiKey)}`
-        );
-        if (quoteRes.ok) {
-          const q = await quoteRes.json();
-          if (q.c && q.c > 0) {
-            return {
-              price: q.c,
-              change: q.d || 0,
-              changePercent: q.dp || 0,
-              dayHigh: q.h || q.c,
-              dayLow: q.l || q.c,
-              openPrice: q.o || q.pc,
-              previousClose: q.pc,
-              volume: 0,
-              timestamp: q.t ? q.t * 1000 : Date.now(),
-              providerId: 'finnhub',
-            };
-          }
-        }
-      }
-    }
-
-    // 4. Fallback catalog known state (if available in directory)
-    const catalog = InstrumentDirectoryService.getBySymbol(symbol);
-    if (catalog && catalog.price && catalog.price > 0) {
-      return {
-        price: catalog.price,
-        change: catalog.change || 0,
-        changePercent: catalog.changePercent || 0,
-        dayHigh: catalog.high || catalog.price,
-        dayLow: catalog.low || catalog.price,
-        openPrice: catalog.open || catalog.price,
-        previousClose: catalog.previousClose || catalog.price,
-        volume: catalog.volume || 0,
-        bid: catalog.bid,
-        ask: catalog.ask,
-        timestamp: Date.now(),
-      };
-    }
-
-    return null;
+    timestamp: number;
+    providerId: 'massive' | 'alpaca' | 'yahoo';
+    providerName: string;
+    marketSession: 'REGULAR' | 'PRE_MARKET' | 'AFTER_HOURS' | 'CLOSED';
+    isRealTime: boolean;
+    feedDelayMinutes: number;
+    latencyMs: number;
+  }> {
+    const providerSymbol =
+      instrument.providerSymbols?.massive ||
+      instrument.providerSymbols?.alpaca ||
+      instrument.providerSymbols?.yahoo ||
+      instrument.symbol;
+    return getLiveMarketDataService().getQuote(providerSymbol);
   }
 
   public static determineMarketState(
@@ -733,6 +555,9 @@ export class DataProviderRouter {
     timeframe: string = '5m',
     count: number = 60
   ): MultiAssetChartCandle[] {
+    if (!AppConfig.allowSimulatedMarketData) {
+      return [];
+    }
     const basePrice = instrument.price || instrument.previousClose;
     if (!basePrice || basePrice <= 0) {
       if (!AppConfig.allowSimulatedMarketData) {

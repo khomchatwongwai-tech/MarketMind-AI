@@ -38,11 +38,40 @@ import { IntentRouter } from './src/services/ai/intentRouter.js';
 import { MarketMindNewsEngine } from './src/services/MarketMindNewsEngine.js';
 import { buildMarketOutcome } from './src/services/ai/marketOutcomeEngine.js';
 import { randomUUID } from 'crypto';
+import {
+  getLiveMarketDataService,
+  MarketDataUnavailableError,
+} from './src/server/liveMarketDataService.js';
 
 dotenv.config();
 
 const PORT = process.env.PORT ? parseInt(process.env.PORT, 10) : 3000;
 const app = express();
+
+function publicMarketDataFailure(error: unknown, symbol: string) {
+  if (error instanceof MarketDataUnavailableError) {
+    return {
+      status: 'UNAVAILABLE',
+      error: {
+        code: 'LIVE_MARKET_DATA_UNAVAILABLE',
+        message: 'Live market data is unavailable from configured providers.',
+      },
+      symbol,
+      diagnostics: error.diagnostics,
+      timestamp: new Date().toISOString(),
+    };
+  }
+  return {
+    status: 'UNAVAILABLE',
+    error: {
+      code: 'LIVE_MARKET_DATA_UNAVAILABLE',
+      message: 'Live market data is temporarily unavailable.',
+    },
+    symbol,
+    diagnostics: [],
+    timestamp: new Date().toISOString(),
+  };
+}
 
 // Security & CORS Headers Middleware
 app.use((req, res, next) => {
@@ -119,10 +148,43 @@ app.get('/api/health', (req, res) => {
 });
 
 // Readiness check endpoint
-app.get('/api/ready', (req, res) => {
+app.get('/api/ready', async (_req, res) => {
   const preflight = validateProductionEnvironment();
   const isProduction = process.env.NODE_ENV === 'production';
-  const ready = !isProduction || preflight.ok;
+  let marketData: {
+    operational: boolean;
+    provider?: string;
+    mode?: string;
+    symbol: string;
+    diagnostics: unknown[];
+  } = {
+    operational: false,
+    symbol: 'SPY',
+    diagnostics: [],
+  };
+
+  try {
+    const probe = await DataProviderRouter.getQuote('SPY');
+    marketData = {
+      operational: Boolean(
+        probe?.entitlementStatus.isAvailable &&
+          probe.quote.metadata?.validationStatus === 'VALID' &&
+          probe.quote.metadata?.stale === false
+      ),
+      provider: probe?.quote.metadata?.provider,
+      mode: probe?.quote.metadata?.mode,
+      symbol: 'SPY',
+      diagnostics: [],
+    };
+  } catch (error) {
+    marketData = {
+      operational: false,
+      symbol: 'SPY',
+      diagnostics: error instanceof MarketDataUnavailableError ? error.diagnostics : [],
+    };
+  }
+
+  const ready = (!isProduction || preflight.ok) && marketData.operational;
 
   const responseBody = {
     status: ready ? 'ready' : 'not_ready',
@@ -135,6 +197,7 @@ app.get('/api/ready', (req, res) => {
       errors: preflight.errors,
       warnings: preflight.warnings,
     },
+    marketData,
   };
 
   if (!ready) {
@@ -245,8 +308,8 @@ app.get('/api/instruments/:instrumentId', (req, res) => {
 
 // 3. Multi-Asset Quote with live data & asset-specific enrichment
 app.get('/api/instruments/:instrumentId/quote', async (req, res) => {
+  const idOrSymbol = req.params.instrumentId;
   try {
-    const idOrSymbol = req.params.instrumentId;
     const quoteResponse = await DataProviderRouter.getQuote(idOrSymbol);
     if (!quoteResponse) {
       return res.status(404).json({
@@ -255,9 +318,8 @@ app.get('/api/instruments/:instrumentId/quote', async (req, res) => {
       });
     }
     res.json(quoteResponse);
-  } catch (err: any) {
-    console.error('[API Quote Error]:', err);
-    res.status(500).json({ error: 'Failed to retrieve quote', message: err.message });
+  } catch (error) {
+    res.status(503).json(publicMarketDataFailure(error, idOrSymbol.toUpperCase()));
   }
 });
 
@@ -276,7 +338,20 @@ app.get('/api/instruments/:instrumentId/chart', (req, res) => {
   }
 
   const candles = DataProviderRouter.generateMultiAssetCandles(instrument, timeframe, count);
-  res.json({
+  if (candles.length === 0) {
+    return res.status(503).json({
+      status: 'UNAVAILABLE',
+      instrumentId: instrument.instrumentId,
+      symbol: instrument.symbol,
+      timeframe,
+      candles: [],
+      error: {
+        code: 'HISTORICAL_MARKET_DATA_UNAVAILABLE',
+        message: 'Verified historical candles are unavailable for this route.',
+      },
+    });
+  }
+  return res.json({
     instrumentId: instrument.instrumentId,
     symbol: instrument.symbol,
     timeframe,
@@ -286,15 +361,15 @@ app.get('/api/instruments/:instrumentId/chart', (req, res) => {
 
 // Market Route Aliases for Shared Web, iOS, and Android Compatibility
 app.get('/api/market/quote/:symbol', async (req, res) => {
+  const symbol = req.params.symbol.toUpperCase().trim();
   try {
-    const symbol = req.params.symbol;
     const quoteResponse = await DataProviderRouter.getQuote(symbol);
     if (!quoteResponse) {
       return res.status(404).json({ error: 'Quote unavailable for symbol', symbol });
     }
     res.json(quoteResponse);
-  } catch (err: any) {
-    res.status(500).json({ error: 'Failed to retrieve quote', message: err.message });
+  } catch (error) {
+    res.status(503).json(publicMarketDataFailure(error, symbol));
   }
 });
 
@@ -371,7 +446,13 @@ app.get('/api/providers/capabilities', (req, res) => {
 // 9. Provider Health & Latency Status
 app.get('/api/providers/status', (req, res) => {
   const status = DataProviderRouter.getProviderStatus();
-  res.json({ providers: status, timestamp: new Date().toISOString() });
+  const liveService = getLiveMarketDataService();
+  res.json({
+    providers: status,
+    configured: liveService.getConfigurationStatus(),
+    diagnostics: liveService.getDiagnostics(),
+    timestamp: new Date().toISOString(),
+  });
 });
 
 // 10. Admin Instrument Sync Endpoint
@@ -465,356 +546,222 @@ app.get('/api/market/candles/:ticker', async (req, res) => {
   const timeframe = (req.query.timeframe as string) || '5m';
   const extended = req.query.extended !== 'false';
   const { range, interval } = getTimeframeParams(timeframe);
+  const diagnostics: Array<{
+    provider: 'massive' | 'yahoo';
+    category: 'authorization' | 'rate_limit' | 'upstream' | 'network' | 'malformed_payload';
+    httpStatus?: number;
+  }> = [];
+
+  let liveQuote;
+  try {
+    liveQuote = await getLiveMarketDataService().getQuote(ticker);
+  } catch (error) {
+    return res.status(503).json(publicMarketDataFailure(error, ticker));
+  }
+
+  type VerifiedCandle = {
+    time: number;
+    open: number;
+    high: number;
+    low: number;
+    close: number;
+    volume: number;
+    session: 'PRE' | 'REGULAR' | 'POST';
+    vwap?: number;
+  };
+
+  const diagnosticCategory = (status: number) =>
+    status === 401 || status === 403
+      ? 'authorization'
+      : status === 429
+        ? 'rate_limit'
+        : 'upstream';
+
+  const sessionForTimestamp = (timestampMs: number): VerifiedCandle['session'] => {
+    if (timeframe === '1d' || timeframe === '1w') return 'REGULAR';
+    const parts = new Intl.DateTimeFormat('en-US', {
+      timeZone: 'America/New_York',
+      hour12: false,
+      hour: '2-digit',
+      minute: '2-digit',
+    }).formatToParts(new Date(timestampMs));
+    const hour = Number(parts.find((part) => part.type === 'hour')?.value || 0) % 24;
+    const minute = Number(parts.find((part) => part.type === 'minute')?.value || 0);
+    const minutes = hour * 60 + minute;
+    if (minutes >= 240 && minutes < 570) return 'PRE';
+    if (minutes >= 960 && minutes < 1200) return 'POST';
+    return 'REGULAR';
+  };
+
+  const buildCandles = (
+    rawBars: Array<{ timestampMs: unknown; open: unknown; high: unknown; low: unknown; close: unknown; volume: unknown }>
+  ): VerifiedCandle[] => {
+    let cumulativePriceVolume = 0;
+    let cumulativeVolume = 0;
+    const candles: VerifiedCandle[] = [];
+
+    const chronologicalBars = [...rawBars].sort(
+      (left, right) => Number(left.timestampMs) - Number(right.timestampMs)
+    );
+    for (const raw of chronologicalBars) {
+      const timestampMs = Number(raw.timestampMs);
+      const open = Number(raw.open);
+      const high = Number(raw.high);
+      const low = Number(raw.low);
+      const close = Number(raw.close);
+      const volume = Number(raw.volume);
+      const valid =
+        Number.isFinite(timestampMs) &&
+        timestampMs > 0 &&
+        [open, high, low, close].every((value) => Number.isFinite(value) && value > 0) &&
+        Number.isFinite(volume) &&
+        volume >= 0 &&
+        high >= Math.max(open, close, low) &&
+        low <= Math.min(open, close, high);
+      if (!valid) continue;
+
+      cumulativePriceVolume += ((high + low + close) / 3) * volume;
+      cumulativeVolume += volume;
+      const candle: VerifiedCandle = {
+        time: Math.floor(timestampMs / 1000),
+        open: Number(open.toFixed(4)),
+        high: Number(high.toFixed(4)),
+        low: Number(low.toFixed(4)),
+        close: Number(close.toFixed(4)),
+        volume,
+        session: sessionForTimestamp(timestampMs),
+      };
+      if (cumulativeVolume > 0) {
+        candle.vwap = Number((cumulativePriceVolume / cumulativeVolume).toFixed(4));
+      }
+      candles.push(candle);
+    }
+    return candles.slice(-500);
+  };
+
+  const sendVerifiedCandles = (source: string, candles: VerifiedCandle[]) =>
+    res.json({
+      source,
+      quoteSource: liveQuote.providerName,
+      status: 'SUCCESS',
+      ticker,
+      name: liveQuote.name || `${ticker} Equity`,
+      timeframe,
+      currency: liveQuote.currency,
+      exchange: liveQuote.exchange || 'US Equities',
+      price: liveQuote.price,
+      change: liveQuote.change,
+      changePercent: liveQuote.changePercent,
+      previousClose: liveQuote.previousClose,
+      dayHigh: liveQuote.dayHigh,
+      dayLow: liveQuote.dayLow,
+      levels: { pdc: liveQuote.previousClose },
+      candles,
+      lastSyncTime: new Date(liveQuote.timestamp).toISOString(),
+    });
 
   const massiveKey = getMassiveApiKey();
-
-  // 1. Try Massive / Polygon API if key is configured
   if (massiveKey) {
     try {
       let multiplier = 5;
       let timespan = 'minute';
-      const now = new Date();
-      const fromDate = new Date();
-
+      let historyDays = 5;
       switch (timeframe.toLowerCase()) {
-        case '1m':
-          multiplier = 1;
-          timespan = 'minute';
-          fromDate.setDate(now.getDate() - 2);
-          break;
-        case '2m':
-          multiplier = 2;
-          timespan = 'minute';
-          fromDate.setDate(now.getDate() - 3);
-          break;
-        case '5m':
-          multiplier = 5;
-          timespan = 'minute';
-          fromDate.setDate(now.getDate() - 5);
-          break;
-        case '15m':
-          multiplier = 15;
-          timespan = 'minute';
-          fromDate.setDate(now.getDate() - 10);
-          break;
-        case '30m':
-          multiplier = 30;
-          timespan = 'minute';
-          fromDate.setDate(now.getDate() - 20);
-          break;
-        case '1h':
-          multiplier = 1;
-          timespan = 'hour';
-          fromDate.setDate(now.getDate() - 45);
-          break;
-        case '4h':
-          multiplier = 4;
-          timespan = 'hour';
-          fromDate.setDate(now.getDate() - 90);
-          break;
-        case '1d':
-          multiplier = 1;
-          timespan = 'day';
-          fromDate.setDate(now.getDate() - 365);
-          break;
-        case '1w':
-          multiplier = 1;
-          timespan = 'week';
-          fromDate.setDate(now.getDate() - 730);
-          break;
+        case '1m': multiplier = 1; historyDays = 2; break;
+        case '2m': multiplier = 2; historyDays = 3; break;
+        case '15m': multiplier = 15; historyDays = 10; break;
+        case '30m': multiplier = 30; historyDays = 20; break;
+        case '1h': multiplier = 1; timespan = 'hour'; historyDays = 45; break;
+        case '4h': multiplier = 4; timespan = 'hour'; historyDays = 90; break;
+        case '1d': multiplier = 1; timespan = 'day'; historyDays = 365; break;
+        case '1w': multiplier = 1; timespan = 'week'; historyDays = 730; break;
       }
-
-      const fromStr = fromDate.toISOString().split('T')[0];
-      const toStr = now.toISOString().split('T')[0];
-
-      const massiveAggUrl = `https://api.polygon.io/v2/aggs/ticker/${encodeURIComponent(
-        ticker
-      )}/range/${multiplier}/${timespan}/${fromStr}/${toStr}?adjusted=true&sort=asc&limit=5000&apiKey=${encodeURIComponent(
-        massiveKey
-      )}`;
-
-      const massiveRes = await fetch(massiveAggUrl);
-      if (massiveRes.ok) {
-        const json = await massiveRes.json();
-        if (json.results && json.results.length > 0) {
-          const results = json.results;
-          let cumulativePV = 0;
-          let cumulativeVolume = 0;
-          let dayHigh = -Infinity;
-          let dayLow = Infinity;
-          let pmHigh = -Infinity;
-          let pmLow = Infinity;
-
-          const candles = results.map((bar: any) => {
-            const time = Math.floor(bar.t / 1000);
-            const o = bar.o;
-            const h = bar.h;
-            const l = bar.l;
-            const c = bar.c;
-            const v = bar.v;
-
-            const date = new Date(bar.t);
-            const etHour = parseInt(
-              date.toLocaleTimeString('en-US', { hour: '2-digit', hour12: false, timeZone: 'America/New_York' }),
-              10
-            );
-            const etMin = parseInt(
-              date.toLocaleTimeString('en-US', { minute: '2-digit', hour12: false, timeZone: 'America/New_York' }),
-              10
-            );
-            const mins = etHour * 60 + etMin;
-
-            let session: 'PRE' | 'REGULAR' | 'POST' = 'REGULAR';
-            if (mins >= 240 && mins < 570) {
-              session = 'PRE';
-              pmHigh = Math.max(pmHigh, h);
-              pmLow = Math.min(pmLow, l);
-            } else if (mins >= 570 && mins < 960) {
-              session = 'REGULAR';
-              dayHigh = Math.max(dayHigh, h);
-              dayLow = Math.min(dayLow, l);
-            } else if (mins >= 960 && mins < 1200) {
-              session = 'POST';
-            }
-
-            const typical = (h + l + c) / 3;
-            cumulativePV += typical * v;
-            cumulativeVolume += v;
-            const vwap = cumulativeVolume > 0 ? Number((cumulativePV / cumulativeVolume).toFixed(2)) : c;
-
-            return {
-              time,
-              open: Number(o.toFixed(2)),
-              high: Number(h.toFixed(2)),
-              low: Number(l.toFixed(2)),
-              close: Number(c.toFixed(2)),
-              volume: v,
-              session,
-              vwap,
-            };
-          });
-
-          const lastCandle = candles[candles.length - 1];
-          const currentPrice = lastCandle.close;
-          const prevClose = candles.length > 1 ? candles[candles.length - 2].close : currentPrice * 0.995;
-          const pivot = Number((((dayHigh > 0 ? dayHigh : currentPrice) + (dayLow < Infinity ? dayLow : currentPrice) + prevClose) / 3).toFixed(2));
-
-          return res.json({
-            source: 'Massive / Polygon Institutional Data API',
-            status: 'SUCCESS',
-            ticker,
-            name: `${ticker} Equity`,
-            timeframe,
-            currency: 'USD',
-            exchange: 'US Equities',
-            price: currentPrice,
-            change: Number((currentPrice - prevClose).toFixed(2)),
-            changePercent: Number((((currentPrice - prevClose) / prevClose) * 100).toFixed(2)),
-            previousClose: prevClose,
-            dayHigh: dayHigh > 0 ? dayHigh : currentPrice,
-            dayLow: dayLow < Infinity ? dayLow : currentPrice,
-            pmHigh: pmHigh > 0 ? pmHigh : undefined,
-            pmLow: pmLow < Infinity ? pmLow : undefined,
-            levels: {
-              pivot,
-              r1: Number((2 * pivot - (dayLow < Infinity ? dayLow : currentPrice)).toFixed(2)),
-              r2: Number((pivot + ((dayHigh > 0 ? dayHigh : currentPrice) - (dayLow < Infinity ? dayLow : currentPrice))).toFixed(2)),
-              s1: Number((2 * pivot - (dayHigh > 0 ? dayHigh : currentPrice)).toFixed(2)),
-              s2: Number((pivot - ((dayHigh > 0 ? dayHigh : currentPrice) - (dayLow < Infinity ? dayLow : currentPrice))).toFixed(2)),
-              pdh: Number((prevClose * 1.008).toFixed(2)),
-              pdl: Number((prevClose * 0.992).toFixed(2)),
-              pdc: prevClose,
-            },
-            candles: candles.slice(-500),
-            lastSyncTime: new Date().toLocaleTimeString('en-US', {
-              hour: '2-digit',
-              minute: '2-digit',
-              second: '2-digit',
-              timeZone: 'America/New_York',
-            }) + ' ET',
-          });
+      const now = new Date();
+      const fromDate = new Date(now);
+      fromDate.setDate(now.getDate() - historyDays);
+      const massiveAggUrl =
+        `https://api.polygon.io/v2/aggs/ticker/${encodeURIComponent(ticker)}` +
+        `/range/${multiplier}/${timespan}/${fromDate.toISOString().split('T')[0]}` +
+        `/${now.toISOString().split('T')[0]}?adjusted=true&sort=desc&limit=5000`;
+      const response = await fetch(massiveAggUrl, {
+        headers: { Authorization: `Bearer ${massiveKey}` },
+      });
+      if (!response.ok) {
+        diagnostics.push({ provider: 'massive', category: diagnosticCategory(response.status), httpStatus: response.status });
+      } else {
+        const payload = await response.json();
+        const candles = buildCandles(
+          Array.isArray(payload?.results)
+            ? payload.results.map((bar: any) => ({
+                timestampMs: bar.t,
+                open: bar.o,
+                high: bar.h,
+                low: bar.l,
+                close: bar.c,
+                volume: bar.v,
+              }))
+            : []
+        );
+        if (candles.length > 0) {
+          return sendVerifiedCandles('Massive / Polygon Aggregates API', candles);
         }
+        diagnostics.push({ provider: 'massive', category: 'malformed_payload' });
       }
-    } catch (err: any) {
-      console.warn(`[MassiveAPI] Fetch error for ${ticker}:`, err.message);
+    } catch {
+      diagnostics.push({ provider: 'massive', category: 'network' });
     }
   }
 
-  // 2. Fallback to Yahoo Finance live query
-  try {
-    const yahooUrl = `https://query1.finance.yahoo.com/v8/finance/chart/${encodeURIComponent(
-      ticker
-    )}?range=${range}&interval=${interval}&includePrePost=${extended ? 'true' : 'false'}`;
-
-    const response = await fetch(yahooUrl, {
-      headers: YAHOO_HEADERS,
-    });
-
-    if (response.ok) {
-      const data = await response.json();
-      const result = data?.chart?.result?.[0];
-      if (result) {
-        const meta = result.meta || {};
-        const timestamps: number[] = result.timestamp || [];
-        const quoteObj = result.indicators?.quote?.[0] || {};
-        const closes: (number | null)[] = quoteObj.close || [];
-        const opens: (number | null)[] = quoteObj.open || [];
-        const highs: (number | null)[] = quoteObj.high || [];
-        const lows: (number | null)[] = quoteObj.low || [];
-        const volumes: (number | null)[] = quoteObj.volume || [];
-
-        const currentPrice = meta.regularMarketPrice ?? meta.previousClose ?? 500;
-        const prevClose = meta.chartPreviousClose ?? meta.previousClose ?? currentPrice;
-
-        // Build candles
-        let cumulativeVolume = 0;
-        let cumulativePV = 0;
-        let dayHigh = -Infinity;
-        let dayLow = Infinity;
-        let pmHigh = -Infinity;
-        let pmLow = Infinity;
-        let orHigh = -Infinity;
-        let orLow = Infinity;
-
-        const candles: Array<{
-          time: number;
-          open: number;
-          high: number;
-          low: number;
-          close: number;
-          volume: number;
-          session: 'PRE' | 'REGULAR' | 'POST';
-          vwap?: number;
-        }> = [];
-
-        for (let i = 0; i < timestamps.length; i++) {
-          const ts = timestamps[i];
-          const c = closes[i];
-          if (c == null || isNaN(c)) continue;
-          const o = opens[i] ?? c;
-          const h = highs[i] ?? Math.max(o, c);
-          const l = lows[i] ?? Math.min(o, c);
-          const v = volumes[i] ?? 0;
-
-          const date = new Date(ts * 1000);
-          // Convert to ET hours & minutes
-          const etHourStr = date.toLocaleTimeString('en-US', {
-            hour: '2-digit',
-            hour12: false,
-            timeZone: 'America/New_York',
-          });
-          const etMinStr = date.toLocaleTimeString('en-US', {
-            minute: '2-digit',
-            hour12: false,
-            timeZone: 'America/New_York',
-          });
-          const etHour = parseInt(etHourStr, 10);
-          const etMin = parseInt(etMinStr, 10);
-          const etMinutesFromMidnight = etHour * 60 + etMin;
-
-          let session: 'PRE' | 'REGULAR' | 'POST' = 'REGULAR';
-          if (etMinutesFromMidnight >= 240 && etMinutesFromMidnight < 570) {
-            session = 'PRE';
-            pmHigh = Math.max(pmHigh, h);
-            pmLow = Math.min(pmLow, l);
-          } else if (etMinutesFromMidnight >= 570 && etMinutesFromMidnight < 960) {
-            session = 'REGULAR';
-            dayHigh = Math.max(dayHigh, h);
-            dayLow = Math.min(dayLow, l);
-            // Opening Range: first 30 mins (9:30 - 10:00)
-            if (etMinutesFromMidnight <= 600) {
-              orHigh = Math.max(orHigh, h);
-              orLow = Math.min(orLow, l);
-            }
-          } else if (etMinutesFromMidnight >= 960 && etMinutesFromMidnight < 1200) {
-            session = 'POST';
-          }
-
-          // VWAP calculation: typical price = (H+L+C)/3
-          const typicalPrice = (h + l + c) / 3;
-          cumulativePV += typicalPrice * v;
-          cumulativeVolume += v;
-          const vwap = cumulativeVolume > 0 ? Number((cumulativePV / cumulativeVolume).toFixed(2)) : c;
-
-          candles.push({
-            time: ts,
-            open: Number(o.toFixed(2)),
-            high: Number(h.toFixed(2)),
-            low: Number(l.toFixed(2)),
-            close: Number(c.toFixed(2)),
-            volume: v,
-            session,
-            vwap,
-          });
-        }
-
-        // Key support/resistance levels
-        const pivot = Number((((dayHigh > 0 ? dayHigh : currentPrice) + (dayLow < Infinity ? dayLow : currentPrice) + prevClose) / 3).toFixed(2));
-        const r1 = Number((2 * pivot - (dayLow < Infinity ? dayLow : currentPrice)).toFixed(2));
-        const s1 = Number((2 * pivot - (dayHigh > 0 ? dayHigh : currentPrice)).toFixed(2));
-        const r2 = Number((pivot + ((dayHigh > 0 ? dayHigh : currentPrice) - (dayLow < Infinity ? dayLow : currentPrice))).toFixed(2));
-        const s2 = Number((pivot - ((dayHigh > 0 ? dayHigh : currentPrice) - (dayLow < Infinity ? dayLow : currentPrice))).toFixed(2));
-
-        return res.json({
-          source: 'Yahoo Finance Real-Time Candle API',
-          status: 'SUCCESS',
-          ticker,
-          name: meta.longName || meta.shortName || `${ticker} Stock`,
-          timeframe,
-          currency: meta.currency || 'USD',
-          exchange: meta.exchangeName || 'NYSE/NASDAQ',
-          price: Number(currentPrice.toFixed(2)),
-          change: Number((currentPrice - prevClose).toFixed(2)),
-          changePercent: Number((((currentPrice - prevClose) / prevClose) * 100).toFixed(2)),
-          previousClose: Number(prevClose.toFixed(2)),
-          dayHigh: dayHigh > 0 ? Number(dayHigh.toFixed(2)) : meta.regularMarketDayHigh ?? currentPrice,
-          dayLow: dayLow < Infinity ? Number(dayLow.toFixed(2)) : meta.regularMarketDayLow ?? currentPrice,
-          pmHigh: pmHigh > 0 ? Number(pmHigh.toFixed(2)) : undefined,
-          pmLow: pmLow < Infinity ? Number(pmLow.toFixed(2)) : undefined,
-          orHigh: orHigh > 0 ? Number(orHigh.toFixed(2)) : undefined,
-          orLow: orLow < Infinity ? Number(orLow.toFixed(2)) : undefined,
-          levels: {
-            pivot,
-            r1,
-            r2,
-            s1,
-            s2,
-            pdh: Number(prevClose * 1.008),
-            pdl: Number(prevClose * 0.992),
-            pdc: Number(prevClose.toFixed(2)),
-          },
-          candles: candles.slice(-500),
-          lastSyncTime: new Date().toLocaleTimeString('en-US', {
-            hour: '2-digit',
-            minute: '2-digit',
-            second: '2-digit',
-            timeZone: 'America/New_York',
-          }) + ' ET',
-        });
+  for (const host of ['query1.finance.yahoo.com', 'query2.finance.yahoo.com']) {
+    try {
+      const yahooUrl =
+        `https://${host}/v8/finance/chart/${encodeURIComponent(ticker)}` +
+        `?range=${range}&interval=${interval}&includePrePost=${extended ? 'true' : 'false'}`;
+      const response = await fetch(yahooUrl, { headers: YAHOO_HEADERS });
+      if (!response.ok) {
+        diagnostics.push({ provider: 'yahoo', category: diagnosticCategory(response.status), httpStatus: response.status });
+        continue;
       }
+      const payload = await response.json();
+      const result = payload?.chart?.result?.[0];
+      const timestamps: unknown[] = Array.isArray(result?.timestamp) ? result.timestamp : [];
+      const quote = result?.indicators?.quote?.[0] || {};
+      const candles = buildCandles(
+        timestamps.map((timestamp, index) => ({
+          timestampMs: Number(timestamp) * 1000,
+          open: quote.open?.[index],
+          high: quote.high?.[index],
+          low: quote.low?.[index],
+          close: quote.close?.[index],
+          volume: quote.volume?.[index],
+        }))
+      );
+      if (candles.length > 0) return sendVerifiedCandles('Yahoo Finance Chart API', candles);
+      diagnostics.push({ provider: 'yahoo', category: 'malformed_payload' });
+    } catch {
+      diagnostics.push({ provider: 'yahoo', category: 'network' });
     }
-
-    throw new Error('Live Yahoo Candle stream unavailable');
-  } catch (err: any) {
-    console.warn(`[CandleAPI] Candle fetch failure for ${ticker} (${timeframe}):`, err.message);
-
-    return res.status(503).json({
-      source: 'Market Real-Time Proxy Engine',
-      status: 'UNAVAILABLE',
-      ticker,
-      name: `${ticker} Stock`,
-      timeframe,
-      currency: 'USD',
-      exchange: 'US Equities',
-      price: null,
-      change: 0,
-      changePercent: 0,
-      previousClose: null,
-      candles: [],
-      error: 'Candle data temporarily unavailable from upstream providers.',
-      timestamp: Date.now(),
-    });
   }
+
+  return res.status(503).json({
+    source: 'Market Data Proxy',
+    status: 'UNAVAILABLE',
+    ticker,
+    timeframe,
+    price: null,
+    change: null,
+    changePercent: null,
+    previousClose: null,
+    dayHigh: null,
+    dayLow: null,
+    candles: [],
+    diagnostics,
+    error: {
+      code: 'HISTORICAL_MARKET_DATA_UNAVAILABLE',
+      message: 'Historical candle data is unavailable from upstream providers.',
+    },
+    timestamp: new Date().toISOString(),
+  });
 });
 
 // AI Structured Chart Analysis endpoint
@@ -843,38 +790,11 @@ app.post('/api/ai/analyze-chart', async (req, res) => {
     const ai = getAI();
 
     if (!ai) {
-      // Deterministic institutional analysis fallback
-      const isAboveVwap = Number(currentPrice) >= Number(vwap);
-      const isRsiBullish = Number(rsi) >= 50 && Number(rsi) <= 70;
-      return res.json({
-        currentTrend: `${trend} (${timeframe} Chart)`,
-        bullishSignals: [
-          `Price ($${currentPrice}) is trading ${isAboveVwap ? 'above' : 'near'} session VWAP ($${vwap}).`,
-          `9 EMA ($${ema9}) is stacked above 20 EMA ($${ema20}), signaling short-term momentum.`,
-          `RSI(14) at ${rsi} demonstrates steady buying pressure without immediate exhaustion.`,
-          `Relative volume at ${relativeVolume}x confirms institutional order flow participation.`,
-        ],
-        bearishSignals: [
-          `Overhead resistance at ${resistanceLevels[0] || `$${(Number(currentPrice) * 1.006).toFixed(2)}`} presents supply overhang.`,
-          `Any loss of VWAP ($${vwap}) risks cascading liquidation towards ${supportLevels[0] || `$${(Number(currentPrice) * 0.994).toFixed(2)}`}.`,
-        ],
-        importantSupport: [
-          `S1: ${supportLevels[0] || `$${(Number(currentPrice) * 0.995).toFixed(2)}`}`,
-          `Session VWAP: $${vwap}`,
-          `S2: ${supportLevels[1] || `$${(Number(currentPrice) * 0.99).toFixed(2)}`}`,
-        ],
-        importantResistance: [
-          `R1: ${resistanceLevels[0] || `$${(Number(currentPrice) * 1.005).toFixed(2)}`}`,
-          `R2: ${resistanceLevels[1] || `$${(Number(currentPrice) * 1.01).toFixed(2)}`}`,
-        ],
-        breakoutLevel: resistanceLevels[0] || `$${(Number(currentPrice) * 1.005).toFixed(2)}`,
-        breakdownLevel: supportLevels[0] || `$${(Number(currentPrice) * 0.995).toFixed(2)}`,
-        momentum: isAboveVwap && isRsiBullish ? 'Strong Bullish' : 'Moderate / Neutral',
-        volumeConfirmation: Number(relativeVolume) >= 1.2 ? 'Confirmed (High Volume)' : 'Moderate / Normal Volume',
-        risk: 'Moderate Risk — Wait for candle close confirmation outside key levels.',
-        aiExplanation: `On the ${timeframe} timeframe, ${ticker} exhibits a ${trend.toLowerCase()} regime structured by ${marketStructure.toLowerCase()}. Price holds ${isAboveVwap ? 'above' : 'below'} VWAP ($${vwap}), which serves as the primary intraday inflection line. Key resistance at ${resistanceLevels[0] || 'R1'} requires sustained volume expansion (>1.25x) for continuation, while a decisive breakdown below ${supportLevels[0] || 'S1'} invalidates the immediate bullish structure.`,
-        timestamp: new Date().toLocaleTimeString('en-US', { timeZone: 'America/New_York' }) + ' ET',
-        source: 'MarketMind Structured Quantitative Engine',
+      return res.status(503).json({
+        error: {
+          code: 'AI_PROVIDER_UNAVAILABLE',
+          message: 'Chart analysis is unavailable because no AI provider is configured.',
+        },
       });
     }
 
@@ -920,7 +840,9 @@ Return a comprehensive, institutional-grade probabilistic chart analysis in JSON
   "volumeConfirmation": "Confirmed with above-average volume / Unconfirmed",
   "risk": "Assessment of risk-to-reward ratio and volatility risk",
   "aiExplanation": "3-4 concise sentences detailing the institutional trade context, key pivot behavior, and exact confirmation triggers."
-}`;
+}
+
+Use only numeric market values present in the supplied payload. If an input or level is missing, label it unavailable; never infer, estimate, or invent a price, indicator, volume, or price movement.`;
 
     const response = await ai.models.generateContent({
       model: getGeminiModel(),
@@ -938,190 +860,47 @@ Return a comprehensive, institutional-grade probabilistic chart analysis in JSON
     });
   } catch (error: any) {
     console.error('AI Analyze Chart error:', error?.message);
-    const { ticker = 'SPY', timeframe = '5M', currentPrice = null, vwap = null } = req.body;
-    if (!currentPrice) {
-      return res.status(503).json({ error: 'AI Chart analysis unavailable without verified current price.' });
-    }
-    return res.json({
-      currentTrend: `Consolidation (${timeframe})`,
-      bullishSignals: vwap ? [`Price ($${currentPrice}) relative to session VWAP ($${vwap}).`] : [`Current price is $${currentPrice}.`],
-      bearishSignals: [`Monitor supply near resistance levels.`],
-      importantSupport: vwap ? [`VWAP: $${vwap}`, `S1 Support`] : [`S1 Support`],
-      importantResistance: [`R1 Resistance`, `Day High`],
-      breakoutLevel: `$${(Number(currentPrice) * 1.006).toFixed(2)}`,
-      breakdownLevel: `$${(Number(currentPrice) * 0.994).toFixed(2)}`,
-      momentum: 'Neutral/Quantitative Baseline',
-      volumeConfirmation: 'Standard Volume',
-      risk: 'Moderate Risk',
-      aiExplanation: `${ticker} technical structure evaluated at $${currentPrice} on the ${timeframe} timeframe.`,
-      timestamp: new Date().toLocaleTimeString('en-US', { timeZone: 'America/New_York' }) + ' ET',
-      source: 'MarketMind Verified Technical Baseline',
+    return res.status(503).json({
+      error: {
+        code: 'AI_ANALYSIS_UNAVAILABLE',
+        message: 'Chart analysis is temporarily unavailable.',
+      },
     });
   }
 });
 
-// Real-Time Live Quote & Intraday Chart endpoint (Yahoo Finance & Google Finance bridge)
+// Backward-compatible live quote alias. Both web and shared clients use the same
+// provider-backed router and normalization path.
 app.get('/api/market/live/:ticker', async (req, res) => {
   const ticker = (req.params.ticker || 'SPY').toUpperCase().trim();
-  const massiveKey = getMassiveApiKey();
-
-  // 1. Try Massive Snapshot if API key is provided
-  if (massiveKey) {
-    try {
-      const snapUrl = `https://api.polygon.io/v2/snapshot/locale/us/markets/stocks/tickers/${encodeURIComponent(
-        ticker
-      )}?apiKey=${encodeURIComponent(massiveKey)}`;
-      const snapRes = await fetch(snapUrl);
-      if (snapRes.ok) {
-        const snapData = await snapRes.json();
-        const t = snapData?.ticker;
-        const currentPrice = t?.min?.c ?? t?.day?.c ?? t?.prevDay?.c;
-        if (t && currentPrice && currentPrice > 0) {
-          const prevClose = t.prevDay?.c ?? currentPrice;
-          const change = Number((t.todaysChange ?? (currentPrice - prevClose)).toFixed(2));
-          const changePercent = Number((t.todaysChangePerc ?? (((currentPrice - prevClose) / prevClose) * 100)).toFixed(2));
-
-          return res.json({
-            source: 'Massive / Polygon Real-Time Snapshot API',
-            status: 'SUCCESS',
-            ticker,
-            name: `${ticker} Equity`,
-            currency: 'USD',
-            exchangeName: 'US Equities',
-            price: Number(currentPrice.toFixed(2)),
-            change,
-            changePercent,
-            previousClose: Number(prevClose.toFixed(2)),
-            dayHigh: Number((t.day?.h ?? currentPrice).toFixed(2)),
-            dayLow: Number((t.day?.l ?? currentPrice).toFixed(2)),
-            volume: t.day?.v ?? 0,
-            marketState: 'REGULAR',
-            lastSyncTime: new Date().toLocaleTimeString('en-US', {
-              hour: '2-digit',
-              minute: '2-digit',
-              second: '2-digit',
-              timeZone: 'America/New_York',
-            }) + ' ET',
-          });
-        }
-      }
-    } catch (err: any) {
-      console.warn(`[MassiveSnapshot] Failed for ${ticker}:`, err.message);
-    }
-  }
-
-  // 2. Fallback to Yahoo Finance / Real-Time Proxy
   try {
-    const yahooUrl = `https://query1.finance.yahoo.com/v8/finance/chart/${encodeURIComponent(
-      ticker
-    )}?range=1d&interval=2m&includePrePost=true`;
-
-    const response = await fetch(yahooUrl, {
-      headers: YAHOO_HEADERS,
-    });
-
-    if (response.ok) {
-      const data = await response.json();
-      const result = data?.chart?.result?.[0];
-      if (result) {
-        const meta = result.meta || {};
-        const timestamps: number[] = result.timestamp || [];
-        const quoteObj = result.indicators?.quote?.[0] || {};
-        const closes: (number | null)[] = quoteObj.close || [];
-        const opens: (number | null)[] = quoteObj.open || [];
-        const highs: (number | null)[] = quoteObj.high || [];
-        const lows: (number | null)[] = quoteObj.low || [];
-        const volumes: (number | null)[] = quoteObj.volume || [];
-
-        const currentPrice = meta.regularMarketPrice ?? meta.previousClose;
-        if (!currentPrice || currentPrice <= 0) {
-          throw new Error(`No valid real-time market price found for ${ticker}`);
-        }
-        const prevClose = meta.chartPreviousClose ?? meta.previousClose ?? currentPrice;
-        const change = Number((currentPrice - prevClose).toFixed(2));
-        const changePercent = Number(((change / prevClose) * 100).toFixed(2));
-        const dayHigh = meta.regularMarketDayHigh ?? Math.max(...highs.filter(Boolean) as number[], currentPrice);
-        const dayLow = meta.regularMarketDayLow ?? Math.min(...lows.filter(Boolean) as number[], currentPrice);
-        const volume = meta.regularMarketVolume ?? volumes.reduce((acc, v) => acc + (v || 0), 0);
-
-        // Build 1m/2m chart candles
-        const chartData = timestamps
-          .map((ts, idx) => {
-            const closeVal = closes[idx];
-            if (closeVal == null) return null;
-            const date = new Date(ts * 1000);
-            return {
-              time: date.toLocaleTimeString('en-US', {
-                hour: '2-digit',
-                minute: '2-digit',
-                timeZone: 'America/New_York',
-              }),
-              timestamp: ts,
-              price: Number(closeVal.toFixed(2)),
-              open: Number((opens[idx] ?? closeVal).toFixed(2)),
-              high: Number((highs[idx] ?? closeVal).toFixed(2)),
-              low: Number((lows[idx] ?? closeVal).toFixed(2)),
-              volume: volumes[idx] ?? 0,
-            };
-          })
-          .filter(Boolean);
-
-        return res.json({
-          source: 'Yahoo Finance Live API',
-          status: 'SUCCESS',
-          ticker,
-          name: meta.longName || meta.shortName || `${ticker} Stock`,
-          currency: meta.currency || 'USD',
-          exchangeName: meta.exchangeName || 'NYSE/NASDAQ',
-          price: Number(currentPrice.toFixed(2)),
-          change,
-          changePercent,
-          previousClose: Number(prevClose.toFixed(2)),
-          dayHigh: Number(dayHigh.toFixed(2)),
-          dayLow: Number(dayLow.toFixed(2)),
-          volume,
-          marketState: meta.marketState || 'REGULAR',
-          fiftyTwoWeekHigh: meta.fiftyTwoWeekHigh,
-          fiftyTwoWeekLow: meta.fiftyTwoWeekLow,
-          chartData: chartData.length > 0 ? chartData : undefined,
-          lastSyncTime: new Date().toLocaleTimeString('en-US', {
-            hour: '2-digit',
-            minute: '2-digit',
-            second: '2-digit',
-            timeZone: 'America/New_York',
-          }) + ' ET',
-        });
-      }
+    const response = await DataProviderRouter.getQuote(ticker);
+    if (!response?.entitlementStatus.isAvailable || response.quote.metadata?.validationStatus !== 'VALID') {
+      return res.status(503).json(publicMarketDataFailure(new Error('UNAVAILABLE'), ticker));
     }
 
-    // Fail closed if Yahoo returned non-200 or parsing failed
-    throw new Error('Live endpoint unavailable');
-  } catch (err: any) {
-    console.warn(`[LiveMarket] Quote fetch failure for ${ticker}:`, err.message);
-
-    return res.status(503).json({
-      source: 'Market Real-Time Proxy Engine',
-      status: 'UNAVAILABLE',
-      ticker,
-      name: `${ticker} Equity`,
-      currency: 'USD',
-      exchangeName: 'US Equities',
-      price: null,
-      change: 0,
-      changePercent: 0,
-      previousClose: null,
-      dayHigh: null,
-      dayLow: null,
-      volume: 0,
-      marketState: 'UNAVAILABLE',
-      error: 'Live quote temporarily unavailable from upstream provider.',
-      lastSyncTime: new Date().toLocaleTimeString('en-US', {
-        hour: '2-digit',
-        minute: '2-digit',
-        second: '2-digit',
-        timeZone: 'America/New_York',
-      }) + ' ET',
+    return res.json({
+      status: 'SUCCESS',
+      ticker: response.instrument.symbol,
+      name: response.instrument.name,
+      currency: response.quote.currency,
+      exchangeName: response.instrument.exchange,
+      price: response.quote.price,
+      change: response.quote.change,
+      changePercent: response.quote.changePercent,
+      previousClose: response.quote.previousClose,
+      dayHigh: response.quote.dayHigh,
+      dayLow: response.quote.dayLow,
+      openPrice: response.quote.openPrice,
+      volume: response.quote.volume,
+      marketState: response.quote.marketState,
+      timestamp: response.quote.timestamp,
+      source: response.quote.dataSource,
+      provider: response.quote.metadata?.provider,
+      metadata: response.quote.metadata,
     });
+  } catch (error) {
+    return res.status(503).json(publicMarketDataFailure(error, ticker));
   }
 });
 
@@ -1138,16 +917,37 @@ app.get('/api/market/tape', async (req, res) => {
       const data = await response.json();
       const quotes = data?.quoteResponse?.result || [];
       if (quotes.length > 0) {
-        const tape = quotes.map((q: any) => ({
-          symbol: q.symbol,
-          name: q.shortName || q.longName || q.symbol,
-          price: q.regularMarketPrice ?? 0,
-          change: Number((q.regularMarketChange ?? 0).toFixed(2)),
-          changePercent: Number((q.regularMarketChangePercent ?? 0).toFixed(2)),
-          volume: q.regularMarketVolume ?? 0,
-          marketState: q.marketState || 'REGULAR',
-        }));
-        return res.json({ source: 'Yahoo Finance Real-Time Tape', quotes: tape, timestamp: Date.now() });
+        const tape = quotes
+          .filter((q: any) => {
+            const price = Number(q.regularMarketPrice);
+            const change = Number(q.regularMarketChange);
+            const changePercent = Number(q.regularMarketChangePercent);
+            const volume = Number(q.regularMarketVolume);
+            const timestamp = Number(q.regularMarketTime);
+            return (
+              Number.isFinite(price) &&
+              price > 0 &&
+              Number.isFinite(change) &&
+              Number.isFinite(changePercent) &&
+              Number.isFinite(volume) &&
+              volume >= 0 &&
+              Number.isFinite(timestamp) &&
+              timestamp > 0
+            );
+          })
+          .map((q: any) => ({
+            symbol: q.symbol,
+            name: q.shortName || q.longName || q.symbol,
+            price: Number(q.regularMarketPrice),
+            change: Number(Number(q.regularMarketChange).toFixed(6)),
+            changePercent: Number(Number(q.regularMarketChangePercent).toFixed(6)),
+            volume: Number(q.regularMarketVolume),
+            marketState: q.marketState || 'CLOSED',
+            timestamp: new Date(Number(q.regularMarketTime) * 1000).toISOString(),
+          }));
+        if (tape.length > 0) {
+          return res.json({ source: 'Yahoo Finance Tape', quotes: tape, timestamp: new Date().toISOString() });
+        }
       }
     }
     throw new Error('Yahoo quote batch fallback');
@@ -1759,50 +1559,12 @@ app.post('/api/ai/report', async (req, res) => {
     const ai = getAI();
 
     if (!ai) {
-      const price = marketState?.price || marketState?.preMarket || null;
-      if (!price) {
-        return res.status(503).json({ error: 'Market report unavailable without verified price.' });
-      }
-      if (type === 'morning') {
-        return res.json({
-          title: `Morning Market Intelligence Report: ${marketState?.ticker || 'SPY'}`,
-          bias: 'NEUTRAL / MONITORING',
-          riskLevel: 'MODERATE',
-          preMarketPrice: price,
-          overnightFutures: 'Futures data aligned with baseline session.',
-          overnightNews: 'Market participants awaiting standard opening session catalysts.',
-          economicCalendar: 'Refer to institutional macroeconomic calendar for upcoming releases.',
-          keyLevels: {
-            pivot: price,
-            resistance1: Number((price * 1.008).toFixed(2)),
-            resistance2: Number((price * 1.015).toFixed(2)),
-            support1: Number((price * 0.992).toFixed(2)),
-            support2: Number((price * 0.985).toFixed(2)),
-          },
-          bullishScenario: `Hold above $${Number((price * 1.004).toFixed(2))} with relative volume confirmation.`,
-          bearishScenario: `Breakdown below $${Number((price * 0.992).toFixed(2))} indicates risk-off pressure.`,
-          summary: `Pre-market structure for ${marketState?.ticker || 'SPY'} evaluated at $${price}. Monitor the opening range before executing trades.`,
-          source: 'MarketMind Intelligence Engine (Verified Baseline Pipeline)',
-        });
-      } else {
-        return res.json({
-          title: `End-of-Day Market Performance Review: ${marketState?.ticker || 'SPY'}`,
-          outcome: 'Session Review',
-          closingPrice: price,
-          dayRange: `${marketState?.dayLow || Number((price * 0.99).toFixed(2))} - ${marketState?.dayHigh || Number((price * 1.01).toFixed(2))}`,
-          whyMarketMoved: 'Daily price movement evaluated against institutional breadth and sector performance.',
-          strongestSectors: ['Technology', 'Financials'],
-          weakestSectors: ['Utilities', 'Energy'],
-          predictionAccuracy: 'Analysis aligned with prevailing market structure.',
-          lessonsLearned: 'Risk management and key level adherence remain paramount.',
-          tomorrowLevels: {
-            majorResistance: Number((price * 1.01).toFixed(2)),
-            keyPivot: price,
-            majorSupport: Number((price * 0.99).toFixed(2)),
-          },
-          source: 'MarketMind Intelligence Engine (EOD Verified Baseline)',
-        });
-      }
+      return res.status(503).json({
+        error: {
+          code: 'AI_PROVIDER_UNAVAILABLE',
+          message: 'Market report generation is unavailable because no AI provider is configured.',
+        },
+      });
     }
 
     const prompt = `Generate a comprehensive, structured financial market report for ${type.toUpperCase()} report.
@@ -1810,7 +1572,8 @@ Context:
 Ticker: ${marketState?.ticker || 'SPY'}
 Current State: ${JSON.stringify(marketState)}
 
-Respond in valid JSON format matching the schema for a professional trading desk report.`;
+Respond in valid JSON format matching the schema for a professional trading desk report.
+Use only market prices, movements, volume, breadth, technical indicators, and news evidence explicitly present in the supplied context. Label missing values unavailable; never infer or invent them.`;
 
     const response = await ai.models.generateContent({
       model: getGeminiModel(),
@@ -2660,7 +2423,17 @@ function getRealtimeServerManager(): RealtimeServerManager {
 
 // Endpoint to inspect or trigger active Massive stream
 app.get('/api/market/massive/signals', (req, res) => {
-  res.json(getMassiveWsManager().getCalculatedSignals());
+  const signals = getMassiveWsManager().getVerifiedSignals();
+  if (!signals) {
+    return res.status(503).json({
+      status: 'UNAVAILABLE',
+      error: {
+        code: 'VERIFIED_STREAM_SIGNALS_UNAVAILABLE',
+        message: 'Verified stream-derived indicators are unavailable.',
+      },
+    });
+  }
+  return res.json(signals);
 });
 
 app.post('/api/market/massive/subscribe', (req, res) => {

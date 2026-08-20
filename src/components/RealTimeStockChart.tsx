@@ -165,6 +165,7 @@ export const RealTimeStockChart: React.FC<RealTimeStockChartProps> = ({
   // Real-time Breakout Alerts
   const [breakoutAlert, setBreakoutAlert] = useState<BreakoutAlert | null>(null);
   const prevPriceRef = useRef<number>(0);
+  const previousCloseRef = useRef<number | null>(null);
 
   // AI Chart Analysis modal state
   const [isAiModalOpen, setIsAiModalOpen] = useState<boolean>(false);
@@ -466,6 +467,7 @@ export const RealTimeStockChart: React.FC<RealTimeStockChartProps> = ({
         setLiveChange(res.change);
         setLiveChangePercent(res.changePercent);
         prevPriceRef.current = res.price;
+        previousCloseRef.current = res.previousClose;
         setMarketStatus('LIVE');
         setLastUpdateStr(res.lastSyncTime || new Date().toLocaleTimeString('en-US', { timeZone: 'America/New_York' }) + ' ET');
       } else {
@@ -473,6 +475,7 @@ export const RealTimeStockChart: React.FC<RealTimeStockChartProps> = ({
         setLivePrice(null);
         setLiveChange(null);
         setLiveChangePercent(null);
+        previousCloseRef.current = null;
         setMarketStatus('LIVE DATA UNAVAILABLE');
         setConnectionMessage('Live Market Data Unavailable');
       }
@@ -482,6 +485,7 @@ export const RealTimeStockChart: React.FC<RealTimeStockChartProps> = ({
       setLivePrice(null);
       setLiveChange(null);
       setLiveChangePercent(null);
+      previousCloseRef.current = null;
       setMarketStatus('LIVE DATA UNAVAILABLE');
       setConnectionMessage('Reconnecting to market data...');
     } finally {
@@ -785,10 +789,15 @@ export const RealTimeStockChart: React.FC<RealTimeStockChartProps> = ({
         setTimeout(() => setPriceFlash(null), 400);
 
         setLivePrice(p);
-        const openRef = candles.length > 0 ? candles[0].open : p;
-        const chg = p - openRef;
-        setLiveChange(Number(chg.toFixed(2)));
-        setLiveChangePercent(Number(((chg / openRef) * 100).toFixed(2)));
+        const previousClose = previousCloseRef.current;
+        if (previousClose !== null && previousClose > 0) {
+          const chg = p - previousClose;
+          setLiveChange(Number(chg.toFixed(6)));
+          setLiveChangePercent(Number(((chg / previousClose) * 100).toFixed(6)));
+        } else {
+          setLiveChange(null);
+          setLiveChangePercent(null);
+        }
         setLastUpdateStr(
           new Date().toLocaleTimeString('en-US', {
             hour: '2-digit',
@@ -822,15 +831,17 @@ export const RealTimeStockChart: React.FC<RealTimeStockChartProps> = ({
         // Re-evaluate breakout alerts against live tick
         const vwapLine = calculateVWAP(candles);
         const vwap = vwapLine.length > 0 ? vwapLine[vwapLine.length - 1].value : p;
-        const alert = checkRealTimeBreakouts(
-          ticker,
-          p,
-          prevPriceRef.current,
-          levels,
-          vwap,
-          marketStructure.relativeVolume
-        );
-        if (alert) setBreakoutAlert(alert);
+        if (marketStructure.relativeVolume !== null) {
+          const alert = checkRealTimeBreakouts(
+            ticker,
+            p,
+            prevPriceRef.current,
+            levels,
+            vwap,
+            marketStructure.relativeVolume
+          );
+          if (alert) setBreakoutAlert(alert);
+        }
         prevPriceRef.current = p;
       },
       subscriberUID
@@ -891,6 +902,9 @@ export const RealTimeStockChart: React.FC<RealTimeStockChartProps> = ({
     setIsAiModalOpen(true);
     setIsAiLoading(true);
     try {
+      if (candles.length < 5 || marketStructure.relativeVolume === null) {
+        throw new Error('Verified candle data is unavailable for analysis.');
+      }
       const vwapLine = calculateVWAP(candles);
       const vwapVal = vwapLine.length > 0 ? vwapLine[vwapLine.length - 1].value : (livePrice ?? 0);
       const ema9Val = calculateEMA(candles, 9).pop()?.value || (livePrice ?? 0);
@@ -911,14 +925,12 @@ export const RealTimeStockChart: React.FC<RealTimeStockChartProps> = ({
         macd: currentMacd,
         volume: candles.length > 0 ? candles[candles.length - 1].volume : 0,
         relativeVolume: marketStructure.relativeVolume,
-        supportLevels: [
-          levels.s1 ? `$${levels.s1.toFixed(2)}` : livePrice !== null && livePrice > 0 ? `$${(livePrice * 0.995).toFixed(2)}` : '$0.00',
-          levels.s2 ? `$${levels.s2.toFixed(2)}` : livePrice !== null && livePrice > 0 ? `$${(livePrice * 0.99).toFixed(2)}` : '$0.00',
-        ],
-        resistanceLevels: [
-          levels.r1 ? `$${levels.r1.toFixed(2)}` : livePrice !== null && livePrice > 0 ? `$${(livePrice * 1.005).toFixed(2)}` : '$0.00',
-          levels.r2 ? `$${levels.r2.toFixed(2)}` : livePrice !== null && livePrice > 0 ? `$${(livePrice * 1.01).toFixed(2)}` : '$0.00',
-        ],
+        supportLevels: [levels.s1, levels.s2]
+          .filter((level): level is number => typeof level === 'number' && Number.isFinite(level))
+          .map((level) => `$${level.toFixed(2)}`),
+        resistanceLevels: [levels.r1, levels.r2]
+          .filter((level): level is number => typeof level === 'number' && Number.isFinite(level))
+          .map((level) => `$${level.toFixed(2)}`),
         trend: marketStructure.trend,
         marketStructure: marketStructure.structure,
         candles,
@@ -1218,7 +1230,8 @@ export const RealTimeStockChart: React.FC<RealTimeStockChartProps> = ({
           {/* ANALYZE CHART AI Button */}
           <button
             onClick={handleTriggerAiAnalysis}
-            className="px-3 py-1 bg-gradient-to-r from-[#6366f1] to-[#8b5cf6] hover:from-[#4f46e5] hover:to-[#7c3aed] text-white font-bold text-xs rounded shadow flex items-center gap-1.5 transition"
+            disabled={candles.length < 5}
+            className="px-3 py-1 bg-gradient-to-r from-[#6366f1] to-[#8b5cf6] hover:from-[#4f46e5] hover:to-[#7c3aed] disabled:opacity-40 disabled:cursor-not-allowed text-white font-bold text-xs rounded shadow flex items-center gap-1.5 transition"
             title="Send structured candlestick & indicator data to Gemini AI Analyst"
           >
             <Sparkles className="w-3.5 h-3.5" />
@@ -1280,7 +1293,9 @@ export const RealTimeStockChart: React.FC<RealTimeStockChartProps> = ({
           <div className="flex items-center gap-1.5 hidden xl:flex">
             <span className="text-[10px] text-slate-400 uppercase font-semibold">Volume:</span>
             <span className="font-mono font-bold text-slate-200">
-              {marketStructure.volumeCondition} ({marketStructure.relativeVolume}x)
+              {marketStructure.relativeVolume === null
+                ? 'Unavailable'
+                : `${marketStructure.volumeCondition} (${marketStructure.relativeVolume}x)`}
             </span>
           </div>
         </div>
@@ -1289,7 +1304,9 @@ export const RealTimeStockChart: React.FC<RealTimeStockChartProps> = ({
         <div className="flex items-center gap-2">
           <span className="text-[10px] font-mono text-slate-400">Multi-Timeframe Alignment:</span>
           <span className="font-mono font-bold text-emerald-400 text-xs px-2 py-0.5 bg-emerald-500/10 border border-emerald-500/30 rounded">
-            {marketStructure.overallAlignmentScore}% {marketStructure.overallBias}
+            {marketStructure.overallAlignmentScore === null
+              ? 'Unavailable'
+              : `${marketStructure.overallAlignmentScore}% ${marketStructure.overallBias}`}
           </span>
           <div className="hidden 2xl:flex items-center gap-1">
             {marketStructure.multiTimeframeAlignment.slice(0, 5).map((m) => (
@@ -1448,10 +1465,12 @@ export const RealTimeStockChart: React.FC<RealTimeStockChartProps> = ({
                   : 'text-slate-200'
               }`}
             >
-              {currentRsi.toFixed(1)}
+              {rsiValues.length > 0 ? currentRsi.toFixed(1) : 'Unavailable'}
             </span>
             <span className="text-[10px] text-slate-500 font-normal">
-              ({currentRsi > 70 ? 'Overbought' : currentRsi < 30 ? 'Oversold' : 'Neutral Momentum'})
+              {rsiValues.length > 0
+                ? `(${currentRsi > 70 ? 'Overbought' : currentRsi < 30 ? 'Oversold' : 'Neutral Momentum'})`
+                : ''}
             </span>
           </div>
           {/* Visual RSI bar */}
@@ -1460,7 +1479,7 @@ export const RealTimeStockChart: React.FC<RealTimeStockChartProps> = ({
               className={`h-full ${
                 currentRsi > 70 ? 'bg-rose-500' : currentRsi < 30 ? 'bg-emerald-500' : 'bg-[#6366f1]'
               }`}
-              style={{ width: `${currentRsi}%` }}
+              style={{ width: `${rsiValues.length > 0 ? currentRsi : 0}%` }}
             />
           </div>
         </div>
@@ -1473,11 +1492,12 @@ export const RealTimeStockChart: React.FC<RealTimeStockChartProps> = ({
                 currentMacd >= 0 ? 'text-emerald-400' : 'text-rose-400'
               }`}
             >
-              {currentMacd >= 0 ? '+' : ''}
-              {currentMacd.toFixed(2)}
+              {macdValues.histogram.length > 0 ? `${currentMacd >= 0 ? '+' : ''}${currentMacd.toFixed(2)}` : 'Unavailable'}
             </span>
             <span className="text-[10px] text-slate-500 font-normal">
-              ({currentMacd >= 0 ? 'Bullish Histogram' : 'Bearish Momentum'})
+              {macdValues.histogram.length > 0
+                ? `(${currentMacd >= 0 ? 'Bullish Histogram' : 'Bearish Momentum'})`
+                : ''}
             </span>
           </div>
           <span className="text-[10px] text-slate-400">

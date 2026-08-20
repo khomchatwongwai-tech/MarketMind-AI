@@ -52,12 +52,18 @@ services:
         sync: false
       - key: POLYGON_API_KEY
         sync: false
+      - key: MASSIVE_FEED_DELAY_MINUTES
+        value: "15"
       - key: ALPACA_API_KEY
         sync: false
       - key: ALPACA_API_SECRET
         sync: false
       - key: ALPACA_DATA_FEED
         value: "iex"
+      - key: MARKET_DATA_TIMEOUT_MS
+        value: "8000"
+      - key: YAHOO_MARKET_DATA_ENABLED
+        value: "true"
       - key: MAX_ACTIVE_STREAM_SYMBOLS
         value: "30"
       - key: INSTRUMENT_SYNC_PROVIDER
@@ -65,9 +71,9 @@ services:
       - key: ALLOW_SIMULATED_MARKET_DATA
         value: "false"
       - key: MARKET_DATA_MODE
-        value: end_of_day
+        value: real_time
       - key: VITE_MARKET_DATA_MODE
-        value: end_of_day
+        value: real_time
       - key: FINNHUB_API_KEY
         sync: false
       - key: BENZINGA_API_KEY

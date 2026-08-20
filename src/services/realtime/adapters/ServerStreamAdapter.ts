@@ -219,12 +219,16 @@ export class ServerStreamAdapter extends BaseRealTimeAdapter {
     const symbol = (msg.symbol || msg.ticker || msg.s || '').toUpperCase();
     if (!symbol) return null;
 
-    const price = Number(msg.price ?? msg.last ?? msg.p ?? msg.close ?? 0);
+    const price = Number(msg.price ?? msg.last ?? msg.p ?? msg.close);
     if (isNaN(price) || price <= 0) return null;
 
-    const timestamp = Number(msg.timestamp || msg.t || Date.now());
+    const timestamp = Number(msg.timestamp ?? msg.t);
+    if (!Number.isFinite(timestamp) || timestamp <= 0) return null;
     const session = MarketSessionEngine.getSessionForSymbol(symbol, new Date(timestamp));
-    const freshness = MarketSessionEngine.evaluateFreshness(symbol, timestamp, Date.now(), 'REAL_TIME');
+    const declaredMode = ['REAL_TIME', 'DELAYED', 'CACHED', 'CLOSED'].includes(msg.mode)
+      ? msg.mode
+      : 'UNAVAILABLE';
+    const freshness = MarketSessionEngine.evaluateFreshness(symbol, timestamp, Date.now(), declaredMode);
 
     return {
       symbol,
@@ -254,10 +258,11 @@ export class ServerStreamAdapter extends BaseRealTimeAdapter {
     const symbol = (msg.symbol || msg.ticker || msg.s || '').toUpperCase();
     if (!symbol) return null;
 
-    const price = Number(msg.price ?? msg.p ?? 0);
+    const price = Number(msg.price ?? msg.p);
     if (isNaN(price) || price <= 0) return null;
 
-    const timestamp = Number(msg.timestamp || msg.t || Date.now());
+    const timestamp = Number(msg.timestamp ?? msg.t);
+    if (!Number.isFinite(timestamp) || timestamp <= 0) return null;
 
     return {
       symbol,
@@ -265,7 +270,7 @@ export class ServerStreamAdapter extends BaseRealTimeAdapter {
       size: msg.size != null ? Number(msg.size) : undefined,
       timestamp,
       provider: msg.provider || 'MarketMind Provider Gateway',
-      mode: 'REAL_TIME',
+      mode: ['REAL_TIME', 'DELAYED', 'CACHED', 'CLOSED'].includes(msg.mode) ? msg.mode : 'UNAVAILABLE',
       exchange: msg.exchange || msg.x,
       conditions: msg.conditions || msg.c,
     };

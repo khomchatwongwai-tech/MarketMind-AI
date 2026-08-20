@@ -218,7 +218,8 @@ export function calculateVWAP(
   for (let i = 0; i < candles.length; i++) {
     const c = candles[i];
     const typical = (c.high + c.low + c.close) / 3;
-    const vol = c.volume || 1;
+    const vol = Number(c.volume);
+    if (!Number.isFinite(vol) || vol <= 0) continue;
     cumPV += typical * vol;
     cumVol += vol;
     const vwapVal = Number((cumPV / cumVol).toFixed(2));
@@ -239,23 +240,16 @@ export function evaluateMarketStructure(
   if (!candles || candles.length < 5) {
     return {
       timeframe: timeframeStr,
-      trend: 'Uptrend',
-      structure: 'Higher highs / higher lows',
-      priceVsVwap: 'Above',
-      vwapConditionText: 'Price above VWAP → Bullish intraday condition',
-      momentum: 'Strong',
-      volumeCondition: 'Above Average',
-      relativeVolume: 1.4,
-      multiTimeframeAlignment: [
-        { timeframe: '1M', bias: 'Bullish', score: 82 },
-        { timeframe: '5M', bias: 'Bullish', score: 78 },
-        { timeframe: '15M', bias: 'Bullish', score: 74 },
-        { timeframe: '1H', bias: 'Bullish', score: 80 },
-        { timeframe: '4H', bias: 'Neutral', score: 62 },
-        { timeframe: 'Daily', bias: 'Bullish', score: 85 },
-      ],
-      overallAlignmentScore: 77,
-      overallBias: 'Bullish',
+      trend: 'Unavailable',
+      structure: 'Unavailable',
+      priceVsVwap: 'Unavailable',
+      vwapConditionText: 'Verified candle data unavailable',
+      momentum: 'Unavailable',
+      volumeCondition: 'Unavailable',
+      relativeVolume: null,
+      multiTimeframeAlignment: [],
+      overallAlignmentScore: null,
+      overallBias: 'Unavailable',
     };
   }
 

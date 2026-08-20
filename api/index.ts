@@ -1,4 +1,3 @@
-import { createRequire } from 'module';
 import { normalizeApiUrl } from '../src/utils/apiUrlNormalizer.js';
 
 let appPromise: Promise<any> | null = null;
@@ -7,8 +6,8 @@ async function getApp() {
   if (!appPromise) {
     appPromise = (async () => {
       try {
-        const require = createRequire(import.meta.url);
-        const mod = require('../dist/server.cjs');
+        // @ts-ignore
+        const mod = await import('../dist/server.cjs');
         return mod.app || mod.default || mod;
       } catch (err1) {
         console.warn('[Vercel Serverless] Falling back to server.js due to:', err1);

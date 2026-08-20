@@ -65,6 +65,6 @@ test('/api/ready reports sanitized market-data diagnostics when providers are un
   assert.equal(result.body.marketData.operational, false);
   assert.deepEqual(
     result.body.marketData.diagnostics.map((diagnostic: any) => diagnostic.category),
-    ['missing_configuration', 'missing_configuration', 'missing_configuration']
+    ['missing_configuration', 'missing_configuration', 'missing_configuration', 'missing_configuration']
   );
 });

@@ -48,6 +48,7 @@ export interface ProviderSymbolMap {
   massive?: string; // Polygon / Massive (e.g., C:EURUSD, X:BTCUSD, O:SPY260821C00515000, I:SPX)
   finnhub?: string; // Finnhub (e.g., BINANCE:BTCUSDT, OANDA:EUR_USD)
   alpaca?: string;  // Alpaca (e.g., BTCUSD, SPY)
+  robinhood?: string; // Robinhood read-only market-data gateway
   benzinga?: string;
   yahoo?: string;   // Yahoo Finance fallback (e.g., EURUSD=X, BTC-USD, ES=F, ^GSPC, ^TNX)
   cme?: string;     // CME Group (e.g., /ESH25, /ESM26, /CLH25)
@@ -168,7 +169,7 @@ export interface NormalizedInstrument {
 
   // Active status & Feed Entitlements
   activeStatus: InstrumentActiveStatus;
-  primaryProvider: 'massive' | 'finnhub' | 'alpaca' | 'benzinga' | 'yahoo' | 'cme' | 'fred' | 'institutional_engine';
+  primaryProvider: 'massive' | 'finnhub' | 'alpaca' | 'robinhood' | 'benzinga' | 'yahoo' | 'cme' | 'fred' | 'institutional_engine';
   realTimeStatus: RealTimeDataTier;
   feedDelayMinutes: number; // 0 = real-time, 15 = delayed
   isEntitled: boolean;
@@ -208,7 +209,7 @@ export interface InstrumentSearchResultGroup {
 }
 
 export interface ProviderCapability {
-  providerId: 'massive' | 'finnhub' | 'alpaca' | 'benzinga' | 'yahoo' | 'cme' | 'fred';
+  providerId: 'massive' | 'finnhub' | 'alpaca' | 'robinhood' | 'benzinga' | 'yahoo' | 'cme' | 'fred';
   name: string;
   isConfigured: boolean;
   healthStatus: 'HEALTHY' | 'DEGRADED' | 'RATE_LIMITED' | 'OFFLINE';

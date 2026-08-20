@@ -1,4 +1,6 @@
-export type MarketDataProviderId = 'massive' | 'alpaca' | 'yahoo';
+import { RobinhoodMarketDataError, RobinhoodMarketDataService } from './robinhoodMarketDataService.js';
+
+export type MarketDataProviderId = 'massive' | 'alpaca' | 'robinhood' | 'yahoo';
 
 export type MarketDataErrorCategory =
   | 'missing_configuration'
@@ -40,8 +42,12 @@ export interface NormalizedLiveQuote {
   marketSession: 'REGULAR' | 'PRE_MARKET' | 'AFTER_HOURS' | 'CLOSED';
   providerId: MarketDataProviderId;
   providerName: string;
+  /** False unless the provider explicitly confirms a live entitlement. */
   isRealTime: boolean;
-  feedDelayMinutes: number;
+  /** Only set when the provider supplies a verified delay. */
+  feedDelayMinutes?: number;
+  liveStatus?: 'live' | 'delayed' | 'unknown';
+  entitlementStatus?: string;
   latencyMs: number;
 }
 
@@ -79,6 +85,7 @@ interface LiveMarketDataServiceOptions {
 const MASSIVE_NAME = 'Massive / Polygon.io';
 const ALPACA_NAME = 'Alpaca IEX';
 const YAHOO_NAME = 'Yahoo Finance';
+const ROBINHOOD_NAME = 'Robinhood Read-Only Market Data';
 
 function finitePositive(value: unknown): number | null {
   if (value === null || value === undefined || value === '') return null;
@@ -113,6 +120,49 @@ function normalizeTimestamp(value: unknown): number | null {
     if (Number.isFinite(parsed)) return parsed;
   }
   return null;
+}
+
+type RobinhoodTiming = Pick<NormalizedLiveQuote, 'isRealTime' | 'feedDelayMinutes' | 'liveStatus' | 'entitlementStatus'> & { timestamp?: number };
+
+function object(value: unknown): Record<string, unknown> {
+  return value !== null && typeof value === 'object' && !Array.isArray(value) ? value as Record<string, unknown> : {};
+}
+
+function field(metadata: Record<string, unknown>, ...names: string[]): unknown {
+  for (const name of names) if (metadata[name] !== undefined) return metadata[name];
+  return undefined;
+}
+
+function boolean(value: unknown): boolean | null {
+  if (value === true || value === false) return value;
+  if (typeof value === 'string' && /^(true|false)$/i.test(value.trim())) return value.trim().toLowerCase() === 'true';
+  return null;
+}
+
+function robinhoodTiming(...sources: unknown[]): RobinhoodTiming {
+  const metadata = Object.assign({}, ...sources.map(object));
+  const rawLiveStatus = field(metadata, 'liveStatus', 'live_status', 'marketDataStatus', 'market_data_status');
+  const rawRealTime = field(metadata, 'isRealTime', 'is_real_time', 'realtime', 'real_time');
+  const rawDelay = field(metadata, 'feedDelayMinutes', 'feed_delay_minutes', 'delayMinutes', 'delay_minutes');
+  const rawEntitlement = field(metadata, 'entitlementStatus', 'entitlement_status', 'entitlement');
+  const rawStale = field(metadata, 'stale', 'isStale', 'is_stale');
+  const rawTimestamp = field(metadata, 'timestamp', 'providerTimestamp', 'provider_timestamp', 'asOf', 'as_of');
+  const status = typeof rawLiveStatus === 'string' ? rawLiveStatus.trim().toLowerCase() : '';
+  const entitlementStatus = typeof rawEntitlement === 'string' && rawEntitlement.trim() ? rawEntitlement.trim() : undefined;
+  const entitlement = entitlementStatus?.toLowerCase() ?? '';
+  const declaredRealTime = boolean(rawRealTime);
+  const declaredStale = boolean(rawStale);
+  const delay = rawDelay === undefined ? null : finiteNonNegative(rawDelay);
+  if ((rawRealTime !== undefined && declaredRealTime === null) || (rawStale !== undefined && declaredStale === null) || (rawDelay !== undefined && delay === null) || (rawTimestamp !== undefined && normalizeTimestamp(rawTimestamp) === null)) throw new Error('MALFORMED_ROBINHOOD_TIMING');
+  if (declaredStale === true) throw new Error('STALE_ROBINHOOD_QUOTE');
+
+  const saysLive = ['live', 'real_time', 'real-time', 'realtime'].includes(status) || ['live', 'real_time', 'real-time', 'realtime', 'entitled'].includes(entitlement);
+  const saysDelayed = ['delayed', 'delay'].includes(status) || ['delayed', 'delay'].includes(entitlement) || declaredRealTime === false;
+  if ((saysLive && (saysDelayed || delay !== null && delay > 0)) || (saysDelayed && declaredRealTime === true)) throw new Error('CONTRADICTORY_ROBINHOOD_TIMING');
+
+  const liveStatus: RobinhoodTiming['liveStatus'] = saysLive || declaredRealTime === true ? 'live' : saysDelayed ? 'delayed' : 'unknown';
+  if (liveStatus === 'live' && delay !== null && delay > 0) throw new Error('CONTRADICTORY_ROBINHOOD_TIMING');
+  return { isRealTime: liveStatus === 'live', ...(delay === null ? {} : { feedDelayMinutes: delay }), liveStatus, ...(entitlementStatus ? { entitlementStatus } : {}), ...(rawTimestamp === undefined ? {} : { timestamp: normalizeTimestamp(rawTimestamp)! }) };
 }
 
 function sessionFromProvider(value: unknown, now: number): NormalizedLiveQuote['marketSession'] {
@@ -177,6 +227,7 @@ export class LiveMarketDataService {
   private readonly timeoutMs: number;
   private readonly now: () => number;
   private readonly logger: NonNullable<LiveMarketDataServiceOptions['logger']>;
+  private readonly robinhood: RobinhoodMarketDataService;
   private readonly latestDiagnostics = new Map<MarketDataProviderId, MarketDataDiagnostic>();
 
   constructor(options: LiveMarketDataServiceOptions = {}) {
@@ -184,6 +235,7 @@ export class LiveMarketDataService {
     this.fetchFn = options.fetchFn || globalThis.fetch;
     this.timeoutMs = options.timeoutMs || Number(this.env.MARKET_DATA_TIMEOUT_MS) || 8_000;
     this.now = options.now || Date.now;
+    this.robinhood = new RobinhoodMarketDataService({ env: this.env, fetchFn: this.fetchFn, now: this.now });
     this.logger =
       options.logger ||
       ((diagnostic) => {
@@ -195,12 +247,17 @@ export class LiveMarketDataService {
     return {
       massive: Boolean(this.getMassiveApiKey()),
       alpaca: Boolean(this.env.ALPACA_API_KEY?.trim() && this.env.ALPACA_API_SECRET?.trim()),
+      robinhood: this.robinhood.isConfigured(),
       yahoo: this.env.YAHOO_MARKET_DATA_ENABLED !== 'false',
     };
   }
 
   getDiagnostics(): MarketDataDiagnostic[] {
     return Array.from(this.latestDiagnostics.values());
+  }
+
+  getRobinhoodHealth() {
+    return this.robinhood.getHealth();
   }
 
   async getQuote(symbol: string): Promise<NormalizedLiveQuote> {
@@ -216,8 +273,10 @@ export class LiveMarketDataService {
     const configured = this.getConfigurationStatus();
     const attempts: Array<() => Promise<NormalizedLiveQuote>> = [];
 
-    if (configured.massive) attempts.push(() => this.fetchMassiveQuote(clean));
     if (configured.alpaca) attempts.push(() => this.fetchAlpacaQuote(clean));
+    // Schwab is intentionally skipped when no configured adapter is present.
+    if (configured.massive) attempts.push(() => this.fetchMassiveQuote(clean));
+    if (configured.robinhood) attempts.push(() => this.fetchRobinhoodQuote(clean));
     if (configured.yahoo) attempts.push(() => this.fetchYahooQuote(clean));
 
     if (!configured.massive) {
@@ -225,6 +284,9 @@ export class LiveMarketDataService {
     }
     if (!configured.alpaca) {
       diagnostics.push(this.makeDiagnostic('alpaca', 'missing_configuration', false, 0));
+    }
+    if (!configured.robinhood) {
+      diagnostics.push(this.makeDiagnostic('robinhood', 'missing_configuration', false, 0));
     }
 
     for (const attempt of attempts) {
@@ -533,6 +595,54 @@ export class LiveMarketDataService {
       },
       started
     );
+  }
+
+  async fetchRobinhoodQuote(symbol: string): Promise<NormalizedLiveQuote> {
+    const provider: MarketDataProviderId = 'robinhood';
+    const started = this.now();
+    try {
+      const [quotePayload, fundamentalsPayload] = await Promise.all([
+        this.robinhood.getEquityQuotes([symbol]),
+        this.robinhood.getEquityFundamentals([symbol]),
+      ]);
+      const quoteRow = quotePayload?.data?.results?.[0] ?? quotePayload?.results?.[0];
+      const quote = quoteRow?.quote ?? quoteRow;
+      const fundamentalRow = fundamentalsPayload?.data?.results?.[0] ?? fundamentalsPayload?.results?.[0] ?? {};
+      const price = finitePositive(quote?.last_non_reg_trade_price ?? quote?.last_trade_price);
+      const previousClose = finitePositive(quote?.adjusted_previous_close ?? quote?.previous_close);
+      const dayHigh = finitePositive(fundamentalRow?.high ?? fundamentalRow?.day_high);
+      const dayLow = finitePositive(fundamentalRow?.low ?? fundamentalRow?.day_low);
+      const openPrice = finitePositive(fundamentalRow?.open ?? fundamentalRow?.open_price);
+      const volume = finiteNonNegative(fundamentalRow?.volume);
+      const timing = robinhoodTiming(quotePayload?.metadata, quoteRow?.metadata, quote?.metadata);
+      const quoteTimestamp = normalizeTimestamp(quote?.venue_last_non_reg_trade_time ?? quote?.venue_last_trade_time);
+      const timestamp = quoteTimestamp ?? timing.timestamp ?? null;
+      if (quoteTimestamp !== null && timing.timestamp !== undefined && Math.abs(quoteTimestamp - timing.timestamp) > 5 * 60 * 1000) {
+        throw new MarketDataProviderError(this.makeDiagnostic(provider, 'malformed_payload', true, this.now() - started), 'Robinhood returned contradictory quote timestamps.');
+      }
+      if (price === null || previousClose === null || dayHigh === null || dayLow === null || openPrice === null || volume === null || timestamp === null) {
+        throw new MarketDataProviderError(this.makeDiagnostic(provider, 'malformed_payload', true, this.now() - started), 'Robinhood returned an incomplete quote payload.');
+      }
+      return this.finishQuote({
+        symbol, currency: 'USD', exchange: 'US Equities', price, previousClose, dayHigh, dayLow, openPrice, volume,
+        bid: finitePositive(quote?.bid_price) ?? undefined, ask: finitePositive(quote?.ask_price) ?? undefined,
+        timestamp, marketSession: sessionFromProvider(undefined, this.now()), providerId: provider, providerName: ROBINHOOD_NAME,
+        ...timing, latencyMs: this.now() - started, change: 0, changePercent: 0,
+      }, started);
+    } catch (error) {
+      if (error instanceof MarketDataProviderError) throw error;
+      if (error instanceof Error && /(?:ROBINHOOD_TIMING|STALE_ROBINHOOD_QUOTE)/.test(error.message)) {
+        throw new MarketDataProviderError(this.makeDiagnostic(provider, 'malformed_payload', true, this.now() - started), 'Robinhood returned invalid timing metadata.');
+      }
+      if (error instanceof RobinhoodMarketDataError) {
+        const category: MarketDataErrorCategory = error.status === 'unauthorized' ? 'authorization'
+          : error.status === 'rate_limited' ? 'rate_limit'
+          : error.status === 'timeout' ? 'timeout'
+          : error.status === 'malformed_payload' ? 'malformed_payload' : 'upstream';
+        throw new MarketDataProviderError(this.makeDiagnostic(provider, category, error.status !== 'disabled', this.now() - started, error.httpStatus), 'Robinhood market data is unavailable.');
+      }
+      throw error;
+    }
   }
 
   async fetchYahooQuote(symbol: string): Promise<NormalizedLiveQuote> {

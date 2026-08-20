@@ -228,6 +228,7 @@ test('missing environment variables report configuration names by category and n
         [
           ['massive', 'missing_configuration'],
           ['alpaca', 'missing_configuration'],
+          ['robinhood', 'missing_configuration'],
           ['yahoo', 'missing_configuration'],
         ]
       );

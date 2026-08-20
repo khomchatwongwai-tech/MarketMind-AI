@@ -220,6 +220,8 @@ export const DashboardOverview: React.FC<DashboardOverviewProps> = ({
         signals={wsSignals}
         aiInsight={wsAiInsight}
         liveTrade={wsLiveTrade}
+        quote={quote}
+        technicals={technicals}
         onRequestAiInsight={requestAiInsight}
       />
 

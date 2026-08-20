@@ -52,32 +52,32 @@ export async function requireAuth(
   }
 
   try {
-    const auth = authProviderForTests ? authProviderForTests() : getFirebaseAuth();
     let decodedToken: any;
+    const isProduction = process.env.NODE_ENV === 'production';
 
-    try {
-      decodedToken = await auth.verifyIdToken(token);
-    } catch (verifyError: any) {
-      // In development strictly when NOT in production, support dev token for local workflow
-      const isProduction = process.env.NODE_ENV === 'production';
-      if (!isProduction && (token.startsWith('mkt_dev_') || token.startsWith('mkt_token_'))) {
-        const prefix = token.startsWith('mkt_dev_') ? 'mkt_dev_' : 'mkt_token_';
-        const devUid = token.slice(prefix.length) || 'dev_user_uid';
-        let account = ServerUserStore.findById(devUid);
-        if (!account) {
-          account = ServerUserStore.getOrCreateUser({
-            uid: devUid,
-            email: `${devUid}@marketmind.ai`,
-            role: devUid.includes('admin') ? 'admin' : 'user',
-          });
-        }
-        decodedToken = {
+    // In development/test strictly when NOT in production, support dev token for local workflow
+    if (!isProduction && (token.startsWith('mkt_dev_') || token.startsWith('mkt_token_'))) {
+      const prefix = token.startsWith('mkt_dev_') ? 'mkt_dev_' : 'mkt_token_';
+      const devUid = token.slice(prefix.length) || 'dev_user_uid';
+      let account = ServerUserStore.findById(devUid);
+      if (!account) {
+        account = ServerUserStore.getOrCreateUser({
           uid: devUid,
-          email: account?.email || `${devUid}@marketmind.ai`,
-          role: account?.role || (devUid.includes('admin') ? 'admin' : 'user'),
-          email_verified: true,
-        };
-      } else {
+          email: `${devUid}@marketmind.ai`,
+          role: devUid.includes('admin') ? 'admin' : 'user',
+        });
+      }
+      decodedToken = {
+        uid: devUid,
+        email: account?.email || `${devUid}@marketmind.ai`,
+        role: account?.role || (devUid.includes('admin') ? 'admin' : 'user'),
+        email_verified: true,
+      };
+    } else {
+      try {
+        const auth = authProviderForTests ? authProviderForTests() : getFirebaseAuth();
+        decodedToken = await auth.verifyIdToken(token);
+      } catch (verifyError: any) {
         console.error('[AuthMiddleware] ID token verification failed:', verifyError?.message);
         return res.status(401).json({
           error: 'Unauthorized: Expired or invalid Firebase ID token.',

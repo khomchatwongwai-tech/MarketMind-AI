@@ -238,6 +238,8 @@ export interface NewsItem {
   sectorsAffected: string[];
   potentialSPYImpact: string;
   aiExplanation: string;
+  url?: string;
+  verificationStatus?: 'VERIFIED' | 'UNVERIFIED' | 'UNKNOWN';
 }
 
 export type MarketNewsItem = NewsItem;

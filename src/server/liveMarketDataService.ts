@@ -51,6 +51,17 @@ export interface NormalizedLiveQuote {
   latencyMs: number;
 }
 
+export interface NormalizedLiveCandle {
+  timestamp: number;
+  open: number;
+  high: number;
+  low: number;
+  close: number;
+  volume: number;
+  providerId: MarketDataProviderId;
+  providerName: string;
+}
+
 export class MarketDataProviderError extends Error {
   constructor(
     public readonly diagnostic: MarketDataDiagnostic,
@@ -229,6 +240,7 @@ export class LiveMarketDataService {
   private readonly logger: NonNullable<LiveMarketDataServiceOptions['logger']>;
   private readonly robinhood: RobinhoodMarketDataService;
   private readonly latestDiagnostics = new Map<MarketDataProviderId, MarketDataDiagnostic>();
+  private readonly cooldownUntil = new Map<MarketDataProviderId, number>();
 
   constructor(options: LiveMarketDataServiceOptions = {}) {
     this.env = options.env || process.env;
@@ -258,6 +270,89 @@ export class LiveMarketDataService {
 
   getRobinhoodHealth() {
     return this.robinhood.getHealth();
+  }
+
+  /** Provider order: Alpaca, Massive, Robinhood (opt-in), Yahoo, then unavailable. */
+  async getCandles(symbol: string, timeframe = '5m'): Promise<NormalizedLiveCandle[]> {
+    const clean = cleanSymbol(symbol);
+    const diagnostics: MarketDataDiagnostic[] = [];
+    const attempts: Array<() => Promise<NormalizedLiveCandle[]>> = [];
+    if (this.env.ALPACA_API_KEY?.trim() && this.env.ALPACA_API_SECRET?.trim()) attempts.push(() => this.fetchAlpacaCandles(clean, timeframe));
+    if (this.getMassiveApiKey()) attempts.push(() => this.fetchMassiveCandles(clean, timeframe));
+    if (this.robinhood.isConfigured()) attempts.push(() => this.fetchRobinhoodCandles(clean, timeframe));
+    if (this.env.YAHOO_MARKET_DATA_ENABLED !== 'false') attempts.push(() => this.fetchYahooCandles(clean, timeframe));
+    for (const attempt of attempts) {
+      try { return await attempt(); } catch (error) {
+        if (error instanceof MarketDataProviderError) { diagnostics.push(error.diagnostic); this.recordFailure(clean, error.diagnostic); continue; }
+        throw error;
+      }
+    }
+    throw new MarketDataUnavailableError(clean, diagnostics);
+  }
+
+  async getTape(symbols: string[]): Promise<NormalizedLiveQuote[]> {
+    const clean = symbols.map(cleanSymbol);
+    if (this.env.ALPACA_API_KEY?.trim() && this.env.ALPACA_API_SECRET?.trim()) {
+      try { return await this.fetchAlpacaTape(clean); } catch (error) { if (error instanceof MarketDataProviderError) this.recordFailure('TAPE', error.diagnostic); else throw error; }
+    }
+    const results = await Promise.allSettled(clean.map((symbol) => this.getQuote(symbol)));
+    const quotes = results.filter((result): result is PromiseFulfilledResult<NormalizedLiveQuote> => result.status === 'fulfilled').map((result) => result.value);
+    if (quotes.length) return quotes;
+    const diagnostics = results.filter((result): result is PromiseRejectedResult => result.status === 'rejected').flatMap((result) => result.reason instanceof MarketDataUnavailableError ? result.reason.diagnostics : []);
+    throw new MarketDataUnavailableError('TAPE', diagnostics);
+  }
+
+  private alpacaConfig() {
+    const apiKey = this.env.ALPACA_API_KEY?.trim(); const apiSecret = this.env.ALPACA_API_SECRET?.trim();
+    if (!apiKey || !apiSecret) throw new MarketDataProviderError(this.makeDiagnostic('alpaca', 'missing_configuration', false, 0), 'Alpaca market data is not configured.');
+    return { baseUrl: (this.env.ALPACA_DATA_BASE_URL || 'https://data.alpaca.markets').replace(/\/$/, ''), headers: { 'APCA-API-KEY-ID': apiKey, 'APCA-API-SECRET-KEY': apiSecret, Accept: 'application/json' }, feed: this.env.ALPACA_DATA_FEED?.trim() || 'iex' };
+  }
+
+  private candleTimeframe(timeframe: string) { const value = timeframe.toLowerCase(); return value === '1d' ? '1Day' : value === '1w' ? '1Week' : `${Math.max(1, Number.parseInt(value, 10) || 5)}Min`; }
+
+  private normalizeCandles(providerId: MarketDataProviderId, providerName: string, bars: any[]): NormalizedLiveCandle[] {
+    const candles = bars.map((bar) => ({ timestamp: normalizeTimestamp(bar.t ?? bar.timestamp ?? bar.begins_at), open: finitePositive(bar.o ?? bar.open ?? bar.open_price), high: finitePositive(bar.h ?? bar.high ?? bar.high_price), low: finitePositive(bar.l ?? bar.low ?? bar.low_price), close: finitePositive(bar.c ?? bar.close ?? bar.close_price), volume: finiteNonNegative(bar.v ?? bar.volume), providerId, providerName })).filter((bar): bar is NormalizedLiveCandle => bar.timestamp !== null && bar.open !== null && bar.high !== null && bar.low !== null && bar.close !== null && bar.volume !== null && bar.high >= Math.max(bar.open, bar.close, bar.low) && bar.low <= Math.min(bar.open, bar.close, bar.high)).sort((a, b) => a.timestamp - b.timestamp);
+    if (!candles.length) throw new MarketDataProviderError(this.makeDiagnostic(providerId, 'malformed_payload', true, 0), `${providerName} returned no valid candles.`);
+    return candles.slice(-500);
+  }
+
+  private async fetchAlpacaCandles(symbol: string, timeframe: string) {
+    const started = this.now(); const config = this.alpacaConfig();
+    const response = await this.request('alpaca', `${config.baseUrl}/v2/stocks/${encodeURIComponent(symbol)}/bars?timeframe=${encodeURIComponent(this.candleTimeframe(timeframe))}&feed=${encodeURIComponent(config.feed)}&limit=500`, config.headers, started);
+    const payload = await this.readJson('alpaca', response, started);
+    return this.normalizeCandles('alpaca', ALPACA_NAME, Array.isArray(payload?.bars) ? payload.bars : []);
+  }
+
+  private async fetchMassiveCandles(symbol: string, timeframe: string) {
+    const started = this.now(); const key = this.getMassiveApiKey(); if (!key) throw new MarketDataProviderError(this.makeDiagnostic('massive', 'missing_configuration', false, 0), 'Massive is not configured.');
+    const value = timeframe.toLowerCase(); const unit = value === '1d' ? 'day' : value === '1w' ? 'week' : value === '1h' || value === '4h' ? 'hour' : 'minute'; const multiplier = value === '1h' ? 1 : value === '4h' ? 4 : value === '1d' || value === '1w' ? 1 : Math.max(1, Number.parseInt(value, 10) || 5);
+    const end = new Date(this.now()); const start = new Date(this.now() - 30 * 24 * 60 * 60 * 1000);
+    const response = await this.request('massive', `https://api.polygon.io/v2/aggs/ticker/${encodeURIComponent(symbol)}/range/${multiplier}/${unit}/${start.toISOString().slice(0, 10)}/${end.toISOString().slice(0, 10)}?adjusted=true&sort=asc&limit=5000`, { Authorization: `Bearer ${key}`, Accept: 'application/json' }, started);
+    const payload = await this.readJson('massive', response, started); return this.normalizeCandles('massive', MASSIVE_NAME, Array.isArray(payload?.results) ? payload.results : []);
+  }
+
+  private async fetchRobinhoodCandles(symbol: string, timeframe: string) {
+    const payload = await this.robinhood.getEquityHistoricals({ symbols: [symbol], interval: timeframe });
+    const result = payload?.data?.results?.[0] ?? payload?.results?.[0]; return this.normalizeCandles('robinhood', ROBINHOOD_NAME, Array.isArray(result?.bars) ? result.bars : []);
+  }
+
+  private async fetchYahooCandles(symbol: string, timeframe: string) {
+    const started = this.now(); const interval = timeframe === '1h' ? '60m' : timeframe === '1d' ? '1d' : timeframe === '1w' ? '1wk' : timeframe;
+    const response = await this.request('yahoo', `https://query1.finance.yahoo.com/v8/finance/chart/${encodeURIComponent(symbol)}?range=1mo&interval=${encodeURIComponent(interval)}`, { Accept: 'application/json', 'User-Agent': 'MarketMindAI/1.0 market-data-gateway' }, started);
+    const payload = await this.readJson('yahoo', response, started); const result = payload?.chart?.result?.[0]; const quote = result?.indicators?.quote?.[0] ?? {};
+    return this.normalizeCandles('yahoo', YAHOO_NAME, (result?.timestamp ?? []).map((t: unknown, i: number) => ({ t, o: quote.open?.[i], h: quote.high?.[i], l: quote.low?.[i], c: quote.close?.[i], v: quote.volume?.[i] })));
+  }
+
+  private async fetchAlpacaTape(symbols: string[]) {
+    const started = this.now(); const config = this.alpacaConfig();
+    const response = await this.request('alpaca', `${config.baseUrl}/v2/stocks/snapshots?symbols=${encodeURIComponent(symbols.join(','))}&feed=${encodeURIComponent(config.feed)}`, config.headers, started);
+    const payload = await this.readJson('alpaca', response, started); const snapshots = object(payload?.snapshots);
+    const quotes = symbols.map((symbol) => this.normalizeAlpacaSnapshot(symbol, snapshots[symbol], started)).filter((quote): quote is NormalizedLiveQuote => quote !== null);
+    if (!quotes.length) throw new MarketDataProviderError(this.makeDiagnostic('alpaca', 'malformed_payload', true, this.now() - started), 'Alpaca returned no valid tape snapshots.'); return quotes;
+  }
+
+  private normalizeAlpacaSnapshot(symbol: string, payload: any, started: number): NormalizedLiveQuote | null {
+    try { const price = finitePositive(payload?.latestTrade?.p ?? payload?.dailyBar?.c); const previousClose = finitePositive(payload?.prevDailyBar?.c); const dayHigh = finitePositive(payload?.dailyBar?.h); const dayLow = finitePositive(payload?.dailyBar?.l); const openPrice = finitePositive(payload?.dailyBar?.o); const volume = finiteNonNegative(payload?.dailyBar?.v); const timestamp = normalizeTimestamp(payload?.latestTrade?.t ?? payload?.latestQuote?.t); if ([price, previousClose, dayHigh, dayLow, openPrice, volume, timestamp].some((value) => value === null)) return null; return this.finishQuote({ symbol, currency: 'USD', exchange: 'US Equities', price: price!, previousClose: previousClose!, dayHigh: dayHigh!, dayLow: dayLow!, openPrice: openPrice!, volume: volume!, timestamp: timestamp!, marketSession: sessionFromProvider(undefined, this.now()), providerId: 'alpaca', providerName: ALPACA_NAME, isRealTime: this.alpacaConfig().feed === 'iex', feedDelayMinutes: 0, latencyMs: this.now() - started, change: 0, changePercent: 0 }, started); } catch { return null; }
   }
 
   async getQuote(symbol: string): Promise<NormalizedLiveQuote> {
@@ -378,9 +473,6 @@ export class LiveMarketDataService {
         started
       );
     } catch (error) {
-      if (error instanceof MarketDataProviderError) {
-        this.recordFailure(symbol, error.diagnostic);
-      }
       return this.fetchMassiveAggregateQuote(symbol, apiKey, started);
     }
   }
@@ -763,6 +855,10 @@ export class LiveMarketDataService {
     headers: Record<string, string>,
     started: number
   ): Promise<Response> {
+    const cooldownUntil = this.cooldownUntil.get(provider) || 0;
+    if (cooldownUntil > this.now()) {
+      throw new MarketDataProviderError(this.makeDiagnostic(provider, 'rate_limit', true, 0), 'Market data provider is in cooldown.');
+    }
     const controller = new AbortController();
     const timer = setTimeout(() => controller.abort(), this.timeoutMs);
     let response: Response;
@@ -839,6 +935,9 @@ export class LiveMarketDataService {
 
   private recordFailure(symbol: string, diagnostic: MarketDataDiagnostic) {
     this.latestDiagnostics.set(diagnostic.provider, diagnostic);
+    if (diagnostic.category === 'rate_limit' || diagnostic.category === 'timeout' || diagnostic.category === 'authorization') {
+      this.cooldownUntil.set(diagnostic.provider, this.now() + 60_000);
+    }
     this.logger({ event: 'market_data_provider_failure', symbol, ...diagnostic });
   }
 }

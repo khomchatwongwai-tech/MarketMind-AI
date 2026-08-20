@@ -41,14 +41,6 @@ const DEFAULT_SYMBOLS = [
 
 const QUICK_TICKERS = ['SPY', 'QQQ', 'NVDA', 'AAPL', 'MSFT', 'TSLA'];
 
-const DEFAULT_PRICES: Record<string, number | null> = {
-  SPY: 500.0,
-  QQQ: 430.0,
-  NVDA: 130.0,
-  AAPL: 220.0,
-  MSFT: 440.0,
-  TSLA: 210.0,
-};
 
 export const MarketTape: React.FC<MarketTapeProps> = ({
   selectedTicker,
@@ -115,7 +107,7 @@ export const MarketTape: React.FC<MarketTapeProps> = ({
         <div className="flex items-center gap-1.5 overflow-hidden">
           {QUICK_TICKERS.map((sym) => {
             const isSel = selectedTicker.toUpperCase() === sym.toUpperCase();
-            const p = rtQuotes[sym.toUpperCase()]?.price ?? DEFAULT_PRICES[sym];
+            const p = rtQuotes[sym.toUpperCase()]?.price;
             const hasValidP = isFiniteMarketNumber(p) && p > 0;
             return (
               <button

@@ -5,7 +5,7 @@ let appPromise: Promise<any> | null = null;
 async function getApp() {
   if (!appPromise) {
     appPromise = import('../server.js').then((m) => m.app || m.default).catch((err) => {
-      appPromise = null;
+      appPromise = null; // reset so next retry captures error
       throw err;
     });
   }

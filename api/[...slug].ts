@@ -20,7 +20,7 @@ export default async function handler(req: any, res: any) {
     const app = await getApp();
     return app(req, res);
   } catch (error: any) {
-    console.error('[Vercel Serverless Slug Execution Failure]:', error);
+    console.error('[Vercel Serverless Catch-All Execution Failure]:', error);
     if (!res.headersSent) {
       res.statusCode = 500;
       res.setHeader('Content-Type', 'application/json');

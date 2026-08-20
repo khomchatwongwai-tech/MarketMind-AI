@@ -210,19 +210,40 @@ export const TechnicalEngineView: React.FC<TechnicalEngineViewProps> = ({ data }
   const renderVal = <T,>(
     res: IndicatorResult<T>,
     formatter: (val: T) => string,
-    fallbackText = 'N/A'
+    fallbackText = 'Unavailable'
   ) => {
+    const meta = res.metadata;
     if (res.value === null || res.value === undefined) {
       return (
-        <div className="flex flex-col items-end">
-          <span className="font-mono font-bold text-amber-400">{fallbackText}</span>
-          {res.metadata.diagnosticReason && (
-            <span className="text-[9px] text-[#6B7280] font-mono">{res.metadata.diagnosticReason}</span>
+        <div className="flex flex-col items-end text-right">
+          <div className="flex items-center gap-1">
+            <span className="text-[9px] px-1.5 py-0.5 bg-amber-500/10 text-amber-400 border border-amber-500/30 rounded font-mono font-bold uppercase">
+              {meta.validationStatus}
+            </span>
+            <span className="font-mono font-bold text-amber-400 text-xs">{fallbackText}</span>
+          </div>
+          {(meta.unavailableReason || meta.diagnosticReason) && (
+            <span className="text-[9px] text-[#9CA3AF] font-mono mt-0.5">
+              Reason: {meta.unavailableReason || meta.diagnosticReason}
+            </span>
           )}
         </div>
       );
     }
-    return <span className="font-mono font-bold text-white">{formatter(res.value)}</span>;
+
+    return (
+      <div className="flex flex-col items-end text-right">
+        <div className="flex items-center gap-1.5">
+          <span className="text-[9px] px-1.5 py-0.5 bg-emerald-500/10 text-emerald-400 border border-emerald-500/30 rounded font-mono font-bold uppercase">
+            {meta.validationStatus === 'LIVE' ? 'LIVE' : 'VALID'}
+          </span>
+          <span className="font-mono font-bold text-white text-xs">{formatter(res.value)}</span>
+        </div>
+        <span className="text-[9px] text-[#6B7280] font-mono mt-0.5">
+          {meta.source} &bull; Bars: {meta.barsUsed}
+        </span>
+      </div>
+    );
   };
 
   return (

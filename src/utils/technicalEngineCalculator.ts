@@ -7,8 +7,9 @@ export interface IndicatorMetadata {
   barsUsed: number;
   timestamp: string;
   stale: boolean;
-  validationStatus: 'VALID' | 'UNAVAILABLE' | 'INSUFFICIENT_BARS' | 'STALE' | 'MALFORMED';
+  validationStatus: 'LIVE' | 'VALID' | 'DELAYED' | 'STALE' | 'UNAVAILABLE' | 'INSUFFICIENT_BARS' | 'INSUFFICIENT HISTORY' | 'MALFORMED';
   diagnosticReason?: string;
+  unavailableReason?: string;
 }
 
 export interface IndicatorResult<T> {
@@ -96,6 +97,7 @@ function buildMeta(
     stale,
     validationStatus: status,
     diagnosticReason: reason,
+    unavailableReason: status !== 'VALID' && status !== 'LIVE' ? reason || 'Data unavailable' : undefined,
   };
 }
 

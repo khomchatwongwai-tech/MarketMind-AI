@@ -57,6 +57,7 @@ export const MarketMindSummaryCard: React.FC<MarketMindSummaryCardProps> = ({
       : 'UNAVAILABLE';
 
   const priceStr = formatPrice(quote.price, 2, 'Unavailable');
+  const changeStr = formatPercent(quote.changePercent, 2, true, 'N/A');
   const changeNum = quote.change;
   const changeAbsStr = isFiniteMarketNumber(changeNum)
     ? `${isPositive ? '+' : ''}${changeNum.toFixed(2)}`

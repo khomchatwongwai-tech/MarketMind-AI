@@ -344,15 +344,100 @@ export class LiveMarketDataService {
   }
 
   private async fetchAlpacaTape(symbols: string[]) {
-    const started = this.now(); const config = this.alpacaConfig();
-    const response = await this.request('alpaca', `${config.baseUrl}/v2/stocks/snapshots?symbols=${encodeURIComponent(symbols.join(','))}&feed=${encodeURIComponent(config.feed)}`, config.headers, started);
-    const payload = await this.readJson('alpaca', response, started); const snapshots = object(payload?.snapshots);
-    const quotes = symbols.map((symbol) => this.normalizeAlpacaSnapshot(symbol, snapshots[symbol], started)).filter((quote): quote is NormalizedLiveQuote => quote !== null);
-    if (!quotes.length) throw new MarketDataProviderError(this.makeDiagnostic('alpaca', 'malformed_payload', true, this.now() - started), 'Alpaca returned no valid tape snapshots.'); return quotes;
+    const started = this.now();
+    const config = this.alpacaConfig();
+    const response = await this.request(
+      'alpaca',
+      `${config.baseUrl}/v2/stocks/snapshots?symbols=${encodeURIComponent(symbols.join(','))}&feed=${encodeURIComponent(config.feed)}`,
+      config.headers,
+      started
+    );
+    const payload = await this.readJson('alpaca', response, started);
+    const snapshots = object(payload?.snapshots ?? payload);
+    const quotes = symbols
+      .map((symbol) => this.normalizeAlpacaSnapshot(symbol, snapshots[symbol], started))
+      .filter((quote): quote is NormalizedLiveQuote => quote !== null);
+
+    if (!quotes.length) {
+      throw new MarketDataProviderError(
+        this.makeDiagnostic('alpaca', 'malformed_payload', true, this.now() - started, response.status),
+        'Alpaca returned no valid tape snapshots.'
+      );
+    }
+    return quotes;
   }
 
   private normalizeAlpacaSnapshot(symbol: string, payload: any, started: number): NormalizedLiveQuote | null {
-    try { const price = finitePositive(payload?.latestTrade?.p ?? payload?.dailyBar?.c); const previousClose = finitePositive(payload?.prevDailyBar?.c); const dayHigh = finitePositive(payload?.dailyBar?.h); const dayLow = finitePositive(payload?.dailyBar?.l); const openPrice = finitePositive(payload?.dailyBar?.o); const volume = finiteNonNegative(payload?.dailyBar?.v); const timestamp = normalizeTimestamp(payload?.latestTrade?.t ?? payload?.latestQuote?.t); if ([price, previousClose, dayHigh, dayLow, openPrice, volume, timestamp].some((value) => value === null)) return null; return this.finishQuote({ symbol, currency: 'USD', exchange: 'US Equities', price: price!, previousClose: previousClose!, dayHigh: dayHigh!, dayLow: dayLow!, openPrice: openPrice!, volume: volume!, timestamp: timestamp!, marketSession: sessionFromProvider(undefined, this.now()), providerId: 'alpaca', providerName: ALPACA_NAME, isRealTime: this.alpacaConfig().feed === 'iex', feedDelayMinutes: 0, latencyMs: this.now() - started, change: 0, changePercent: 0 }, started); } catch { return null; }
+    if (!payload || typeof payload !== 'object') {
+      this.logger({
+        ...this.makeDiagnostic('alpaca', 'malformed_payload', false, this.now() - started),
+        event: 'market_data_provider_warning',
+        symbol,
+      });
+      return null;
+    }
+
+    try {
+      const price = finitePositive(payload?.latestTrade?.p ?? payload?.dailyBar?.c);
+      const previousClose = finitePositive(payload?.prevDailyBar?.c);
+      const dayHigh = finitePositive(payload?.dailyBar?.h);
+      const dayLow = finitePositive(payload?.dailyBar?.l);
+      const openPrice = finitePositive(payload?.dailyBar?.o);
+      const volume = finiteNonNegative(payload?.dailyBar?.v);
+      const timestamp = normalizeTimestamp(payload?.latestTrade?.t ?? payload?.latestQuote?.t);
+
+      const missingFields: string[] = [];
+      if (price === null) missingFields.push('price (latestTrade.p / dailyBar.c)');
+      if (previousClose === null) missingFields.push('previousClose (prevDailyBar.c)');
+      if (dayHigh === null) missingFields.push('dayHigh (dailyBar.h)');
+      if (dayLow === null) missingFields.push('dayLow (dailyBar.l)');
+      if (openPrice === null) missingFields.push('openPrice (dailyBar.o)');
+      if (volume === null) missingFields.push('volume (dailyBar.v)');
+      if (timestamp === null) missingFields.push('timestamp (latestTrade.t / latestQuote.t)');
+
+      if (missingFields.length > 0) {
+        this.logger({
+          ...this.makeDiagnostic('alpaca', 'malformed_payload', false, this.now() - started),
+          event: 'market_data_provider_warning',
+          symbol,
+        });
+        return null;
+      }
+
+      return this.finishQuote(
+        {
+          symbol,
+          currency: 'USD',
+          exchange: 'US Equities',
+          price: price!,
+          previousClose: previousClose!,
+          dayHigh: dayHigh!,
+          dayLow: dayLow!,
+          openPrice: openPrice!,
+          volume: volume!,
+          bid: finitePositive(payload?.latestQuote?.bp) ?? undefined,
+          ask: finitePositive(payload?.latestQuote?.ap) ?? undefined,
+          vwap: finitePositive(payload?.dailyBar?.vw) ?? undefined,
+          timestamp: timestamp!,
+          marketSession: sessionFromProvider(undefined, this.now()),
+          providerId: 'alpaca',
+          providerName: ALPACA_NAME,
+          isRealTime: this.alpacaConfig().feed === 'iex',
+          feedDelayMinutes: 0,
+          latencyMs: this.now() - started,
+          change: 0,
+          changePercent: 0,
+        },
+        started
+      );
+    } catch {
+      this.logger({
+        ...this.makeDiagnostic('alpaca', 'malformed_payload', false, this.now() - started),
+        event: 'market_data_provider_warning',
+        symbol,
+      });
+      return null;
+    }
   }
 
   async getQuote(symbol: string): Promise<NormalizedLiveQuote> {

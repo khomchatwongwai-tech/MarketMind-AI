@@ -6,9 +6,9 @@ import {
   MassiveAiInsight,
   CalculatedMarketSignals,
   MassiveWsClientMessage,
-} from '../types/massiveWs';
-import { AppConfig } from '../config/environment';
-import { MASTER_INSTRUMENTS } from './marketProviders/InstrumentDirectoryService';
+} from '../types/massiveWs.js';
+import { AppConfig } from '../config/environment.js';
+import { MASTER_INSTRUMENTS } from './marketProviders/InstrumentDirectoryService.js';
 
 interface CandleState {
   time: number;

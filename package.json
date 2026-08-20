@@ -5,7 +5,7 @@
   "type": "module",
   "scripts": {
     "dev": "tsx server.ts",
-    "build": "vite build && esbuild server.ts --bundle --platform=node --format=cjs --packages=external --sourcemap --outfile=dist/server.cjs",
+    "build": "vite build && node scripts/build-server.js",
     "start": "node dist/server.cjs",
     "clean": "rm -rf dist server.js",
     "lint": "tsc --noEmit",
@@ -14,12 +14,6 @@
     "cap:sync": "pnpm --package=@capacitor/cli dlx cap sync",
     "cap:sync:ios": "pnpm --package=@capacitor/cli dlx cap sync ios",
     "cap:sync:android": "pnpm --package=@capacitor/cli dlx cap sync android"
-  },
-  "resolutions": {
-    "jose": "5.10.0"
-  },
-  "overrides": {
-    "jose": "5.10.0"
   },
   "dependencies": {
     "@google/genai": "^2.4.0",
@@ -30,7 +24,7 @@
     "express": "^4.21.2",
     "firebase": "^12.17.1",
     "firebase-admin": "^14.2.0",
-    "jose": "5.10.0",
+    "jose": "^6.2.9",
     "lightweight-charts": "^5.2.1",
     "lucide-react": "^0.546.0",
     "motion": "^12.23.24",

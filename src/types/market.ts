@@ -31,6 +31,9 @@ export interface MarketDataMetadata {
   marketStatus?: 'PRE' | 'OPEN' | 'AFTER' | 'CLOSED';
   outlierFlag?: boolean;
   validationStatus?: 'VALID' | 'SUSPECT_DATA' | 'MALFORMED' | 'UNAVAILABLE';
+  liveStatus?: 'live' | 'delayed' | 'unknown';
+  sourceType?: string;
+  entitlementStatus?: string;
 }
 
 export type LiveMarketDataSource =

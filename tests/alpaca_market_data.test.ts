@@ -48,6 +48,7 @@ test('market-data routing falls back from unavailable Massive to verified Alpaca
       YAHOO_MARKET_DATA_ENABLED: 'false',
     },
     fetchFn: fetchMock,
+    now: () => Date.parse('2026-08-16T14:31:00Z'),
     logger: () => undefined,
   });
   const result = await service.getQuote('SPY');

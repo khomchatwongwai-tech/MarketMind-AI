@@ -450,6 +450,7 @@ app.get('/api/providers/status', (req, res) => {
   res.json({
     providers: status,
     configured: liveService.getConfigurationStatus(),
+    robinhood: liveService.getRobinhoodHealth(),
     diagnostics: liveService.getDiagnostics(),
     timestamp: new Date().toISOString(),
   });

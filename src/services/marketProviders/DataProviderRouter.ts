@@ -90,6 +90,20 @@ export class DataProviderRouter {
       },
     ],
     [
+      'robinhood',
+      {
+        providerId: 'robinhood',
+        name: 'Robinhood Read-Only Market Data',
+        status: process.env.ROBINHOOD_MARKET_DATA_ENABLED === 'true' && process.env.ROBINHOOD_READ_ONLY !== 'false' && process.env.ROBINHOOD_MARKET_DATA_BASE_URL ? 'DEGRADED' : 'CONFIGURATION_REQUIRED',
+        supportedAssetClasses: ['STOCK', 'ETF', 'INDEX', 'OPTION'],
+        latencyMs: 0,
+        successCount: 0,
+        failureCount: 0,
+        isConfigured: process.env.ROBINHOOD_MARKET_DATA_ENABLED === 'true' && process.env.ROBINHOOD_READ_ONLY !== 'false' && Boolean(process.env.ROBINHOOD_MARKET_DATA_BASE_URL),
+        entitlementTier: 'SERVER_SIDE_AUTH_REQUIRED',
+      },
+    ],
+    [
       'cme',
       {
         providerId: 'cme',
@@ -189,6 +203,20 @@ export class DataProviderRouter {
         rateLimitPerMinute: 200,
         averageLatencyMs: 38,
         entitlementTier: 'PRO',
+      },
+    ],
+    [
+      'robinhood',
+      {
+        providerId: 'robinhood',
+        name: 'Robinhood Read-Only Market Data',
+        isConfigured: process.env.ROBINHOOD_MARKET_DATA_ENABLED === 'true' && process.env.ROBINHOOD_READ_ONLY !== 'false' && Boolean(process.env.ROBINHOOD_MARKET_DATA_BASE_URL),
+        healthStatus: 'DEGRADED',
+        supportedAssetClasses: ['STOCK', 'ETF', 'INDEX', 'OPTION'],
+        dataTypes: ['REAL_TIME_QUOTES', 'HISTORICAL_CANDLES', 'OPTIONS_CHAIN', 'GREEKS'],
+        rateLimitPerMinute: 0,
+        averageLatencyMs: 0,
+        entitlementTier: 'UNLICENSED',
       },
     ],
     [
@@ -390,7 +418,7 @@ export class DataProviderRouter {
           const activeProviderName = liveData.providerName;
 
           const metadata: MarketDataMetadata = {
-            provider: activeProviderName,
+            provider: activeProviderId === 'robinhood' ? 'robinhood' : activeProviderName,
             source: activeProviderId,
             timestamp: liveData.timestamp || now,
             receivedAt: now,
@@ -400,6 +428,9 @@ export class DataProviderRouter {
             marketStatus: marketState === 'REGULAR' ? 'OPEN' : marketState === 'PRE_MARKET' ? 'PRE' : marketState === 'AFTER_HOURS' ? 'AFTER' : 'CLOSED',
             outlierFlag: false,
             validationStatus: 'VALID',
+            liveStatus: liveData.isRealTime ? 'live' : 'delayed',
+            sourceType: activeProviderId === 'robinhood' ? 'robinhood_read_only_gateway' : activeProviderId,
+            entitlementStatus: activeProviderId === 'robinhood' ? 'unknown' : undefined,
           };
 
           const response: MultiAssetQuoteResponse = {
@@ -495,7 +526,7 @@ export class DataProviderRouter {
     ask?: number;
     spread?: number;
     timestamp: number;
-    providerId: 'massive' | 'alpaca' | 'yahoo';
+    providerId: 'massive' | 'alpaca' | 'robinhood' | 'yahoo';
     providerName: string;
     marketSession: 'REGULAR' | 'PRE_MARKET' | 'AFTER_HOURS' | 'CLOSED';
     isRealTime: boolean;
@@ -505,6 +536,7 @@ export class DataProviderRouter {
     const providerSymbol =
       instrument.providerSymbols?.massive ||
       instrument.providerSymbols?.alpaca ||
+      instrument.providerSymbols?.robinhood ||
       instrument.providerSymbols?.yahoo ||
       instrument.symbol;
     return getLiveMarketDataService().getQuote(providerSymbol);

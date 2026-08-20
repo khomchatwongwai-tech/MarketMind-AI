@@ -16,6 +16,7 @@ export type MarketDataMode =
   | 'LIVE'
   | 'DELAYED'
   | 'CACHED'
+  | 'UNKNOWN'
   | 'DEMO'
   | 'SIMULATED'
   | 'UNAVAILABLE';

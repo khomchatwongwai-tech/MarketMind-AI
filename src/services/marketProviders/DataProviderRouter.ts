@@ -412,7 +412,8 @@ export class DataProviderRouter {
         }
 
           const marketState = liveData.marketSession;
-          const mode: MarketDataMode = liveData.isRealTime ? 'REAL_TIME' : 'DELAYED';
+          const liveStatus = liveData.liveStatus ?? (liveData.isRealTime ? 'live' : 'delayed');
+          const mode: MarketDataMode = liveStatus === 'live' ? 'REAL_TIME' : liveStatus === 'delayed' ? 'DELAYED' : 'UNKNOWN';
 
           const activeProviderId = liveData.providerId;
           const activeProviderName = liveData.providerName;
@@ -423,14 +424,14 @@ export class DataProviderRouter {
             timestamp: liveData.timestamp || now,
             receivedAt: now,
             mode,
-            delayMinutes: liveData.feedDelayMinutes,
+            ...(liveData.feedDelayMinutes === undefined ? {} : { delayMinutes: liveData.feedDelayMinutes }),
             stale: false,
             marketStatus: marketState === 'REGULAR' ? 'OPEN' : marketState === 'PRE_MARKET' ? 'PRE' : marketState === 'AFTER_HOURS' ? 'AFTER' : 'CLOSED',
             outlierFlag: false,
             validationStatus: 'VALID',
-            liveStatus: liveData.isRealTime ? 'live' : 'delayed',
+            liveStatus,
             sourceType: activeProviderId === 'robinhood' ? 'robinhood_read_only_gateway' : activeProviderId,
-            entitlementStatus: activeProviderId === 'robinhood' ? 'unknown' : undefined,
+            entitlementStatus: liveData.entitlementStatus,
           };
 
           const response: MultiAssetQuoteResponse = {
@@ -463,8 +464,8 @@ export class DataProviderRouter {
               vwap: liveData.vwap,
               marketState,
               timestamp: new Date(liveData.timestamp).toISOString(),
-              dataSource: `${activeProviderName} (${mode === 'REAL_TIME' ? 'Real-Time' : `${liveData.feedDelayMinutes}-min Delayed`})`,
-              isRealTime: mode === 'REAL_TIME',
+              dataSource: `${activeProviderName} (${mode === 'REAL_TIME' ? 'Real-Time' : mode === 'DELAYED' ? `${liveData.feedDelayMinutes ?? 'Unknown'}-min Delayed` : 'Timing Unknown'})`,
+              isRealTime: liveData.isRealTime,
               feedDelayMinutes: liveData.feedDelayMinutes,
               latencyMs: liveData.latencyMs,
               currency: instrument.currency,
@@ -530,7 +531,9 @@ export class DataProviderRouter {
     providerName: string;
     marketSession: 'REGULAR' | 'PRE_MARKET' | 'AFTER_HOURS' | 'CLOSED';
     isRealTime: boolean;
-    feedDelayMinutes: number;
+    feedDelayMinutes?: number;
+    liveStatus?: 'live' | 'delayed' | 'unknown';
+    entitlementStatus?: string;
     latencyMs: number;
   }> {
     const providerSymbol =

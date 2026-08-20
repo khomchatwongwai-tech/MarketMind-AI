@@ -7,7 +7,7 @@ import { RobinhoodMarketDataError, RobinhoodMarketDataService } from '../src/ser
 const now = Date.parse('2026-08-20T14:17:30Z');
 const response = (status: number, body: unknown) => new Response(JSON.stringify(body), { status, headers: { 'content-type': 'application/json' } });
 const env = { ROBINHOOD_MARKET_DATA_ENABLED: 'true', ROBINHOOD_READ_ONLY: 'true', ROBINHOOD_MARKET_DATA_BASE_URL: 'https://gateway.example', YAHOO_MARKET_DATA_ENABLED: 'false' };
-const quotePayload = { data: { results: [{ quote: { last_trade_price: '765.525', adjusted_previous_close: '769.06', bid_price: '765.49', ask_price: '765.50', venue_last_trade_time: '2026-08-20T14:17:16Z' } }] } };
+const quotePayload = { metadata: { liveStatus: 'live', isRealTime: true, feedDelayMinutes: 0, entitlementStatus: 'real_time', timestamp: '2026-08-20T14:17:16Z', stale: false }, data: { results: [{ quote: { last_trade_price: '765.525', adjusted_previous_close: '769.06', bid_price: '765.49', ask_price: '765.50', venue_last_trade_time: '2026-08-20T14:17:16Z' } }] } };
 const fundamentalsPayload = { data: { results: [{ open: '765.95', high: '767.75', low: '765.86', volume: 2517283 }] } };
 
 test('Robinhood successful quote is normalized with provenance metadata', async () => {
@@ -18,6 +18,28 @@ test('Robinhood successful quote is normalized with provenance metadata', async 
   assert.equal(quote.bid, 765.49);
   assert.equal(quote.ask, 765.5);
   assert.equal(quote.isRealTime, true);
+  assert.equal(quote.liveStatus, 'live');
+  assert.equal(quote.feedDelayMinutes, 0);
+  assert.equal(quote.entitlementStatus, 'real_time');
+});
+
+test('Robinhood explicitly delayed entitlement preserves delay rather than claiming real-time', async () => {
+  const delayedPayload = { ...quotePayload, metadata: { live_status: 'delayed', is_real_time: false, feed_delay_minutes: 15, entitlement_status: 'delayed', timestamp: '2026-08-20T14:17:16Z', stale: false } };
+  const service = new LiveMarketDataService({ env, now: () => now, logger: () => undefined, fetchFn: async (url) => String(url).endsWith('get_equity_quotes') ? response(200, delayedPayload) : response(200, fundamentalsPayload) });
+  const quote = await service.getQuote('SPY');
+  assert.equal(quote.isRealTime, false);
+  assert.equal(quote.liveStatus, 'delayed');
+  assert.equal(quote.feedDelayMinutes, 15);
+  assert.equal(quote.entitlementStatus, 'delayed');
+});
+
+test('Robinhood unknown entitlement and delay remain unknown instead of becoming real-time or zero-delay', async () => {
+  const unknownPayload = { ...quotePayload, metadata: { timestamp: '2026-08-20T14:17:16Z', stale: false } };
+  const service = new LiveMarketDataService({ env, now: () => now, logger: () => undefined, fetchFn: async (url) => String(url).endsWith('get_equity_quotes') ? response(200, unknownPayload) : response(200, fundamentalsPayload) });
+  const quote = await service.getQuote('SPY');
+  assert.equal(quote.isRealTime, false);
+  assert.equal(quote.liveStatus, 'unknown');
+  assert.equal(quote.feedDelayMinutes, undefined);
 });
 
 test('Robinhood provides Level 2 price-book and five-minute candles through read-only operations', async () => {
@@ -62,6 +84,16 @@ test('Robinhood stale quote is rejected and failover continues to Yahoo', async 
   } });
   const quote = await stale.getQuote('SPY');
   assert.equal(quote.providerId, 'yahoo');
+});
+
+test('Robinhood malformed or contradictory timing metadata is rejected and falls back', async () => {
+  const fallback = new LiveMarketDataService({ env: { ...env, YAHOO_MARKET_DATA_ENABLED: 'true' }, now: () => now, logger: () => undefined, fetchFn: async (url) => {
+    if (String(url).includes('gateway.example')) return String(url).endsWith('get_equity_quotes')
+      ? response(200, { ...quotePayload, metadata: { liveStatus: 'live', isRealTime: false, feedDelayMinutes: 15, timestamp: 'invalid' } })
+      : response(200, fundamentalsPayload);
+    return response(200, { chart: { result: [{ meta: { regularMarketPrice: 700, chartPreviousClose: 699, regularMarketDayHigh: 701, regularMarketDayLow: 698, regularMarketOpen: 699.5, regularMarketVolume: 100, regularMarketTime: now, currency: 'USD' }, timestamp: [now], indicators: { quote: [{ high: [701], low: [698], open: [699.5], close: [700], volume: [100] }] } }] } });
+  } });
+  assert.equal((await fallback.getQuote('SPY')).providerId, 'yahoo');
 });
 
 test('Robinhood failure rotates to the next healthy provider', async () => {

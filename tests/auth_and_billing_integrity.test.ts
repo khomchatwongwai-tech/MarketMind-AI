@@ -1,7 +1,7 @@
 import { describe, it } from 'node:test';
 import assert from 'node:assert/strict';
-import { UserService } from '../src/services/userService';
-import { AppConfig } from '../src/config/environment';
+import { UserService } from '../src/services/userService.js';
+import { AppConfig } from '../src/config/environment.js';
 
 describe('Auth & Billing Integrity Unit Tests', () => {
   it('Normal users must always default to role="user" and plan="free"', () => {
@@ -42,33 +42,39 @@ describe('Auth & Billing Integrity Unit Tests', () => {
   });
 
   it('requireAuth correctly extracts full UID from dev tokens with underscores', async () => {
-    const { requireAuth } = await import('../src/server/authMiddleware');
-    const { ServerUserStore } = await import('../src/services/serverUserStore');
+    const originalEnv = process.env.NODE_ENV;
+    process.env.NODE_ENV = 'development';
+    try {
+      const { requireAuth } = await import('../src/server/authMiddleware.js');
+      const { ServerUserStore } = await import('../src/services/serverUserStore.js');
 
-    ServerUserStore.getOrCreateUser({
-      uid: 'usr_default_trader',
-      email: 'trader@marketmind.ai',
-      role: 'user',
-      selectedPlan: 'pro',
-    });
+      ServerUserStore.getOrCreateUser({
+        uid: 'usr_default_trader',
+        email: 'trader@marketmind.ai',
+        role: 'user',
+        selectedPlan: 'pro',
+      });
 
-    const mockReq: any = {
-      headers: {
-        authorization: 'Bearer mkt_dev_usr_default_trader',
-      },
-    };
-    const mockRes: any = {
-      status: (code: number) => ({
-        json: (data: any) => ({ statusCode: code, data }),
-      }),
-    };
-    let nextCalled = false;
-    const mockNext = () => {
-      nextCalled = true;
-    };
+      const mockReq: any = {
+        headers: {
+          authorization: 'Bearer mkt_dev_usr_default_trader',
+        },
+      };
+      const mockRes: any = {
+        status: (code: number) => ({
+          json: (data: any) => ({ statusCode: code, data }),
+        }),
+      };
+      let nextCalled = false;
+      const mockNext = () => {
+        nextCalled = true;
+      };
 
-    await requireAuth(mockReq, mockRes, mockNext);
-    assert.equal(nextCalled, true, 'requireAuth should call next()');
-    assert.equal(mockReq.user?.uid, 'usr_default_trader', 'Dev UID with underscores should not be truncated');
+      await requireAuth(mockReq, mockRes, mockNext);
+      assert.equal(nextCalled, true, 'requireAuth should call next()');
+      assert.equal(mockReq.user?.uid, 'usr_default_trader', 'Dev UID with underscores should not be truncated');
+    } finally {
+      process.env.NODE_ENV = originalEnv;
+    }
   });
 });

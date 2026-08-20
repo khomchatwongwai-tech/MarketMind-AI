@@ -1,23 +1,24 @@
+import { createRequire } from 'module';
 import { normalizeApiUrl } from '../src/utils/apiUrlNormalizer.js';
 
-let appPromise: Promise<any> | null = null;
+const require = createRequire(import.meta.url);
 
-async function getApp() {
-  if (!appPromise) {
-    appPromise = import('../server.js').then((m) => m.app || m.default).catch((err) => {
-      appPromise = null; // reset so next retry captures error
-      throw err;
-    });
+let appInstance: any = null;
+
+function getApp() {
+  if (!appInstance) {
+    const mod = require('../dist/server.cjs');
+    appInstance = mod.app || mod.default || mod;
   }
-  return appPromise;
+  return appInstance;
 }
 
-export default async function handler(req: any, res: any) {
+export default function handler(req: any, res: any) {
   try {
     if (req.url) {
       req.url = normalizeApiUrl(req.url);
     }
-    const app = await getApp();
+    const app = getApp();
     return app(req, res);
   } catch (error: any) {
     console.error('[Vercel Serverless Index Execution Failure]:', error);

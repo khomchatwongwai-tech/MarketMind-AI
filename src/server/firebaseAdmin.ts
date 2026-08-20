@@ -1,8 +1,9 @@
 import { initializeApp, cert, getApps, App } from 'firebase-admin/app';
-import { getAuth, Auth } from 'firebase-admin/auth';
+import type { Auth } from 'firebase-admin/auth';
 import { getFirestore, Firestore } from 'firebase-admin/firestore';
 
 let appInstance: App | null = null;
+let authInstance: Auth | null = null;
 
 export function parseFirebaseServiceAccount(rawKey: string, expectedProjectId?: string): any {
   let credentials: any;
@@ -56,8 +57,14 @@ export function getFirebaseApp(): App {
 }
 
 export function getFirebaseAuth(): Auth {
-  const app = getFirebaseApp();
-  return getAuth(app);
+  if (!authInstance) {
+    const app = getFirebaseApp();
+    // Lazy load firebase-admin/auth only when authenticated requests require token verification
+    // This prevents top-level module load from triggering jwks-rsa -> require('jose') in Vercel Node runtime
+    const { getAuth } = require('firebase-admin/auth');
+    authInstance = getAuth(app);
+  }
+  return authInstance;
 }
 
 export function getFirebaseFirestore(): Firestore {

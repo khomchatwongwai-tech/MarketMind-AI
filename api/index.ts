@@ -4,17 +4,7 @@ let appPromise: Promise<any> | null = null;
 
 async function getApp() {
   if (!appPromise) {
-    appPromise = (async () => {
-      try {
-        // @ts-ignore
-        const mod = await import('../dist/server.cjs');
-        return mod.app || mod.default || mod;
-      } catch (err1) {
-        console.warn('[Vercel Serverless] Falling back to server.js due to:', err1);
-        const mod = await import('../server.js');
-        return mod.app || mod.default || mod;
-      }
-    })().catch((err) => {
+    appPromise = import('../server.js').then((m) => m.app || m.default).catch((err) => {
       appPromise = null;
       throw err;
     });

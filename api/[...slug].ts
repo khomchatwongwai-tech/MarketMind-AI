@@ -1,5 +1,5 @@
-import app from '../server';
-import { normalizeApiUrl } from '../src/utils/apiUrlNormalizer';
+import app from '../server.js';
+import { normalizeApiUrl } from '../src/utils/apiUrlNormalizer.js';
 
 export default function handler(req: any, res: any) {
   try {

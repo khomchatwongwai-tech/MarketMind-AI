@@ -560,6 +560,22 @@ app.get('/api/market/candles/:ticker', async (req, res) => {
     return res.status(503).json(publicMarketDataFailure(error, ticker));
   }
 
+  try {
+    const providerCandles = await getLiveMarketDataService().getCandles(ticker, timeframe);
+    return res.json({
+      source: providerCandles[0].providerName,
+      quoteSource: liveQuote.providerName,
+      status: 'SUCCESS', ticker, name: liveQuote.name || `${ticker} Equity`, timeframe,
+      currency: liveQuote.currency, exchange: liveQuote.exchange || 'US Equities', price: liveQuote.price,
+      change: liveQuote.change, changePercent: liveQuote.changePercent, previousClose: liveQuote.previousClose,
+      dayHigh: liveQuote.dayHigh, dayLow: liveQuote.dayLow, levels: { pdc: liveQuote.previousClose },
+      candles: providerCandles.map((candle) => ({ time: Math.floor(candle.timestamp / 1000), open: candle.open, high: candle.high, low: candle.low, close: candle.close, volume: candle.volume })),
+      lastSyncTime: new Date(liveQuote.timestamp).toISOString(),
+    });
+  } catch (error) {
+    return res.status(503).json(publicMarketDataFailure(error, ticker));
+  }
+
   type VerifiedCandle = {
     time: number;
     open: number;
@@ -909,58 +925,10 @@ app.get('/api/market/live/:ticker', async (req, res) => {
 app.get('/api/market/tape', async (req, res) => {
   const symbols = ['SPY', 'QQQ', 'DIA', 'IWM', 'NVDA', 'AAPL', 'MSFT', 'TSLA', 'AMZN', 'META', 'AMD', 'GOOGL', 'PLTR', 'COIN'];
   try {
-    const yahooUrl = `https://query1.finance.yahoo.com/v7/finance/quote?symbols=${symbols.join(',')}`;
-    const response = await fetch(yahooUrl, {
-      headers: YAHOO_HEADERS,
-    });
-
-    if (response.ok) {
-      const data = await response.json();
-      const quotes = data?.quoteResponse?.result || [];
-      if (quotes.length > 0) {
-        const tape = quotes
-          .filter((q: any) => {
-            const price = Number(q.regularMarketPrice);
-            const change = Number(q.regularMarketChange);
-            const changePercent = Number(q.regularMarketChangePercent);
-            const volume = Number(q.regularMarketVolume);
-            const timestamp = Number(q.regularMarketTime);
-            return (
-              Number.isFinite(price) &&
-              price > 0 &&
-              Number.isFinite(change) &&
-              Number.isFinite(changePercent) &&
-              Number.isFinite(volume) &&
-              volume >= 0 &&
-              Number.isFinite(timestamp) &&
-              timestamp > 0
-            );
-          })
-          .map((q: any) => ({
-            symbol: q.symbol,
-            name: q.shortName || q.longName || q.symbol,
-            price: Number(q.regularMarketPrice),
-            change: Number(Number(q.regularMarketChange).toFixed(6)),
-            changePercent: Number(Number(q.regularMarketChangePercent).toFixed(6)),
-            volume: Number(q.regularMarketVolume),
-            marketState: q.marketState || 'CLOSED',
-            timestamp: new Date(Number(q.regularMarketTime) * 1000).toISOString(),
-          }));
-        if (tape.length > 0) {
-          return res.json({ source: 'Yahoo Finance Tape', quotes: tape, timestamp: new Date().toISOString() });
-        }
-      }
-    }
-    throw new Error('Yahoo quote batch fallback');
+    const quotes = await getLiveMarketDataService().getTape(symbols);
+    return res.json({ source: quotes[0]?.providerName || 'Market Data Provider', quotes: quotes.map((quote) => ({ symbol: quote.symbol, name: quote.name || quote.symbol, price: quote.price, change: quote.change, changePercent: quote.changePercent, volume: quote.volume, marketState: quote.marketSession, timestamp: new Date(quote.timestamp).toISOString() })), timestamp: new Date().toISOString() });
   } catch (err: any) {
-    console.warn('[LiveMarket] Market tape fetch failure:', err.message);
-    return res.status(503).json({
-      source: 'Market Real-Time Proxy Engine',
-      status: 'UNAVAILABLE',
-      quotes: [],
-      error: 'Market tape temporarily unavailable from upstream provider.',
-      timestamp: Date.now(),
-    });
+    return res.status(503).json({ ...publicMarketDataFailure(err, 'TAPE'), quotes: [] });
   }
 });
 

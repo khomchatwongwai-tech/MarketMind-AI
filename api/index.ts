@@ -1,12 +1,5 @@
 import app from '../server';
-
-export function normalizeApiUrl(rawUrl: string): string {
-  if (!rawUrl) return '/api';
-  if (!rawUrl.startsWith('/api')) {
-    return '/api' + (rawUrl.startsWith('/') ? rawUrl : '/' + rawUrl);
-  }
-  return rawUrl;
-}
+import { normalizeApiUrl } from '../src/utils/apiUrlNormalizer';
 
 export default function handler(req: any, res: any) {
   try {
@@ -15,7 +8,7 @@ export default function handler(req: any, res: any) {
     }
     return app(req, res);
   } catch (error: any) {
-    console.error('[Vercel Serverless Execution Failure]:', error);
+    console.error('[Vercel Serverless Index Execution Failure]:', error);
     if (!res.headersSent) {
       res.statusCode = 500;
       res.setHeader('Content-Type', 'application/json');

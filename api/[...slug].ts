@@ -1,5 +1,5 @@
 import app from '../server';
-import { normalizeApiUrl } from './index';
+import { normalizeApiUrl } from '../src/utils/apiUrlNormalizer';
 
 export default function handler(req: any, res: any) {
   try {

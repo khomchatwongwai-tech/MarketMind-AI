@@ -532,23 +532,23 @@ export const Header: React.FC<HeaderProps> = ({
                 }`}
               >
                 {isPositive ? <TrendingUp className="w-3.5 h-3.5" /> : <TrendingDown className="w-3.5 h-3.5" />}
-                {isFiniteMarketNumber(quote.change) ? `${isPositive ? '+' : ''}${quote.change.toFixed(2)}` : 'N/A'} (
-                {formatPercent(quote.changePercent, 2, true, 'N/A')})
+                {isFiniteMarketNumber(quote.change) ? `${isPositive ? '+' : ''}${quote.change.toFixed(2)}` : 'Unavailable'} (
+                {formatPercent(quote.changePercent, 2, true, 'Unavailable')})
               </div>
             </div>
 
             {/* Mobile Session Stats (Right of Price on Mobile: High, Low, Vol) */}
             <div className="flex flex-col items-end sm:hidden text-[10px] font-mono text-[#9CA3AF] space-y-0.5">
               <div>
-                High: <span className="text-white font-bold">{isFiniteMarketNumber(quote.dayHigh) ? `$${quote.dayHigh.toFixed(2)}` : 'N/A'}</span>
+                High: <span className="text-white font-bold">{isFiniteMarketNumber(quote.dayHigh) ? `$${quote.dayHigh.toFixed(2)}` : 'Unavailable'}</span>
               </div>
               <div>
-                Low: <span className="text-white font-bold">{isFiniteMarketNumber(quote.dayLow) ? `$${quote.dayLow.toFixed(2)}` : 'N/A'}</span>
+                Low: <span className="text-white font-bold">{isFiniteMarketNumber(quote.dayLow) ? `$${quote.dayLow.toFixed(2)}` : 'Unavailable'}</span>
               </div>
               <div>
                 {t('market.volume')}:{' '}
                 <span className="text-white font-bold">
-                  {formatVolume(quote.volume)}
+                  {formatVolume(quote.volume, 'Unavailable')}
                 </span>
               </div>
             </div>
@@ -559,25 +559,25 @@ export const Header: React.FC<HeaderProps> = ({
           {/* Desktop Session Metrics Bar */}
           <div className="hidden sm:grid xl:grid grid-cols-3 gap-x-4 gap-y-0.5 text-[10px] text-[#9CA3AF] uppercase tracking-wider pl-2 border-l border-[#242424]">
             <div>
-              {t('market.dayHigh')}: <span className="text-white font-mono font-semibold">{isFiniteMarketNumber(quote.dayHigh) ? `$${quote.dayHigh.toFixed(2)}` : 'N/A'}</span>
+              {t('market.dayHigh')}: <span className="text-white font-mono font-semibold">{isFiniteMarketNumber(quote.dayHigh) ? `$${quote.dayHigh.toFixed(2)}` : 'Unavailable'}</span>
             </div>
             <div>
-              {t('market.dayLow')}: <span className="text-white font-mono font-semibold">{isFiniteMarketNumber(quote.dayLow) ? `$${quote.dayLow.toFixed(2)}` : 'N/A'}</span>
+              {t('market.dayLow')}: <span className="text-white font-mono font-semibold">{isFiniteMarketNumber(quote.dayLow) ? `$${quote.dayLow.toFixed(2)}` : 'Unavailable'}</span>
             </div>
             <div>
-              {t('market.prevClose')}: <span className="text-white font-mono font-semibold">{isFiniteMarketNumber(quote.previousClose) ? `$${quote.previousClose.toFixed(2)}` : 'N/A'}</span>
+              {t('market.prevClose')}: <span className="text-white font-mono font-semibold">{isFiniteMarketNumber(quote.previousClose) ? `$${quote.previousClose.toFixed(2)}` : 'Unavailable'}</span>
             </div>
             <div>
               {t('market.volume')}:{' '}
               <span className="text-white font-mono font-semibold">
-                {formatVolume(quote.volume)}
+                {formatVolume(quote.volume, 'Unavailable')}
               </span>
             </div>
             <div>
-              Rel {t('market.volume')}: <span className="text-[#D4AF37] font-mono font-semibold">{isFiniteMarketNumber(quote.relativeVolume) ? `${quote.relativeVolume}x` : 'N/A'}</span>
+              Rel {t('market.volume')}: <span className="text-[#D4AF37] font-mono font-semibold">{isFiniteMarketNumber(quote.relativeVolume) ? `${quote.relativeVolume}x` : 'Unavailable'}</span>
             </div>
             <div>
-              {t('market.latency')}: <span className="text-[#F2D675] font-mono font-semibold">{isFiniteMarketNumber(quote.latencyMs) ? `${quote.latencyMs}ms` : 'N/A'}</span>
+              {t('market.latency')}: <span className="text-[#F2D675] font-mono font-semibold">{isFiniteMarketNumber(quote.latencyMs) ? `${quote.latencyMs}ms` : 'Unavailable'}</span>
             </div>
           </div>
         </div>

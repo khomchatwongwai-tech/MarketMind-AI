@@ -56,11 +56,11 @@ export const MarketMindSummaryCard: React.FC<MarketMindSummaryCardProps> = ({
       : 'UNAVAILABLE';
 
   const priceStr = formatPrice(quote.price, 2, 'Unavailable');
-  const changeStr = formatPercent(quote.changePercent, 2, true, 'N/A');
+  const changeStr = formatPercent(quote.changePercent, 2, true, 'Unavailable');
   const changeNum = quote.change;
   const changeAbsStr = isFiniteMarketNumber(changeNum)
     ? `${isPositive ? '+' : ''}${changeNum.toFixed(2)}`
-    : 'N/A';
+    : 'Unavailable';
 
   // SVG Gauge calculations
   const radius = 42;

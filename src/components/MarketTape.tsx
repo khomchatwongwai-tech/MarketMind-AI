@@ -42,7 +42,6 @@ const DEFAULT_SYMBOLS = [
 
 const QUICK_TICKERS = ['SPY', 'QQQ', 'NVDA', 'AAPL', 'MSFT', 'TSLA'];
 
-
 export const MarketTape: React.FC<MarketTapeProps> = ({
   selectedTicker,
   onSelectTicker,
@@ -54,9 +53,9 @@ export const MarketTape: React.FC<MarketTapeProps> = ({
     DEFAULT_SYMBOLS.map((sym) => ({
       symbol: sym,
       name: `${sym} Asset`,
-      price: 0,
-      change: 0,
-      changePercent: 0,
+      price: null as any,
+      change: null as any,
+      changePercent: null as any,
     }))
   );
 
@@ -106,7 +105,7 @@ export const MarketTape: React.FC<MarketTapeProps> = ({
           </span>
         </div>
 
-        <div className="flex items-center gap-1.5 overflow-hidden">
+        <div className="flex items-center gap-1.5 overflow-x-auto no-scrollbar">
           {QUICK_TICKERS.map((sym) => {
             const isSel = selectedTicker.toUpperCase() === sym.toUpperCase();
             const p = rtQuotes[sym.toUpperCase()]?.price;
@@ -122,7 +121,7 @@ export const MarketTape: React.FC<MarketTapeProps> = ({
                 }`}
               >
                 <span>{sym}</span>
-                <span className="text-[#E5E5E5]">{hasValidP ? `$${p.toFixed(1)}` : '--'}</span>
+                <span className="text-[#E5E5E5]">{hasValidP ? `$${p.toFixed(1)}` : 'Unavailable'}</span>
               </button>
             );
           })}
@@ -191,8 +190,8 @@ export const MarketTape: React.FC<MarketTapeProps> = ({
               title={`Click to load live ${item.name} analysis`}
             >
               <span className="font-bold text-white">{item.symbol}</span>
-              <span className="text-[#E5E5E5]">{hasValidPrice ? `$${currentPrice.toFixed(2)}` : '--'}</span>
-              {hasValidChangePct && (
+              <span className="text-[#E5E5E5]">{hasValidPrice ? `$${currentPrice.toFixed(2)}` : 'Unavailable'}</span>
+              {hasValidChangePct ? (
                 <span
                   className={`flex items-center text-[10px] font-bold ${
                     isPos ? 'text-[#22C55E]' : 'text-[#EF4444]'
@@ -201,6 +200,8 @@ export const MarketTape: React.FC<MarketTapeProps> = ({
                   {isPos ? '+' : ''}
                   {currentChangePct.toFixed(2)}%
                 </span>
+              ) : (
+                <span className="text-[10px] font-mono text-[#6B7280]">Unavailable</span>
               )}
             </button>
           );

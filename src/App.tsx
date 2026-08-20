@@ -13,7 +13,8 @@ import { OptionsTraderView } from './components/optionsTrader/OptionsTraderView'
 import { EconomicFedView } from './components/EconomicFedView';
 import { NewsAnalyzerView } from './components/NewsAnalyzerView';
 import { NewsIntelligenceDashboard } from './components/news/NewsIntelligenceDashboard';
-import { MultiAssetMarketsView } from './components/markets/MultiAssetMarketsView';
+import { MultiAssetMarketsView } from './components/markets/MultiAssetMarketsView.js';
+import { MarketScannerView } from './components/markets/MarketScannerView.js';
 import { UniversalSearchModal } from './components/markets/UniversalSearchModal';
 import { MultiAssetAiAnalysisModal } from './components/markets/MultiAssetAiAnalysisModal';
 import { AskMarketMindChat } from './components/AskMarketMindChat';
@@ -377,6 +378,15 @@ export default function App() {
             onNavigateTab={handleNavigateTab}
             onAskQuestion={handleAskQuestionFromDashboard}
             onSelectTicker={handleSelectTicker}
+          />
+        )}
+
+        {activeTab === 'scanner' && (
+          <MarketScannerView
+            onSelectTicker={(ticker) => {
+              handleSelectTicker(ticker);
+              setActiveTab('overview');
+            }}
           />
         )}
 

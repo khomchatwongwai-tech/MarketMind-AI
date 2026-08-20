@@ -1,32 +1,27 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import {
   History,
   Sparkles,
   TrendingUp,
   TrendingDown,
-  AlertTriangle,
-  FileText,
-  Calendar,
-  ArrowRight,
+  ExternalLink,
   ShieldCheck,
   Zap,
+  Info,
 } from 'lucide-react';
-import { ComprehensiveMarketData } from '../services/marketDataService';
-import { MASTER_INSTRUMENTS } from '../services/marketProviders/InstrumentDirectoryService';
+import { MarketNewsItem } from '../types/market.js';
+import {
+  VerifiedMarketCatalyst,
+  validateVerifiedCatalyst,
+  formatRelativeTime,
+} from '../utils/verifiedCatalystService.js';
 
 interface WhatChangedRetentionCardProps {
   onSelectSymbol: (symbol: string) => void;
-  onAskAI: (prompt: string) => void;
-}
-
-interface MarketDeltaItem {
-  id: string;
-  type: 'PRICE_MOVE' | 'EARNINGS' | 'LEVEL_BREAK' | 'NEWS' | 'MACRO';
-  symbol?: string;
-  title: string;
-  description: string;
-  timestamp: string;
-  sentiment: 'BULLISH' | 'BEARISH' | 'NEUTRAL';
+  onAskAI?: (prompt: string) => void;
+  news?: MarketNewsItem[];
+  rawEvents?: any[];
+  className?: string;
 }
 
 const LAST_VISIT_KEY = 'marketmind_last_visit_timestamp';
@@ -34,9 +29,12 @@ const LAST_VISIT_KEY = 'marketmind_last_visit_timestamp';
 export const WhatChangedRetentionCard: React.FC<WhatChangedRetentionCardProps> = ({
   onSelectSymbol,
   onAskAI,
+  news = [],
+  rawEvents = [],
+  className = '',
 }) => {
-  const [lastVisitTime, setLastVisitTime] = useState<string>('Earlier today');
-  const [deltaItems, setDeltaItems] = useState<MarketDeltaItem[]>([]);
+  const [lastVisitLabel, setLastVisitLabel] = useState<string>('Earlier today');
+  const [lastVisitMs, setLastVisitMs] = useState<number>(0);
   const [isExpanded, setIsExpanded] = useState<boolean>(true);
 
   useEffect(() => {
@@ -44,62 +42,42 @@ export const WhatChangedRetentionCard: React.FC<WhatChangedRetentionCardProps> =
     const now = Date.now();
 
     if (prevTimestamp) {
-      const prevDate = new Date(parseInt(prevTimestamp, 10));
-      const hoursAgo = Math.max(1, Math.round((now - prevDate.getTime()) / (1000 * 60 * 60)));
-      setLastVisitTime(hoursAgo === 1 ? '1 hour ago' : `${hoursAgo} hours ago`);
+      const prevMs = parseInt(prevTimestamp, 10);
+      if (!isNaN(prevMs) && prevMs > 0) {
+        setLastVisitMs(prevMs);
+        const hoursAgo = Math.max(1, Math.round((now - prevMs) / (1000 * 60 * 60)));
+        setLastVisitLabel(hoursAgo === 1 ? '1 hour ago' : `${hoursAgo} hours ago`);
+      } else {
+        setLastVisitLabel('First session today');
+      }
     } else {
-      setLastVisitTime('First session today');
+      setLastVisitLabel('First session today');
     }
 
     // Record current session timestamp for next visit
     localStorage.setItem(LAST_VISIT_KEY, String(now));
-
-    // Construct verified delta items
-    const deltas: MarketDeltaItem[] = [
-      {
-        id: 'delta_1',
-        type: 'PRICE_MOVE',
-        symbol: 'NVDA',
-        title: 'NVDA accelerated +3.4%',
-        description: 'Broke out on sustained AI accelerator volume following enterprise cluster expansion disclosures.',
-        timestamp: '2h ago',
-        sentiment: 'BULLISH',
-      },
-      {
-        id: 'delta_2',
-        type: 'MACRO',
-        symbol: 'SPY',
-        title: 'Macro PPI Data Release',
-        description: 'Producer Price Index printed cooler than forecast (+0.1% vs +0.2%), easing bond yields.',
-        timestamp: '3h ago',
-        sentiment: 'BULLISH',
-      },
-      {
-        id: 'delta_3',
-        type: 'LEVEL_BREAK',
-        symbol: 'BTC',
-        title: 'Bitcoin Retested $68,000 Resistance',
-        description: 'Spot ETF net inflows expanded by $310M in the latest reporting window.',
-        timestamp: '4h ago',
-        sentiment: 'BULLISH',
-      },
-      {
-        id: 'delta_4',
-        type: 'NEWS',
-        symbol: 'AAPL',
-        title: 'Apple AI Service Rollout Milestone',
-        description: 'Regulatory approvals cleared for multi-region generative Siri enhancements.',
-        timestamp: '5h ago',
-        sentiment: 'NEUTRAL',
-      },
-    ];
-
-    setDeltaItems(deltas);
   }, []);
 
+  // Filter & validate verified events strictly
+  const verifiedCatalysts = useMemo(() => {
+    const combinedCandidates = [...news, ...rawEvents];
+    const results: VerifiedMarketCatalyst[] = [];
+
+    for (const item of combinedCandidates) {
+      const validated = validateVerifiedCatalyst(item, lastVisitMs);
+      if (validated) {
+        results.push(validated);
+      }
+    }
+
+    // Sort by publication timestamp descending
+    return results.sort((a, b) => b.publishedAtMs - a.publishedAtMs);
+  }, [news, rawEvents, lastVisitMs]);
+
   return (
-    <div className="bg-[#0F0F12] border border-[#27272E] rounded-xl p-4 shadow-lg">
-      <div className="flex items-center justify-between pb-3 border-b border-[#222228]">
+    <div className={`bg-[#0F0F12] border border-[#27272E] rounded-xl p-4 shadow-lg select-none font-sans ${className}`}>
+      {/* 1. Header & Last Visit Session Bar */}
+      <div className="flex flex-wrap items-center justify-between gap-3 pb-3 border-b border-[#222228]">
         <div className="flex items-center gap-2.5">
           <div className="p-1.5 bg-[#17171F] border border-[#D4AF37]/40 rounded-lg text-[#D4AF37]">
             <History className="w-4 h-4" />
@@ -110,73 +88,110 @@ export const WhatChangedRetentionCard: React.FC<WhatChangedRetentionCardProps> =
                 WHAT CHANGED SINCE YOUR LAST VISIT?
               </h3>
               <span className="px-2 py-0.5 bg-[#1E1E26] text-[#D4AF37] text-[10px] font-mono rounded font-semibold border border-[#D4AF37]/20">
-                {lastVisitTime}
+                {lastVisitLabel}
               </span>
             </div>
-            <p className="text-[11px] text-[#9CA3AF]">
-              Verified market catalysts and price shifts since your previous session
+            <p className="text-[11px] text-[#9CA3AF] font-mono">
+              Genuinely verified market developments &bull; Source provenance & timestamp verified
             </p>
           </div>
         </div>
 
         <button
           onClick={() => setIsExpanded(!isExpanded)}
-          className="text-xs text-[#D4AF37] hover:underline font-mono"
+          className="text-xs text-[#D4AF37] hover:underline font-mono cursor-pointer"
         >
           {isExpanded ? 'Hide Brief' : 'View Changes'}
         </button>
       </div>
 
+      {/* 2. Verified Catalyst Grid or Empty State */}
       {isExpanded && (
-        <div className="mt-3 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-2.5">
-          {deltaItems.map((item) => (
-            <div
-              key={item.id}
-              onClick={() => {
-                if (item.symbol) onSelectSymbol(item.symbol);
-              }}
-              className="p-3 bg-[#131317] border border-[#202026] hover:border-[#D4AF37]/50 rounded-lg cursor-pointer transition-all flex flex-col justify-between group"
-            >
-              <div>
-                <div className="flex items-center justify-between mb-1.5">
-                  <div className="flex items-center gap-1.5">
-                    {item.symbol && (
-                      <span className="px-1.5 py-0.5 bg-[#1C1C24] text-[#F2D675] text-[10px] font-mono font-bold rounded border border-[#D4AF37]/30">
-                        {item.symbol}
-                      </span>
-                    )}
-                    <span className="text-[10px] text-[#71717A] font-mono">{item.timestamp}</span>
-                  </div>
-                  {item.sentiment === 'BULLISH' ? (
-                    <span className="text-emerald-400 text-[10px] font-semibold flex items-center gap-0.5">
-                      <TrendingUp className="w-3 h-3" /> Bullish
-                    </span>
-                  ) : item.sentiment === 'BEARISH' ? (
-                    <span className="text-red-400 text-[10px] font-semibold flex items-center gap-0.5">
-                      <TrendingDown className="w-3 h-3" /> Bearish
-                    </span>
-                  ) : (
-                    <span className="text-blue-400 text-[10px] font-semibold flex items-center gap-0.5">
-                      <Zap className="w-3 h-3" /> Event
-                    </span>
-                  )}
-                </div>
-                <h4 className="text-xs font-bold text-white group-hover:text-[#F2D675] transition-colors leading-tight">
-                  {item.title}
-                </h4>
-                <p className="text-[11px] text-[#A1A1AA] mt-1 leading-snug line-clamp-2">
-                  {item.description}
-                </p>
-              </div>
-
-              <div className="mt-2 pt-2 border-t border-[#1C1C22] flex items-center justify-between text-[10px] text-[#71717A] font-mono">
-                <span>Verified Fact</span>
-                <span className="text-[#D4AF37] group-hover:underline flex items-center gap-0.5">
-                  Analyze <ArrowRight className="w-2.5 h-2.5" />
+        <div className="mt-3">
+          {verifiedCatalysts.length === 0 ? (
+            <div className="p-6 bg-[#131317] border border-[#202026] rounded-lg text-center font-mono">
+              <div className="flex flex-col items-center justify-center gap-2">
+                <Info className="w-6 h-6 text-[#9CA3AF] opacity-60" />
+                <span className="text-xs font-bold text-[#E5E5E5]">
+                  No verified market developments since your last visit.
+                </span>
+                <span className="text-[11px] text-[#6B7280]">
+                  MarketMind strictly rejects unverified stories, missing sources, and sample news.
                 </span>
               </div>
             </div>
-          ))}
+          ) : (
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-2.5">
+              {verifiedCatalysts.map((item) => (
+                <div
+                  key={item.id}
+                  className="p-3 bg-[#131317] border border-[#202026] hover:border-[#D4AF37]/50 rounded-lg transition-all flex flex-col justify-between group"
+                >
+                  <div>
+                    {/* Header Row: Symbol, Relative Time & Sentiment */}
+                    <div className="flex items-center justify-between mb-1.5 font-mono">
+                      <div className="flex items-center gap-1.5">
+                        <button
+                          onClick={() => onSelectSymbol(item.symbol)}
+                          className="px-1.5 py-0.5 bg-[#1C1C24] text-[#F2D675] hover:text-white text-[10px] font-bold rounded border border-[#D4AF37]/30 transition cursor-pointer"
+                        >
+                          {item.symbol}
+                        </button>
+                        <span className="text-[10px] text-[#71717A]">
+                          {formatRelativeTime(item.publishedAtMs)}
+                        </span>
+                      </div>
+
+                      {item.sentiment === 'BULLISH' ? (
+                        <span className="text-emerald-400 text-[10px] font-semibold flex items-center gap-0.5">
+                          <TrendingUp className="w-3 h-3" /> Bullish
+                        </span>
+                      ) : item.sentiment === 'BEARISH' ? (
+                        <span className="text-red-400 text-[10px] font-semibold flex items-center gap-0.5">
+                          <TrendingDown className="w-3 h-3" /> Bearish
+                        </span>
+                      ) : (
+                        <span className="text-amber-400 text-[10px] font-semibold flex items-center gap-0.5">
+                          <Zap className="w-3 h-3" /> Neutral
+                        </span>
+                      )}
+                    </div>
+
+                    {/* Title */}
+                    <h4 className="text-xs font-bold text-white group-hover:text-[#F2D675] transition-colors leading-tight">
+                      {item.title}
+                    </h4>
+
+                    {/* Description */}
+                    {item.description && (
+                      <p className="text-[11px] text-[#A1A1AA] mt-1 leading-snug line-clamp-2">
+                        {item.description}
+                      </p>
+                    )}
+                  </div>
+
+                  {/* Footer Row: Provenance Source, Verification Badge & Clickable Source Link */}
+                  <div className="mt-2 pt-2 border-t border-[#1C1C22] flex items-center justify-between text-[10px] font-mono">
+                    <div className="flex items-center gap-1 text-emerald-400 font-bold">
+                      <ShieldCheck className="w-3 h-3" />
+                      <span>Verified Fact</span>
+                    </div>
+
+                    <a
+                      href={item.url}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="text-[#D4AF37] hover:text-white flex items-center gap-1 hover:underline cursor-pointer"
+                      title={`Read original story from ${item.source}`}
+                    >
+                      <span className="truncate max-w-[80px]">{item.source}</span>
+                      <ExternalLink className="w-2.5 h-2.5" />
+                    </a>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
         </div>
       )}
     </div>

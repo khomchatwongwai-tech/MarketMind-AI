@@ -210,6 +210,7 @@ export const DashboardOverview: React.FC<DashboardOverviewProps> = ({
           if (onSelectTicker) onSelectTicker(sym as any);
         }}
         onAskAI={onAskQuestion}
+        news={news}
       />
 
       {/* 0. MASSIVE WEBSOCKET LIVE PIPELINE BAR */}

@@ -14,6 +14,10 @@ test('Production API Routing - vercel.json & api/index.ts configured for Serverl
 
   const content = fs.readFileSync(vercelJsonPath, 'utf8');
   const parsed = JSON.parse(content);
+  assert.equal(Array.isArray(parsed.rewrites), true, 'vercel.json must define rewrites');
+  const hasApiRewrite = parsed.rewrites.some((r: any) => r.source === '/api/(.*)' && (r.destination === '/api' || r.destination === '/api/index.ts'));
+  assert.equal(hasApiRewrite, true, 'vercel.json must include /api/(.*) rewrite destination pointing to /api');
+
   const apiIndexPath = path.join(process.cwd(), 'api', 'index.ts');
   assert.equal(fs.existsSync(apiIndexPath), true, 'api/index.ts serverless function entrypoint must exist');
 

@@ -1,3 +1,4 @@
+import { useI18n } from '../i18n/I18nContext.js';
 import React from 'react';
 import { Calendar, AlertTriangle, Scale, Landmark, TrendingUp, TrendingDown, Clock, ShieldAlert } from 'lucide-react';
 import { ComprehensiveMarketData } from '../services/marketDataService';
@@ -7,6 +8,7 @@ interface EconomicFedViewProps {
 }
 
 export const EconomicFedView: React.FC<EconomicFedViewProps> = ({ data }) => {
+  const { t, formatDate } = useI18n();
   const { economicEvents, fed } = data;
 
   const hasHighVolEvent = economicEvents.some((e) => e.isApproachingHighVol);

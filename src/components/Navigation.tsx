@@ -1,3 +1,4 @@
+import { LanguageSelector } from './LanguageSelector.js';
 import React, { useState } from 'react';
 import { useI18n } from '../i18n/I18nContext';
 import {
@@ -301,7 +302,12 @@ export const Navigation: React.FC<NavigationProps> = ({
             </div>
           </div>
 
-          {/* Quick Subscription / Plan Banner */}
+          {/* Language Selector in Mobile Drawer */
+          <div className="px-4 py-2 bg-[#121212] border-b border-[#1C1C1C]">
+            <LanguageSelector variant="mobile-row" />
+          </div>
+
+          /* Quick Subscription / Plan Banner */}
           {currentUser && (
             <div className="px-4 py-2.5 bg-[#121212] border-b border-[#1C1C1C] flex items-center justify-between">
               <div className="flex items-center gap-2">

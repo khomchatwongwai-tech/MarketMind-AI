@@ -1,12 +1,34 @@
-import serverModule from '../dist/server.cjs';
+import { createRequire } from 'module';
 import { normalizeApiUrl } from '../src/utils/apiUrlNormalizer.js';
 
-export default function handler(req: any, res: any) {
+let appPromise: Promise<any> | null = null;
+
+async function getApp() {
+  if (!appPromise) {
+    appPromise = (async () => {
+      try {
+        const require = createRequire(import.meta.url);
+        const mod = require('../dist/server.cjs');
+        return mod.app || mod.default || mod;
+      } catch (err1) {
+        console.warn('[Vercel Serverless] Falling back to server.js due to:', err1);
+        const mod = await import('../server.js');
+        return mod.app || mod.default || mod;
+      }
+    })().catch((err) => {
+      appPromise = null;
+      throw err;
+    });
+  }
+  return appPromise;
+}
+
+export default async function handler(req: any, res: any) {
   try {
     if (req.url) {
       req.url = normalizeApiUrl(req.url);
     }
-    const app = serverModule.app || serverModule.default || serverModule;
+    const app = await getApp();
     return app(req, res);
   } catch (error: any) {
     console.error('[Vercel Serverless Index Execution Failure]:', error);

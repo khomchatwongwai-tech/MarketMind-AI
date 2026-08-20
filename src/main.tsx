@@ -5,6 +5,7 @@ import { I18nProvider } from './i18n/I18nContext';
 import { ThemeProvider } from './context/ThemeContext';
 import { ErrorBoundary } from './components/ErrorBoundary';
 import { testFirestoreConnection } from './config/firebase';
+import { Analytics } from '@vercel/analytics/react';
 import './index.css';
 
 // Validate connection to Firestore on boot as mandated
@@ -16,6 +17,7 @@ createRoot(document.getElementById('root')!).render(
       <ThemeProvider>
         <I18nProvider>
           <App />
+          <Analytics />
         </I18nProvider>
       </ThemeProvider>
     </ErrorBoundary>

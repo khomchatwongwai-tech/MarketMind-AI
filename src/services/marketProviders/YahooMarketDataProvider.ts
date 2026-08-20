@@ -8,49 +8,15 @@ import {
 } from '../../types/marketProviders.js';
 import { MarketQuote } from '../../types/market.js';
 import { InstitutionalMarketDataProvider } from './InstitutionalMarketDataProvider.js';
-import { CapacitorPlatform } from '../mobile/capacitorPlatform.js';
 
 export class YahooMarketDataProvider implements MarketDataProvider {
   readonly id = 'yahoo_finance';
-  readonly name = 'Yahoo Finance (Real-Time)';
+  readonly name = 'Yahoo Finance';
   readonly supportedAssetClasses: AssetClass[] = ['STOCK', 'ETF', 'INDEX', 'CRYPTO', 'TREASURY', 'COMMODITY'];
 
   private fallback = new InstitutionalMarketDataProvider();
 
   async getQuote(symbol: string): Promise<MarketQuote> {
-    try {
-      const baseUrl = CapacitorPlatform.getApiBaseUrl();
-      const res = await fetch(`${baseUrl}/api/market/quote/${encodeURIComponent(symbol)}`);
-      if (res.ok) {
-        const json = await res.json();
-        if (json && json.price) {
-          return {
-            ticker: symbol.toUpperCase() as any,
-            name: json.name || `${symbol} Quote`,
-            price: json.price,
-            change: json.change || 0,
-            changePercent: json.changePercent || 0,
-            dayHigh: json.dayHigh || json.price,
-            dayLow: json.dayLow || json.price,
-            openPrice: json.openPrice || json.price,
-            previousClose: json.previousClose || json.price,
-            preMarketPrice: json.preMarketPrice || json.price,
-            preMarketChangePercent: json.preMarketChangePercent || 0,
-            volume: json.volume || 1000000,
-            avgVolume: json.avgVolume || 1500000,
-            relativeVolume: json.relativeVolume || 1.0,
-            fiftyTwoWeekHigh: json.fiftyTwoWeekHigh || json.price * 1.2,
-            fiftyTwoWeekLow: json.fiftyTwoWeekLow || json.price * 0.8,
-            timestamp: new Date().toLocaleTimeString('en-US', { timeZone: 'America/New_York' }) + ' ET',
-            marketStatus: json.marketStatus || 'REGULAR',
-            dataSource: this.name,
-            latencyMs: 42,
-          };
-        }
-      }
-    } catch (e) {
-      // fallback
-    }
     return this.fallback.getQuote(symbol);
   }
 
@@ -79,9 +45,15 @@ export class YahooMarketDataProvider implements MarketDataProvider {
   }
 
   async getHealth() {
-    return {
-      status: 'ONLINE' as const,
-      latencyMs: 38,
-    };
+    const started = Date.now();
+    try {
+      const quote = await this.getQuote('SPY');
+      return {
+        status: quote.metadata?.source === 'yahoo' ? ('ONLINE' as const) : ('DEGRADED' as const),
+        latencyMs: Date.now() - started,
+      };
+    } catch {
+      return { status: 'OFFLINE' as const, latencyMs: Date.now() - started };
+    }
   }
 }

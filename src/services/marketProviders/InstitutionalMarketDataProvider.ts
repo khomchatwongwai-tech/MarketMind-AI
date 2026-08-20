@@ -70,28 +70,51 @@ export class InstitutionalMarketDataProvider implements MarketDataProvider {
       const res = await fetch(`${baseUrl}/api/market/quote/${encodeURIComponent(sym)}`);
       if (res.ok) {
         const json = await res.json();
-        if (json && json.price) {
+        const providerQuote = json?.quote;
+        const instrument = json?.instrument;
+        const required = [
+          providerQuote?.price,
+          providerQuote?.change,
+          providerQuote?.changePercent,
+          providerQuote?.dayHigh,
+          providerQuote?.dayLow,
+          providerQuote?.openPrice,
+          providerQuote?.previousClose,
+          providerQuote?.volume,
+        ];
+        if (
+          json?.entitlementStatus?.isAvailable &&
+          providerQuote?.metadata?.validationStatus === 'VALID' &&
+          providerQuote?.metadata?.stale === false &&
+          required.every((value) => typeof value === 'number' && Number.isFinite(value))
+        ) {
           const quote: MarketQuote = {
             ticker: sym as any,
-            name: json.name || `${sym} Asset`,
-            price: json.price,
-            change: json.change || 0,
-            changePercent: json.changePercent || 0,
-            dayHigh: json.dayHigh || json.price * 1.008,
-            dayLow: json.dayLow || json.price * 0.992,
-            openPrice: json.openPrice || json.price * 0.998,
-            previousClose: json.previousClose || json.price,
-            preMarketPrice: json.preMarketPrice || json.price,
-            preMarketChangePercent: json.preMarketChangePercent || 0,
-            volume: json.volume || 1500000,
-            avgVolume: json.avgVolume || 2000000,
-            relativeVolume: json.relativeVolume || 1.1,
-            fiftyTwoWeekHigh: json.fiftyTwoWeekHigh || json.price * 1.25,
-            fiftyTwoWeekLow: json.fiftyTwoWeekLow || json.price * 0.75,
-            timestamp: new Date().toLocaleTimeString('en-US', { timeZone: 'America/New_York' }) + ' ET',
-            marketStatus: json.marketStatus || 'REGULAR',
-            dataSource: this.name,
-            latencyMs: 14,
+            name: instrument?.name || `${sym} Asset`,
+            price: providerQuote.price,
+            change: providerQuote.change,
+            changePercent: providerQuote.changePercent,
+            dayHigh: providerQuote.dayHigh,
+            dayLow: providerQuote.dayLow,
+            openPrice: providerQuote.openPrice,
+            previousClose: providerQuote.previousClose,
+            preMarketPrice: null as any,
+            preMarketChangePercent: null as any,
+            volume: providerQuote.volume,
+            avgVolume: null as any,
+            relativeVolume: null as any,
+            fiftyTwoWeekHigh: null as any,
+            fiftyTwoWeekLow: null as any,
+            timestamp: providerQuote.timestamp,
+            marketStatus: providerQuote.marketState,
+            dataStatus: providerQuote.metadata.mode,
+            dataSource: providerQuote.dataSource,
+            latencyMs: providerQuote.latencyMs,
+            currency: providerQuote.currency,
+            exchange: instrument?.exchange,
+            bid: providerQuote.bid,
+            ask: providerQuote.ask,
+            metadata: providerQuote.metadata,
           };
           this.latestQuotesCache.set(sym, quote);
           return quote;
@@ -177,16 +200,33 @@ export class InstitutionalMarketDataProvider implements MarketDataProvider {
       if (res.ok) {
         const json = await res.json();
         if (json && Array.isArray(json.candles) && json.candles.length > 0) {
-          return json.candles.map((c: any) => ({
-            timestamp: typeof c.time === 'number' && c.time < 10000000000 ? c.time * 1000 : Number(c.time || Date.now()),
-            timeString: c.timeString || new Date(c.time * 1000).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
-            open: c.open,
-            high: c.high,
-            low: c.low,
-            close: c.close,
-            volume: c.volume,
-            vwap: c.vwap,
-          }));
+          return json.candles
+            .filter((c: any) => {
+              const timestamp = Number(c.time);
+              const values = [c.open, c.high, c.low, c.close, c.volume].map(Number);
+              return (
+                Number.isFinite(timestamp) &&
+                timestamp > 0 &&
+                values.every(Number.isFinite) &&
+                values.slice(0, 4).every((value) => value > 0) &&
+                values[4] >= 0
+              );
+            })
+            .map((c: any) => ({
+              timestamp: Number(c.time) < 10000000000 ? Number(c.time) * 1000 : Number(c.time),
+              timeString:
+                c.timeString ||
+                new Date(Number(c.time) < 10000000000 ? Number(c.time) * 1000 : Number(c.time)).toLocaleTimeString([], {
+                  hour: '2-digit',
+                  minute: '2-digit',
+                }),
+              open: Number(c.open),
+              high: Number(c.high),
+              low: Number(c.low),
+              close: Number(c.close),
+              volume: Number(c.volume),
+              vwap: Number.isFinite(Number(c.vwap)) ? Number(c.vwap) : undefined,
+            }));
         }
       }
     } catch {
@@ -281,6 +321,9 @@ export class InstitutionalMarketDataProvider implements MarketDataProvider {
   }
 
   async getOptionsChain(symbol: string): Promise<OptionsChainData> {
+    if (!AppConfig.allowSimulatedMarketData) {
+      throw new Error(`Verified options data for ${symbol.toUpperCase().trim()} is unavailable.`);
+    }
     const sym = symbol.toUpperCase().trim();
     let p = 100;
     try {

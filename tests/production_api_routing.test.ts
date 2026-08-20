@@ -7,6 +7,15 @@ import path from 'node:path';
 import { CapacitorPlatform } from '../src/services/mobile/capacitorPlatform.js';
 import { ApiClient } from '../src/services/apiClient.js';
 import app from '../server.js';
+import { LiveMarketDataService, setLiveMarketDataServiceForTests } from '../src/server/liveMarketDataService.js';
+import { DataProviderRouter } from '../src/services/marketProviders/DataProviderRouter.js';
+
+setLiveMarketDataServiceForTests(new LiveMarketDataService({
+  env: { YAHOO_MARKET_DATA_ENABLED: 'false' },
+  fetchFn: async () => { throw new Error('network must not be called'); },
+  logger: () => undefined,
+}));
+DataProviderRouter.resetForTests();
 
 test('Production API Routing - vercel.json & api/index.ts configured for Serverless API execution', () => {
   const vercelJsonPath = path.join(process.cwd(), 'vercel.json');

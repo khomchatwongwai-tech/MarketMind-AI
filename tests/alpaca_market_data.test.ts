@@ -1,8 +1,7 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import { AlpacaMarketDataService, AlpacaProviderError } from '../src/server/alpacaMarketDataService';
-import { DataProviderRouter } from '../src/services/marketProviders/DataProviderRouter';
-import { InstrumentResolver } from '../src/services/marketProviders/InstrumentResolver';
+import { LiveMarketDataService } from '../src/server/liveMarketDataService';
 
 const response = (status: number, body: unknown) => new Response(JSON.stringify(body), { status, headers: { 'content-type': 'application/json' } });
 
@@ -37,15 +36,20 @@ test('Alpaca historical bars parse verified IEX OHLCV data', async () => {
 });
 
 test('market-data routing falls back from unavailable Massive to verified Alpaca IEX', async () => {
-  const previous = { key: process.env.ALPACA_API_KEY, secret: process.env.ALPACA_API_SECRET, fetch: globalThis.fetch };
-  process.env.ALPACA_API_KEY = 'alpaca-key'; process.env.ALPACA_API_SECRET = 'alpaca-secret';
-  globalThis.fetch = (async (url: string | URL | Request) => String(url).includes('polygon.io')
+  const fetchMock = (async (url: string | URL | Request) => String(url).includes('polygon.io')
     ? response(503, {})
     : response(200, { latestTrade: { p: 501, t: '2026-08-16T14:30:00Z' }, latestQuote: { bp: 500.9, ap: 501.1, t: '2026-08-16T14:30:00Z' }, dailyBar: { o: 498, h: 502, l: 497, c: 501, v: 1000 }, prevDailyBar: { c: 499 } })) as typeof fetch;
-  const instrument = InstrumentResolver.resolve('SPY').instrument;
-  const result = await (DataProviderRouter as any).fetchLiveQuote(instrument, { providerId: 'massive', name: 'Massive', averageLatencyMs: 1 });
+  const service = new LiveMarketDataService({
+    env: {
+      MASSIVE_API_KEY: 'massive-key',
+      ALPACA_API_KEY: 'alpaca-key',
+      ALPACA_API_SECRET: 'alpaca-secret',
+      ALPACA_DATA_FEED: 'iex',
+      YAHOO_MARKET_DATA_ENABLED: 'false',
+    },
+    fetchFn: fetchMock,
+    logger: () => undefined,
+  });
+  const result = await service.getQuote('SPY');
   assert.equal(result.providerId, 'alpaca'); assert.equal(result.price, 501);
-  globalThis.fetch = previous.fetch;
-  if (previous.key === undefined) delete process.env.ALPACA_API_KEY; else process.env.ALPACA_API_KEY = previous.key;
-  if (previous.secret === undefined) delete process.env.ALPACA_API_SECRET; else process.env.ALPACA_API_SECRET = previous.secret;
 });

@@ -59,20 +59,20 @@ export interface ChartLevels {
 
 export interface MarketStructureInfo {
   timeframe: string;
-  trend: 'Uptrend' | 'Downtrend' | 'Sideways' | 'Consolidation' | 'Breakout' | 'Breakdown';
-  structure: 'Higher highs / higher lows' | 'Lower highs / lower lows' | 'Consolidation' | 'Breakout' | 'Breakdown' | 'Possible Reversal';
-  priceVsVwap: 'Above' | 'Below' | 'Crossing/Choppy';
+  trend: 'Uptrend' | 'Downtrend' | 'Sideways' | 'Consolidation' | 'Breakout' | 'Breakdown' | 'Unavailable';
+  structure: 'Higher highs / higher lows' | 'Lower highs / lower lows' | 'Consolidation' | 'Breakout' | 'Breakdown' | 'Possible Reversal' | 'Unavailable';
+  priceVsVwap: 'Above' | 'Below' | 'Crossing/Choppy' | 'Unavailable';
   vwapConditionText: string;
-  momentum: 'Strong' | 'Moderate' | 'Weak' | 'Overextended';
-  volumeCondition: 'Above Average' | 'Normal' | 'Below Average' | 'Spike';
-  relativeVolume: number;
+  momentum: 'Strong' | 'Moderate' | 'Weak' | 'Overextended' | 'Unavailable';
+  volumeCondition: 'Above Average' | 'Normal' | 'Below Average' | 'Spike' | 'Unavailable';
+  relativeVolume: number | null;
   multiTimeframeAlignment: Array<{
     timeframe: string;
     bias: 'Bullish' | 'Bearish' | 'Neutral';
     score: number;
   }>;
-  overallAlignmentScore: number;
-  overallBias: 'Bullish' | 'Bearish' | 'Neutral';
+  overallAlignmentScore: number | null;
+  overallBias: 'Bullish' | 'Bearish' | 'Neutral' | 'Unavailable';
 }
 
 export interface BreakoutAlert {

@@ -64,7 +64,7 @@ export function useMassiveWebSocket(initialTicker: string = 'SPY'): UseMassiveWe
 
       ws.onopen = () => {
         setIsConnected(true);
-        setStatus('LIVE');
+        setStatus('CONNECTING');
         reconnectAttemptsRef.current = 0;
         // Subscribe only to active ticker (default SPY)
         ws.send(JSON.stringify({ action: 'SUBSCRIBE', ticker }));
@@ -184,4 +184,3 @@ export function useMassiveWebSocket(initialTicker: string = 'SPY'): UseMassiveWe
     reconnect,
   };
 }
-

@@ -1673,10 +1673,33 @@ const BASE_MASTER_INSTRUMENTS: NormalizedInstrument[] = [
   },
 ];
 
+function stripEmbeddedMarketSnapshot(instrument: NormalizedInstrument): NormalizedInstrument {
+  const {
+    price: _price,
+    change: _change,
+    changePercent: _changePercent,
+    bid: _bid,
+    ask: _ask,
+    spread: _spread,
+    volume: _volume,
+    high: _high,
+    low: _low,
+    open: _open,
+    previousClose: _previousClose,
+    fiftyTwoWeekHigh: _fiftyTwoWeekHigh,
+    fiftyTwoWeekLow: _fiftyTwoWeekLow,
+    marketCap: _marketCap,
+    ...referenceMetadata
+  } = instrument;
+  return referenceMetadata;
+}
+
+// The instrument directory is reference metadata only. Embedded example snapshots
+// must never become a quote fallback or be rendered as current market data.
 export const MASTER_INSTRUMENTS: NormalizedInstrument[] = [
   ...BASE_MASTER_INSTRUMENTS,
   ...ADDITIONAL_INSTRUMENTS,
-];
+].map(stripEmbeddedMarketSnapshot);
 
 export class InstrumentDirectoryService {
   private static directory: Map<string, NormalizedInstrument> = new Map();

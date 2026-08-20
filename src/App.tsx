@@ -51,12 +51,13 @@ import { AnalyticsService } from './services/analyticsService';
 
 import {
   getComprehensiveMarketData,
+  generateEmptyMarketData,
   simulateTick,
   fetchLiveMarketQuote,
   mergeLiveQuoteIntoComprehensiveData,
   ComprehensiveMarketData,
 } from './services/marketDataService';
-import { TickerSymbol, MarketAlert, LiveMarketDataSource } from './types/market';
+import { TickerSymbol, MarketAlert } from './types/market';
 import { NormalizedInstrument } from './types/instrument';
 import { MobileNavigationBar } from './components/mobile/MobileNavigationBar';
 import { DeepLinkManager } from './services/mobile/deepLinking';
@@ -75,7 +76,6 @@ export default function App() {
   );
   const [activeTab, setActiveTab] = useState<ActiveTab>('overview');
   const [isLive, setIsLive] = useState<boolean>(false);
-  const [dataSource, setDataSource] = useState<LiveMarketDataSource>('Yahoo Finance (Real-Time)');
   const [tickSpeed, setTickSpeed] = useState<number>(3000);
   const [isLoadingLive, setIsLoadingLive] = useState<boolean>(false);
   const [reportModalType, setReportModalType] = useState<'morning' | 'eod' | null>(null);
@@ -208,16 +208,21 @@ export default function App() {
   const [alerts, setAlerts] = useState<MarketAlert[]>([]);
 
   // Fetch real-time live market movement from Yahoo Finance / Google Finance
-  const syncLiveMarket = useCallback(async (ticker: TickerSymbol, source: LiveMarketDataSource) => {
+  const syncLiveMarket = useCallback(async (ticker: TickerSymbol) => {
     try {
       setIsLoadingLive(true);
-      const liveResult = await fetchLiveMarketQuote(ticker, source);
+      const liveResult = await fetchLiveMarketQuote(ticker);
       if (liveResult && liveResult.price) {
         setMarketData((prev) => mergeLiveQuoteIntoComprehensiveData(prev, liveResult));
         setIsLive(true);
+      } else {
+        setMarketData(generateEmptyMarketData(ticker));
+        setIsLive(false);
       }
     } catch (e) {
       console.warn('Live sync error:', e);
+      setMarketData(generateEmptyMarketData(ticker));
+      setIsLive(false);
     } finally {
       setIsLoadingLive(false);
     }
@@ -229,33 +234,35 @@ export default function App() {
     const newData = getComprehensiveMarketData(ticker);
     setMarketData(newData);
     // Fetch live quote immediately for new ticker
-    syncLiveMarket(ticker, dataSource);
+    syncLiveMarket(ticker);
   };
 
   // Initial load sync
   useEffect(() => {
-    syncLiveMarket(selectedTicker, dataSource);
-  }, [selectedTicker, dataSource, syncLiveMarket]);
+    syncLiveMarket(selectedTicker);
+  }, [selectedTicker, syncLiveMarket]);
 
   // Manual refresh / recalculate
   const handleManualRefresh = () => {
-    syncLiveMarket(selectedTicker, dataSource);
+    syncLiveMarket(selectedTicker);
   };
 
   // Real-time live movement polling & tick engine
   useEffect(() => {
-    if (!isLive) return;
-
     let tickCount = 0;
     const interval = setInterval(async () => {
       tickCount++;
       // Every 3 ticks, fetch fresh quote from Yahoo / Google
       if (tickCount % 3 === 0) {
-        const liveResult = await fetchLiveMarketQuote(selectedTicker, dataSource);
+        const liveResult = await fetchLiveMarketQuote(selectedTicker);
         if (liveResult && liveResult.price) {
           setMarketData((prev) => mergeLiveQuoteIntoComprehensiveData(prev, liveResult));
+          setIsLive(true);
           return;
         }
+        setMarketData(generateEmptyMarketData(selectedTicker));
+        setIsLive(false);
+        return;
       }
 
       // Fast tick movement interpolation between live queries
@@ -289,7 +296,7 @@ export default function App() {
     }, tickSpeed);
 
     return () => clearInterval(interval);
-  }, [isLive, selectedTicker, dataSource, tickSpeed]);
+  }, [selectedTicker, tickSpeed]);
 
   const handleDismissAlert = (id: string) => {
     setAlerts((prev) => prev.filter((a) => a.id !== id));
@@ -323,7 +330,7 @@ export default function App() {
         selectedTicker={selectedTicker}
         onSelectTicker={handleSelectTicker}
         isLive={isLive}
-        onToggleLive={() => setIsLive(!isLive)}
+        onToggleLive={handleManualRefresh}
         onManualRefresh={handleManualRefresh}
         unreadAlertCount={unreadAlertCount}
         onOpenReport={(type) => {
@@ -334,8 +341,6 @@ export default function App() {
         onOpenChat={() => setActiveTab('chat')}
         onOpenUniversalSearch={() => setIsUniversalSearchOpen(true)}
         onOpenReportIssue={() => setIsReportIssueOpen(true)}
-        dataSource={dataSource}
-        onChangeDataSource={setDataSource}
         tickSpeed={tickSpeed}
         onChangeTickSpeed={setTickSpeed}
         isLoadingLive={isLoadingLive}
@@ -501,12 +506,12 @@ export default function App() {
       {/* Footer / Risk Disclaimer & Telemetry Bar */}
       <footer className="mt-3 py-2.5 px-3 bg-[#15171a] border border-[#2d3139] rounded-lg text-[10px] text-slate-400 flex flex-wrap justify-between items-center gap-2">
         <div className="flex flex-wrap items-center gap-3">
-          <span className="px-1.5 py-0.2 bg-emerald-500/15 text-emerald-400 border border-emerald-500/30 rounded font-bold font-mono text-[9px] flex items-center gap-1">
-            <span className="h-1.5 w-1.5 rounded-full bg-emerald-400 animate-pulse"></span>
-            LIVE MARKET FEED
+          <span className={`px-1.5 py-0.2 rounded font-bold font-mono text-[9px] flex items-center gap-1 border ${isLive ? 'bg-emerald-500/15 text-emerald-400 border-emerald-500/30' : 'bg-rose-500/15 text-rose-400 border-rose-500/30'}`}>
+            <span className={`h-1.5 w-1.5 rounded-full ${isLive ? 'bg-emerald-400 animate-pulse' : 'bg-rose-400'}`}></span>
+            {isLive ? 'LIVE MARKET FEED' : 'MARKET DATA UNAVAILABLE'}
           </span>
           <span>
-            Connected to <strong>{dataSource}</strong>. Probabilities calculated dynamically with Bayesian quantitative models.
+            Provider: <strong>{marketData.quote.dataSource || 'DATA UNAVAILABLE'}</strong>. Derived analytics remain unavailable until verified inputs are present.
           </span>
         </div>
 
@@ -674,7 +679,7 @@ export default function App() {
         isOpen={isReportIssueOpen}
         onClose={() => setIsReportIssueOpen(false)}
         activeSymbol={selectedTicker}
-        dataSource={dataSource}
+        dataSource={marketData.quote.dataSource || 'DATA UNAVAILABLE'}
       />
 
       {/* Mobile Sticky Bottom Navigation Bar */}

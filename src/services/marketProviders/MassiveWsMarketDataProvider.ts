@@ -17,12 +17,7 @@ export class MassiveWsMarketDataProvider implements MarketDataProvider {
   private fallback = new InstitutionalMarketDataProvider();
 
   async getQuote(symbol: string): Promise<MarketQuote> {
-    const q = await this.fallback.getQuote(symbol);
-    return {
-      ...q,
-      dataSource: this.name,
-      latencyMs: 8,
-    };
+    return this.fallback.getQuote(symbol);
   }
 
   async getHistoricalBars(
@@ -50,9 +45,15 @@ export class MassiveWsMarketDataProvider implements MarketDataProvider {
   }
 
   async getHealth() {
-    return {
-      status: 'ONLINE' as const,
-      latencyMs: 8,
-    };
+    const started = Date.now();
+    try {
+      const quote = await this.getQuote('SPY');
+      return {
+        status: quote.metadata?.source === 'massive' ? ('ONLINE' as const) : ('DEGRADED' as const),
+        latencyMs: Date.now() - started,
+      };
+    } catch {
+      return { status: 'OFFLINE' as const, latencyMs: Date.now() - started };
+    }
   }
 }

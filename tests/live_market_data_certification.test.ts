@@ -5,6 +5,30 @@ import { InstrumentDirectoryService } from '../src/services/marketProviders/Inst
 import { TradingViewDatafeedAdapter } from '../src/services/realtime/TradingViewDatafeedAdapter';
 import { RealtimeCandleAggregator } from '../src/services/realtime/RealtimeCandleAggregator';
 import { AppConfig } from '../src/config/environment';
+import {
+  LiveMarketDataService,
+  MarketDataUnavailableError,
+  setLiveMarketDataServiceForTests,
+} from '../src/server/liveMarketDataService';
+
+const providerResponse = new Response(JSON.stringify({
+  ticker: {
+    lastTrade: { p: 650.25, t: 1787149800000000000 },
+    lastQuote: { p: 650.2, P: 650.3 },
+    day: { o: 647.5, h: 652.1, l: 645.8, c: 650.25, v: 38_500_000 },
+    prevDay: { o: 642.2, h: 649.7, l: 640.1, c: 646.4, v: 54_000_000 },
+    updated: 1787149800000000000,
+    market_status: 'open',
+  },
+}), { status: 200, headers: { 'content-type': 'application/json' } });
+
+setLiveMarketDataServiceForTests(new LiveMarketDataService({
+  env: { MASSIVE_API_KEY: 'configured-test-key', YAHOO_MARKET_DATA_ENABLED: 'false' },
+  fetchFn: async () => providerResponse.clone(),
+  now: () => 1787149860000,
+  logger: () => undefined,
+}));
+DataProviderRouter.resetForTests();
 
 describe('MarketMind AI — Live Market Data Certification Suite', () => {
   it('1. Zero Simulation Mandate: allowSimulatedMarketData is strictly false in production', () => {
@@ -14,12 +38,12 @@ describe('MarketMind AI — Live Market Data Certification Suite', () => {
     }
   });
 
-  it('2. Massive / Polygon Provider: Fails closed when unconfigured or error occurs', async () => {
+  it('2. Massive / Polygon Provider: returns a validated provider quote', async () => {
     const quote = await DataProviderRouter.getQuote('NVDA');
     assert.ok(quote);
     assert.ok(quote.instrument);
     assert.equal(quote.instrument.symbol, 'NVDA');
-    assert.ok(typeof quote.quote.price === 'number');
+    assert.ok(typeof quote.quote.price === 'number' && quote.quote.price > 0);
     assert.ok(quote.quote.metadata);
   });
 
@@ -138,11 +162,15 @@ describe('MarketMind AI — Live Market Data Certification Suite', () => {
     assert.equal(btcState, 'ACTIVE_24_7');
   });
 
-  it('9. Stale Data & Unavailability Handling: Missing instrument never generates random mock data', async () => {
-    const unknownQuote = await DataProviderRouter.getQuote('NONEXISTENT_TICKER_XYZ_123');
-    assert.ok(unknownQuote);
-    assert.equal(unknownQuote.quote.price, 0);
-    assert.equal(unknownQuote.quote.metadata?.mode, 'UNAVAILABLE');
-    assert.equal(unknownQuote.entitlementStatus.isAvailable, false);
+  it('9. Stale Data & Unavailability Handling: provider failure never generates mock data', async () => {
+    const unavailable = new LiveMarketDataService({
+      env: { YAHOO_MARKET_DATA_ENABLED: 'false' },
+      fetchFn: async () => { throw new Error('network must not be called'); },
+      logger: () => undefined,
+    });
+    await assert.rejects(
+      () => unavailable.getQuote('SPY'),
+      (error: unknown) => error instanceof MarketDataUnavailableError
+    );
   });
 });

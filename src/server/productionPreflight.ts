@@ -161,8 +161,25 @@ export function validateProductionEnvironment(
   }
 
   // 5. Market Data Feeds (Massive/Polygon or Alpaca)
-  const hasMassiveOrPolygon = Boolean(env.MASSIVE_API_KEY?.trim() || env.POLYGON_API_KEY?.trim());
-  const hasAlpaca = Boolean(env.ALPACA_API_KEY?.trim() && env.ALPACA_API_SECRET?.trim());
+  const configuredSecret = (value: string | undefined) => {
+    const trimmed = value?.trim() || '';
+    const lower = trimmed.toLowerCase();
+    return (
+      trimmed.length >= 8 &&
+      !lower.includes('placeholder') &&
+      !lower.includes('example') &&
+      !lower.includes('api_key') &&
+      !lower.startsWith('your_')
+    );
+  };
+  const hasMassiveOrPolygon = configuredSecret(env.MASSIVE_API_KEY) || configuredSecret(env.POLYGON_API_KEY);
+  const hasAlpacaKey = configuredSecret(env.ALPACA_API_KEY);
+  const hasAlpacaSecret = configuredSecret(env.ALPACA_API_SECRET);
+  const hasAlpaca = hasAlpacaKey && hasAlpacaSecret;
+
+  if (hasAlpacaKey !== hasAlpacaSecret) {
+    errors.push('ALPACA_API_KEY and ALPACA_API_SECRET must be configured as a complete credential pair');
+  }
 
   if (!hasMassiveOrPolygon && !hasAlpaca) {
     if (isProduction) {
@@ -212,6 +229,10 @@ export function validateProductionEnvironment(
   // 8. Market Data Mode Consistency
   const marketMode = env.MARKET_DATA_MODE;
   const viteMarketMode = env.VITE_MARKET_DATA_MODE;
+  const supportedMarketModes = new Set(['real_time', 'live', 'delayed']);
+  if (isProduction && marketMode && !supportedMarketModes.has(marketMode)) {
+    errors.push('MARKET_DATA_MODE must be real_time, live, or delayed for the production live-market pipeline');
+  }
   if (marketMode && viteMarketMode && marketMode !== viteMarketMode) {
     errors.push('MARKET_DATA_MODE and VITE_MARKET_DATA_MODE must match');
   }

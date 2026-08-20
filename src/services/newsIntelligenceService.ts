@@ -308,13 +308,13 @@ export class NewsIntelligenceService {
 
     const matchingEarnings = earningsItems.find((e) => e.ticker === sym);
     const primaryNews = newsItems[0] || {
-      headline: `${sym} Market Structure & Factor Alignment`,
-      source: 'MarketMind Official Financial Aggregator',
-      provider: 'MarketMind',
-      impact: 'HIGH',
-      impactScore: 78,
-      sentiment: 'BULLISH',
-      verificationStatus: 'CONFIRMED',
+      headline: 'No verified catalyst available.',
+      source: 'Unavailable',
+      provider: 'Unavailable',
+      impact: 'LOW',
+      impactScore: 0,
+      sentiment: 'NEUTRAL',
+      verificationStatus: 'UNVERIFIED',
     };
 
     let bullishCount = 0;
@@ -326,9 +326,11 @@ export class NewsIntelligenceService {
       else neutralCount++;
     }
 
-    const currentPrice = liveQuote?.price ?? 0;
-    const priceChange = liveQuote?.change ?? 0;
-    const priceChangePercent = liveQuote?.changePercent ?? 0;
+    const verifiedNumber = (value: unknown): number | null =>
+      typeof value === 'number' && Number.isFinite(value) ? value : null;
+    const currentPrice = verifiedNumber(liveQuote?.price);
+    const priceChange = verifiedNumber(liveQuote?.change);
+    const priceChangePercent = verifiedNumber(liveQuote?.changePercent);
 
     const sources: VerifiedSourceCitation[] = newsItems.map((n) => ({
       sourceName: n.source,
@@ -341,104 +343,89 @@ export class NewsIntelligenceService {
       isPrimaryOfficial: n.sourceTier === 'TIER_1_PRIMARY',
     }));
 
-    if (sources.length === 0) {
-      sources.push({
-        sourceName: `${sym} SEC EDGAR Filings & Investor Relations`,
-        providerId: 'provider_sec_edgar',
-        tier: 'TIER_1_PRIMARY',
-        headline: `Official Corporate Disclosures and Regulatory Filings for ${sym}`,
-        url: `https://www.sec.gov/edgar/searchedgar/companysearch?company=${sym}`,
-        publishedAt: new Date().toISOString(),
-        retrievedAt: new Date().toISOString(),
-        isPrimaryOfficial: true,
-      });
-    }
-
     const totalSentiment = bullishCount + bearishCount + neutralCount;
     const computedScore = totalSentiment > 0
       ? Math.round(50 + ((bullishCount - bearishCount) / totalSentiment) * 30)
-      : (priceChangePercent > 0 ? 65 : priceChangePercent < 0 ? 35 : 50);
+      : null;
 
-    const trend = priceChangePercent > 1
+    const trend = priceChangePercent === null
+      ? 'Unavailable'
+      : priceChangePercent > 1
       ? 'Intraday Uptrend'
       : priceChangePercent < -1
       ? 'Intraday Downtrend'
       : 'Consolidating';
 
-    const vwapText = liveQuote?.vwap
-      ? (currentPrice >= liveQuote.vwap
-        ? `Holding +$${(currentPrice - liveQuote.vwap).toFixed(2)} Above VWAP`
-        : `Trading -$${(liveQuote.vwap - currentPrice).toFixed(2)} Below VWAP`)
-      : 'VWAP Calculation Pending Live Session';
+    const verifiedVwap = verifiedNumber(liveQuote?.vwap);
+    const vwapText = verifiedVwap !== null && currentPrice !== null
+      ? (currentPrice >= verifiedVwap
+        ? `Holding +$${(currentPrice - verifiedVwap).toFixed(2)} Above VWAP`
+        : `Trading -$${(verifiedVwap - currentPrice).toFixed(2)} Below VWAP`)
+      : 'VWAP unavailable';
 
-    const support = liveQuote?.dayLow && liveQuote.dayLow > 0
-      ? liveQuote.dayLow
-      : currentPrice > 0 ? Number((currentPrice * 0.985).toFixed(2)) : 0;
-
-    const resistance = liveQuote?.dayHigh && liveQuote.dayHigh > 0
-      ? liveQuote.dayHigh
-      : currentPrice > 0 ? Number((currentPrice * 1.018).toFixed(2)) : 0;
+    const support = verifiedNumber(liveQuote?.dayLow);
+    const resistance = verifiedNumber(liveQuote?.dayHigh);
 
     return {
       ticker: sym,
       companyName: sym === 'SPY' ? 'SPDR S&P 500 ETF Trust' : sym === 'NVDA' ? 'NVIDIA Corporation' : sym === 'TSLA' ? 'Tesla, Inc.' : sym === 'AAPL' ? 'Apple Inc.' : `${sym} Equity`,
-      latestPrice: currentPrice,
-      priceChange,
-      priceChangePercent,
-      marketMindScore: computedScore,
-      latestCatalyst: primaryNews.headline,
+      latestPrice: currentPrice as any,
+      priceChange: priceChange as any,
+      priceChangePercent: priceChangePercent as any,
+      marketMindScore: computedScore as any,
+      latestCatalyst: newsItems.length > 0 ? primaryNews.headline : 'Unavailable',
       breakingNews: newsItems,
       primaryCatalyst: {
         headline: primaryNews.headline,
         source: primaryNews.source,
-        provider: primaryNews.provider || 'MarketMind Aggregator',
-        impact: (primaryNews.impact || 'HIGH') as any,
-        impactScore: primaryNews.impactScore || 80,
-        sentiment: (primaryNews.sentiment || 'BULLISH') as any,
-        verificationStatus: (primaryNews.verificationStatus || 'CONFIRMED') as any,
+        provider: primaryNews.provider || 'Unavailable',
+        impact: (primaryNews.impact || 'LOW') as any,
+        impactScore: primaryNews.impactScore || 0,
+        sentiment: (primaryNews.sentiment || 'NEUTRAL') as any,
+        verificationStatus: (primaryNews.verificationStatus || 'UNVERIFIED') as any,
       },
       newsSentimentSummary: {
         bullishCount,
         bearishCount,
         neutralCount,
-        overallSentiment: bullishCount >= bearishCount ? 'BULLISH' : 'BEARISH',
-        dominantTheme: newsItems[0]?.headline || `Market news and regulatory disclosures for ${sym}`,
+        overallSentiment: totalSentiment === 0 ? 'NEUTRAL' : bullishCount >= bearishCount ? 'BULLISH' : 'BEARISH',
+        dominantTheme: newsItems[0]?.headline || 'Unavailable',
       },
       technicalCondition: {
         trend,
         vwapStatus: vwapText,
-        keySupport: support,
-        keyResistance: resistance,
-        relativeVolume: liveQuote?.volume ? 1.0 : 0,
+        keySupport: support as any,
+        keyResistance: resistance as any,
+        relativeVolume: verifiedNumber(liveQuote?.relativeVolume) as any,
       },
       optionsActivity: {
-        putCallRatio: liveQuote?.optionsMetrics?.putCallRatio || 1.0,
+        putCallRatio: verifiedNumber(liveQuote?.optionsMetrics?.putCallRatio) as any,
         unusualFlowDetected: !!liveQuote?.optionsMetrics?.unusualFlowDetected,
         flowSentiment: (liveQuote?.optionsMetrics?.flowSentiment as any) || 'Neutral',
-        dominantStrike: liveQuote?.optionsMetrics?.dominantStrike || (currentPrice > 0 ? `$${Math.round(currentPrice * 1.02)} Strike` : 'N/A'),
+        dominantStrike: liveQuote?.optionsMetrics?.dominantStrike || 'N/A',
       },
-      upcomingEvents: [
-        {
-          date: matchingEarnings ? matchingEarnings.reportDate : 'Upcoming Fiscal Cycle',
-          title: matchingEarnings ? `${sym} Quarterly Earnings Release (${matchingEarnings.timing})` : `${sym} Investor Disclosures`,
-          type: matchingEarnings ? 'EARNINGS' : 'CONFERENCE',
-        },
-      ],
+      upcomingEvents: matchingEarnings
+        ? [{
+            date: matchingEarnings.reportDate,
+            title: `${sym} Quarterly Earnings Release (${matchingEarnings.timing})`,
+            type: 'EARNINGS',
+          }]
+        : [],
       marketMindOutlook: {
         verifiedFacts: [
-          `Verified primary filings from ${sources[0]?.sourceName || 'SEC EDGAR'}.`,
-          currentPrice > 0 ? `Price trading at $${currentPrice.toFixed(2)} (${priceChangePercent >= 0 ? '+' : ''}${priceChangePercent.toFixed(2)}% on session).` : 'Live quote feed pending provider connection.',
+          ...(sources[0] ? [`Verified source evidence from ${sources[0].sourceName}.`] : []),
+          currentPrice !== null && priceChangePercent !== null ? `Price trading at $${currentPrice.toFixed(2)} (${priceChangePercent >= 0 ? '+' : ''}${priceChangePercent.toFixed(2)}% on session).` : 'Live quote feed pending provider connection.',
           newsItems.length > 0 ? `Aggregated ${newsItems.length} verified news catalysts from authorized providers.` : 'No breaking news catalysts reported in current window.',
         ],
         aiInterpretation: totalSentiment > 0
           ? `${bullishCount >= bearishCount ? 'Constructive' : 'Cautious'} news sentiment observed across ${totalSentiment} analyzed wire reports.`
           : 'Awaiting additional market intelligence and provider updates.',
-        marketDataConfirmation: currentPrice > 0 ? `Live market price discovery validated by authorized provider.` : 'Awaiting real-time market data feed.',
+        marketDataConfirmation: currentPrice !== null ? `Market price received from the selected provider.` : 'Awaiting real-time market data feed.',
         risksAndAlternativeExplanations: [
-          support > 0 ? `A break below support ($${support.toFixed(2)}) may indicate increased selling pressure.` : 'Monitor support levels upon market open.',
+          support !== null ? `A break below the verified day low ($${support.toFixed(2)}) may indicate increased selling pressure.` : 'Verified support level unavailable.',
           'Macro headline volatility from official economic releases could impact asset valuations.',
         ],
-        shortTermBias: bullishCount >= bearishCount ? 'Bullish' : 'Bearish',
+        shortTermBias: totalSentiment === 0 ? 'Neutral' : bullishCount >= bearishCount ? 'Bullish' : 'Bearish',
         confidence: totalSentiment >= 3 ? 'HIGH' : totalSentiment >= 1 ? 'MEDIUM' : 'LOW',
       },
       sources,

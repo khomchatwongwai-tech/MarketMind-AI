@@ -67,17 +67,25 @@ export interface MassiveAiInsight {
   bearishFactors: string[];
   breakoutConfirmation: string;
   invalidationLevel: string;
-  bias: 'BULLISH' | 'BEARISH' | 'NEUTRAL';
+  bias: 'BULLISH' | 'BEARISH' | 'NEUTRAL' | 'UNAVAILABLE';
   confidence: number;
   summary: string;
   keyLevels: {
-    vwap: number;
-    ema9: number;
-    ema20: number;
-    support: number;
-    resistance: number;
+    vwap: number | null;
+    ema9: number | null;
+    ema20: number | null;
+    support: number | null;
+    resistance: number | null;
   };
   timestamp: string;
+  provenance?: {
+    status: 'SUCCESS' | 'UNAVAILABLE' | 'INSUFFICIENT_DATA';
+    fieldsUsed: string[];
+    sourcesUsed: string[];
+    generatedAt: string;
+    confidence: number;
+    omittedFields: string[];
+  };
 }
 
 export interface MassiveWsClientMessage {

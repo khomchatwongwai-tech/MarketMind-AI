@@ -300,6 +300,42 @@ export const MassiveLiveFeedBar: React.FC<MassiveLiveFeedBarProps> = ({
               <span className="text-[#EF4444] font-bold">Invalidation Level:</span> {aiInsight.invalidationLevel}
             </div>
           </div>
+
+          {/* Provenance & Validated Data Guardrails Metadata */}
+          {aiInsight.provenance && (
+            <div className="mt-1 pt-2 border-t border-[#1F1F24] flex flex-wrap items-center justify-between gap-2 text-[10px] font-mono text-[#9CA3AF]">
+              <div className="flex flex-wrap items-center gap-1.5">
+                <span className="text-[#22C55E] font-bold">Verified Inputs ({aiInsight.provenance.fieldsUsed.length}):</span>
+                {aiInsight.provenance.fieldsUsed.slice(0, 5).map((f) => (
+                  <span key={f} className="px-1.5 py-0.5 bg-[#151515] border border-[#22C55E]/30 text-[#E5E5E5] rounded">
+                    {f}
+                  </span>
+                ))}
+              </div>
+
+              {aiInsight.provenance.omittedFields.length > 0 && (
+                <div className="flex flex-wrap items-center gap-1.5">
+                  <span className="text-amber-400 font-bold">Omitted (Missing):</span>
+                  {aiInsight.provenance.omittedFields.slice(0, 4).map((f) => (
+                    <span key={f} className="px-1.5 py-0.5 bg-[#151515] border border-amber-500/30 text-amber-300 rounded">
+                      {f}
+                    </span>
+                  ))}
+                </div>
+              )}
+
+              <div className="flex items-center gap-2">
+                <span className="px-2 py-0.5 bg-[#151515] border border-[#D4AF37]/30 text-[#F2D675] rounded font-bold">
+                  Conviction: {aiInsight.provenance.confidence}%
+                </span>
+                {aiInsight.provenance.sourcesUsed.map((s) => (
+                  <span key={s} className="px-1.5 py-0.5 bg-[#18181B] text-[#A1A1AA] border border-[#27272A] rounded">
+                    {s}
+                  </span>
+                ))}
+              </div>
+            </div>
+          )}
         </div>
       )}
     </div>

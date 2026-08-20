@@ -1,34 +1,28 @@
-import React from 'react';
-import { useI18n } from '../i18n/I18nContext';
+import React, { useState } from 'react';
+import { useI18n } from '../i18n/I18nContext.js';
 import {
   Sparkles,
-  Radio,
-  Clock,
   TrendingUp,
   TrendingDown,
   ShieldCheck,
-  Target,
-  BarChart2,
-  Database,
   CheckCircle2,
   AlertTriangle,
   Zap,
-  Activity,
-  Layers,
   BotMessageSquare,
-  Flame,
-  HelpCircle,
-  FileText,
   Crown,
   Info,
+  Layers,
+  ChevronDown,
+  ChevronUp,
 } from 'lucide-react';
-import { ComprehensiveMarketData } from '../services/marketDataService';
-import { Probabilities } from '../types/market';
-import { isFiniteMarketNumber, formatPrice, formatPercent, formatNumber } from '../utils/formatters';
+import { ComprehensiveMarketData } from '../services/marketDataService.js';
+import { Probabilities } from '../types/market.js';
+import { isFiniteMarketNumber, formatPrice, formatPercent } from '../utils/formatters.js';
+import { calculateRealtimeIntelligence } from '../utils/realtimeIntelligenceEngine.js';
 
 interface MarketMindSummaryCardProps {
   data: ComprehensiveMarketData;
-  probabilities: Probabilities;
+  probabilities?: Probabilities;
   onAskQuestion?: (q: string) => void;
   onNavigateTab?: (tab: any) => void;
   className?: string;
@@ -41,68 +35,38 @@ export const MarketMindSummaryCard: React.FC<MarketMindSummaryCardProps> = ({
   onNavigateTab,
   className = '',
 }) => {
-  const { t, timezone, currency } = useI18n();
-  const { quote, technicals, supportResistance, trends, breadth } = data;
+  const { t } = useI18n();
+  const [showDiagnostics, setShowDiagnostics] = useState<boolean>(false);
+  const { quote } = data;
   const isPositive = isFiniteMarketNumber(quote.change) ? quote.change >= 0 : true;
 
-  // Determine Direction
-  const isBullish = (probabilities?.bullish ?? 50) >= (probabilities?.bearish ?? 50);
-  const primaryOutlook = isBullish ? t('dashboard.bullish') : t('dashboard.bearish');
-  const primaryConfidence = isBullish ? (probabilities?.bullish ?? 50) : (probabilities?.bearish ?? 50);
+  // Run Real-Time Intelligence Engine
+  const engine = calculateRealtimeIntelligence(data);
 
-  // Multi-timeframe percentages
-  const tf15MScore = isBullish ? Math.min(95, primaryConfidence - 4) : Math.min(95, primaryConfidence - 3);
-  const tf1HScore = primaryConfidence;
-  const tfTodayScore = isBullish ? Math.max(50, primaryConfidence - 7) : Math.max(50, primaryConfidence - 6);
+  const isScoreValid = engine.status !== 'UNAVAILABLE' && engine.intelligenceScore !== null;
+  const isBullish = engine.overallBias === 'BULLISH';
+  const isBearish = engine.overallBias === 'BEARISH';
 
-  // Setup Quality & Score Calculation
-  const setupScore = probabilities?.setupScore || 78;
-  const setupQualityText =
-    probabilities?.setupQuality ||
-    (setupScore >= 75 ? t('dashboard.strongSetup') : setupScore >= 55 ? t('dashboard.moderateSetup') : t('dashboard.weakSetup'));
+  const primaryOutlook =
+    engine.overallBias === 'BULLISH'
+      ? t('dashboard.bullish')
+      : engine.overallBias === 'BEARISH'
+      ? t('dashboard.bearish')
+      : engine.overallBias === 'NEUTRAL'
+      ? 'NEUTRAL'
+      : 'UNAVAILABLE';
 
-  // Confirmation & Invalidation levels
-  const confirmationLevel = isFiniteMarketNumber(supportResistance.r1)
-    ? supportResistance.r1.toFixed(2)
-    : isFiniteMarketNumber(quote.price)
-    ? (quote.price * 1.004).toFixed(2)
+  const priceStr = formatPrice(quote.price, 2, 'Unavailable');
+  const changeNum = quote.change;
+  const changeAbsStr = isFiniteMarketNumber(changeNum)
+    ? `${isPositive ? '+' : ''}${changeNum.toFixed(2)}`
     : 'N/A';
-
-  const invalidationLevel = isFiniteMarketNumber(supportResistance.s1)
-    ? supportResistance.s1.toFixed(2)
-    : isFiniteMarketNumber(quote.price)
-    ? (quote.price * 0.996).toFixed(2)
-    : 'N/A';
-
-  // Dynamic Factors Check
-  const isAboveVwap = isFiniteMarketNumber(quote.price) && isFiniteMarketNumber(technicals.vwap)
-    ? quote.price >= technicals.vwap
-    : true;
-  const isEmaBullish = isFiniteMarketNumber(technicals.ema9) && isFiniteMarketNumber(technicals.ema20)
-    ? technicals.ema9 >= technicals.ema20
-    : true;
-  const isBreadthPositive = isFiniteMarketNumber(breadth.advanceDeclineRatio)
-    ? breadth.advanceDeclineRatio >= 1.0
-    : true;
-
-  // Timestamp in ET
-  const timeET = quote.timestamp || new Date().toLocaleTimeString('en-US', {
-    hour: '2-digit',
-    minute: '2-digit',
-    second: '2-digit',
-    timeZone: 'America/New_York',
-  }) + ' ET';
 
   // SVG Gauge calculations
   const radius = 42;
   const circumference = 2 * Math.PI * radius;
-  const strokeDashoffset = circumference - (setupScore / 100) * circumference;
-
-  const priceStr = formatPrice(quote.price, 2, 'Unavailable');
-  const changeStr = formatPercent(quote.changePercent, 2, true, 'N/A');
-  const changeAbsStr = isFiniteMarketNumber(quote.change) ? `${isPositive ? '+' : ''}${quote.change.toFixed(2)}` : 'N/A';
-  const vwapStr = isFiniteMarketNumber(technicals.vwap) ? `$${technicals.vwap.toFixed(2)}` : 'N/A';
-  const r1Str = isFiniteMarketNumber(supportResistance.r1) ? `$${supportResistance.r1.toFixed(2)}` : 'N/A';
+  const scoreVal = isScoreValid ? engine.intelligenceScore! : 0;
+  const strokeDashoffset = circumference - (scoreVal / 100) * circumference;
 
   return (
     <div
@@ -114,7 +78,7 @@ export const MarketMindSummaryCard: React.FC<MarketMindSummaryCardProps> = ({
         <div>
           <div className="flex items-center gap-2">
             <span className="text-xl sm:text-2xl font-black font-mono tracking-wider text-white">
-              {quote.ticker}
+              {quote.ticker || 'SPY'}
             </span>
             <span className="text-[10px] px-2 py-0.5 bg-[#151515] text-[#F2D675] border border-[#D4AF37]/40 rounded font-mono font-bold uppercase">
               {quote.name || 'Benchmark Asset'}
@@ -134,7 +98,7 @@ export const MarketMindSummaryCard: React.FC<MarketMindSummaryCardProps> = ({
           </div>
         </div>
 
-        {/* Live Feed Status Badge & Action */}
+        {/* Live Feed Status Badge & Timestamp */}
         <div className="flex flex-col sm:items-end gap-1.5 font-mono">
           <div className="flex items-center gap-2 px-3 py-1 bg-[#22C55E]/10 border border-[#22C55E]/40 rounded-md text-[#22C55E] text-xs font-bold shadow-sm">
             <span className="relative flex h-2 w-2">
@@ -144,7 +108,7 @@ export const MarketMindSummaryCard: React.FC<MarketMindSummaryCardProps> = ({
             <span className="tracking-widest">{t('common.live')} FEED</span>
           </div>
           <span className="text-[11px] text-[#9CA3AF]">
-            {t('dashboard.updatedAt')}: <strong className="text-white">{timeET}</strong>
+            {t('dashboard.updatedAt')}: <strong className="text-white">{engine.updatedAt}</strong>
           </span>
         </div>
       </div>
@@ -166,18 +130,20 @@ export const MarketMindSummaryCard: React.FC<MarketMindSummaryCardProps> = ({
                     strokeWidth="7"
                     fill="transparent"
                   />
-                  <circle
-                    cx="50"
-                    cy="50"
-                    r={radius}
-                    stroke="url(#goldGradient)"
-                    strokeWidth="7"
-                    strokeDasharray={circumference}
-                    strokeDashoffset={strokeDashoffset}
-                    strokeLinecap="round"
-                    fill="transparent"
-                    className="transition-all duration-1000 ease-out"
-                  />
+                  {isScoreValid && (
+                    <circle
+                      cx="50"
+                      cy="50"
+                      r={radius}
+                      stroke="url(#goldGradient)"
+                      strokeWidth="7"
+                      strokeDasharray={circumference}
+                      strokeDashoffset={strokeDashoffset}
+                      strokeLinecap="round"
+                      fill="transparent"
+                      className="transition-all duration-1000 ease-out"
+                    />
+                  )}
                   <defs>
                     <linearGradient id="goldGradient" x1="0%" y1="0%" x2="100%" y2="100%">
                       <stop offset="0%" stopColor="#8C6B18" />
@@ -188,11 +154,11 @@ export const MarketMindSummaryCard: React.FC<MarketMindSummaryCardProps> = ({
                   </defs>
                 </svg>
                 <div className="absolute inset-0 flex flex-col items-center justify-center text-center">
-                  <span className="text-xl font-black font-mono text-white leading-none">
-                    {setupScore}
+                  <span className="text-lg font-black font-mono text-white leading-none">
+                    {isScoreValid ? engine.intelligenceScore : 'N/A'}
                   </span>
                   <span className="text-[9px] text-[#9CA3AF] font-mono leading-none mt-0.5">
-                    / 100
+                    {isScoreValid ? '/ 100' : 'UNAVAIL'}
                   </span>
                 </div>
               </div>
@@ -207,15 +173,27 @@ export const MarketMindSummaryCard: React.FC<MarketMindSummaryCardProps> = ({
                 <div className="flex items-baseline gap-2 mt-0.5">
                   <span
                     className={`text-xl sm:text-2xl font-black tracking-wide font-mono flex items-center gap-1.5 ${
-                      isBullish ? 'text-[#22C55E]' : 'text-[#EF4444]'
+                      isBullish
+                        ? 'text-[#22C55E]'
+                        : isBearish
+                        ? 'text-[#EF4444]'
+                        : 'text-amber-400'
                     }`}
                   >
-                    {isBullish ? <TrendingUp className="w-5 h-5" /> : <TrendingDown className="w-5 h-5" />}
+                    {isBullish ? (
+                      <TrendingUp className="w-5 h-5" />
+                    ) : isBearish ? (
+                      <TrendingDown className="w-5 h-5" />
+                    ) : (
+                      <Zap className="w-5 h-5" />
+                    )}
                     {primaryOutlook}
                   </span>
-                  <span className="text-xs text-[#9CA3AF] font-mono">
-                    Confidence: <strong className="text-white font-bold">{primaryConfidence}%</strong>
-                  </span>
+                  {isScoreValid && (
+                    <span className="text-xs text-[#9CA3AF] font-mono">
+                      Confidence: <strong className="text-white font-bold">{engine.overallConfidence}%</strong>
+                    </span>
+                  )}
                 </div>
               </div>
             </div>
@@ -224,17 +202,35 @@ export const MarketMindSummaryCard: React.FC<MarketMindSummaryCardProps> = ({
             <div className="flex flex-wrap gap-2 text-[10px] font-mono">
               <div className="bg-[#151515] border border-[#242424] px-2.5 py-1 rounded-lg">
                 <span className="text-[#9CA3AF]">Structure: </span>
-                <span className={`font-bold ${isBullish ? 'text-[#22C55E]' : 'text-[#EF4444]'}`}>
-                  {isBullish ? 'Bullish' : 'Bearish'}
+                <span
+                  className={`font-bold ${
+                    engine.structure === 'BULLISH'
+                      ? 'text-[#22C55E]'
+                      : engine.structure === 'BEARISH'
+                      ? 'text-[#EF4444]'
+                      : 'text-amber-400'
+                  }`}
+                >
+                  {engine.structure}
                 </span>
               </div>
               <div className="bg-[#151515] border border-[#242424] px-2.5 py-1 rounded-lg">
                 <span className="text-[#9CA3AF]">Momentum: </span>
-                <span className="font-bold text-[#F2D675]">Strong</span>
+                <span className="font-bold text-[#F2D675]">{engine.momentum.replace('_', ' ')}</span>
               </div>
               <div className="bg-[#151515] border border-[#242424] px-2.5 py-1 rounded-lg">
                 <span className="text-[#9CA3AF]">News Sentiment: </span>
-                <span className="font-bold text-[#22C55E]">Positive</span>
+                <span
+                  className={`font-bold ${
+                    engine.newsSentiment === 'POSITIVE'
+                      ? 'text-[#22C55E]'
+                      : engine.newsSentiment === 'NEGATIVE'
+                      ? 'text-[#EF4444]'
+                      : 'text-amber-400'
+                  }`}
+                >
+                  {engine.newsSentiment}
+                </span>
               </div>
             </div>
           </div>
@@ -243,20 +239,49 @@ export const MarketMindSummaryCard: React.FC<MarketMindSummaryCardProps> = ({
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 font-mono text-xs">
             <div className="bg-[#050505] p-3 rounded-lg border border-[#1C1C1C] flex justify-between items-center">
               <span className="font-bold text-[#9CA3AF] tracking-wider">{t('dashboard.tf15m')}</span>
-              <span className={`font-bold ${isBullish ? 'text-[#22C55E]' : 'text-[#EF4444]'}`}>
-                {tf15MScore}% {isBullish ? 'Bullish' : 'Bearish'}
+              <span
+                className={`font-bold ${
+                  engine.timeframeBias.tf15m.bias === 'BULLISH'
+                    ? 'text-[#22C55E]'
+                    : engine.timeframeBias.tf15m.bias === 'BEARISH'
+                    ? 'text-[#EF4444]'
+                    : 'text-amber-400'
+                }`}
+              >
+                {engine.timeframeBias.tf15m.score ? `${engine.timeframeBias.tf15m.score}% ` : ''}
+                {engine.timeframeBias.tf15m.bias}
               </span>
             </div>
+
             <div className="bg-[#050505] p-3 rounded-lg border border-[#1C1C1C] flex justify-between items-center">
               <span className="font-bold text-[#9CA3AF] tracking-wider">{t('dashboard.tf1h')}</span>
-              <span className={`font-bold ${isBullish ? 'text-[#22C55E]' : 'text-[#EF4444]'}`}>
-                {tf1HScore}% {isBullish ? 'Bullish' : 'Bearish'}
+              <span
+                className={`font-bold ${
+                  engine.timeframeBias.tf1h.bias === 'BULLISH'
+                    ? 'text-[#22C55E]'
+                    : engine.timeframeBias.tf1h.bias === 'BEARISH'
+                    ? 'text-[#EF4444]'
+                    : 'text-amber-400'
+                }`}
+              >
+                {engine.timeframeBias.tf1h.score ? `${engine.timeframeBias.tf1h.score}% ` : ''}
+                {engine.timeframeBias.tf1h.bias}
               </span>
             </div>
+
             <div className="bg-[#050505] p-3 rounded-lg border border-[#1C1C1C] flex justify-between items-center">
               <span className="font-bold text-[#9CA3AF] tracking-wider">{t('dashboard.tfToday')}</span>
-              <span className={`font-bold ${isBullish ? 'text-[#22C55E]' : 'text-[#EF4444]'}`}>
-                {tfTodayScore}% {isBullish ? 'Bullish' : 'Bearish'}
+              <span
+                className={`font-bold ${
+                  engine.timeframeBias.tfToday.bias === 'BULLISH'
+                    ? 'text-[#22C55E]'
+                    : engine.timeframeBias.tfToday.bias === 'BEARISH'
+                    ? 'text-[#EF4444]'
+                    : 'text-amber-400'
+                }`}
+              >
+                {engine.timeframeBias.tfToday.score ? `${engine.timeframeBias.tfToday.score}% ` : ''}
+                {engine.timeframeBias.tfToday.bias}
               </span>
             </div>
           </div>
@@ -270,33 +295,41 @@ export const MarketMindSummaryCard: React.FC<MarketMindSummaryCardProps> = ({
               <span>{t('dashboard.setupQuality')}</span>
             </div>
             <div className="text-base sm:text-lg font-black font-mono text-white mt-0.5">
-              {setupScore} / 100 &mdash;{' '}
-              <span
-                className={
-                  setupScore >= 75
-                    ? 'text-[#22C55E]'
-                    : setupScore >= 55
-                    ? 'text-[#F2D675]'
-                    : 'text-[#EF4444]'
-                }
-              >
-                {setupQualityText}
-              </span>
+              {isScoreValid ? (
+                <>
+                  {engine.setupScore} / 100 &mdash;{' '}
+                  <span
+                    className={
+                      engine.setupScore! >= 75
+                        ? 'text-[#22C55E]'
+                        : engine.setupScore! >= 55
+                        ? 'text-[#F2D675]'
+                        : 'text-[#EF4444]'
+                    }
+                  >
+                    {engine.setupQuality}
+                  </span>
+                </>
+              ) : (
+                <span className="text-amber-400">UNAVAILABLE &mdash; Awaiting Validated Inputs</span>
+              )}
             </div>
           </div>
 
-          <div className="w-full sm:w-48 bg-[#050505] h-2.5 rounded-full overflow-hidden border border-[#242424]">
-            <div
-              className={`h-full transition-all duration-500 rounded-full ${
-                setupScore >= 75
-                  ? 'bg-gradient-to-r from-[#22C55E] to-[#10B981]'
-                  : setupScore >= 55
-                  ? 'bg-gradient-to-r from-[#D4AF37] to-[#F2D675]'
-                  : 'bg-gradient-to-r from-[#EF4444] to-[#DC2626]'
-              }`}
-              style={{ width: `${setupScore}%` }}
-            />
-          </div>
+          {isScoreValid && (
+            <div className="w-full sm:w-48 bg-[#050505] h-2.5 rounded-full overflow-hidden border border-[#242424]">
+              <div
+                className={`h-full transition-all duration-500 rounded-full ${
+                  engine.setupScore! >= 75
+                    ? 'bg-gradient-to-r from-[#22C55E] to-[#10B981]'
+                    : engine.setupScore! >= 55
+                    ? 'bg-gradient-to-r from-[#D4AF37] to-[#F2D675]'
+                    : 'bg-gradient-to-r from-[#EF4444] to-[#DC2626]'
+                }`}
+                style={{ width: `${engine.setupScore}%` }}
+              />
+            </div>
+          )}
         </div>
 
         {/* WHY BULLISH / WHY BEARISH RATIONALE CHECKLIST */}
@@ -308,8 +341,12 @@ export const MarketMindSummaryCard: React.FC<MarketMindSummaryCardProps> = ({
             </span>
             {onAskQuestion && (
               <button
-                onClick={() => onAskQuestion(`Explain why the market outlook for ${quote.ticker} is ${primaryOutlook} with ${primaryConfidence}% confidence`)}
-                className="text-[11px] font-bold text-[#F2D675] hover:text-white flex items-center gap-1 transition"
+                onClick={() =>
+                  onAskQuestion(
+                    `Explain why the market outlook for ${quote.ticker || 'SPY'} is ${primaryOutlook}`
+                  )
+                }
+                className="text-[11px] font-bold text-[#F2D675] hover:text-white flex items-center gap-1 transition cursor-pointer"
               >
                 <BotMessageSquare className="w-3.5 h-3.5 text-[#D4AF37]" />
                 <span>{t('dashboard.askInChat')} &rarr;</span>
@@ -317,45 +354,20 @@ export const MarketMindSummaryCard: React.FC<MarketMindSummaryCardProps> = ({
             )}
           </div>
 
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-xs sm:text-sm">
-            <div className="flex items-center gap-2 p-2.5 bg-[#050505] rounded-lg border border-[#1C1C1C]">
-              <span className="text-[#22C55E] font-bold text-base">✓</span>
-              <span className="text-[#E5E5E5]">
-                {isAboveVwap ? `Above VWAP (${vwapStr})` : `Below VWAP (${vwapStr})`}
-              </span>
+          {engine.reasons.length === 0 ? (
+            <div className="p-3 bg-[#050505] rounded-lg border border-[#1C1C1C] text-xs font-mono text-[#9CA3AF] text-center">
+              No validated factor reasons available for this direction.
             </div>
-
-            <div className="flex items-center gap-2 p-2.5 bg-[#050505] rounded-lg border border-[#1C1C1C]">
-              <span className="text-[#22C55E] font-bold text-base">✓</span>
-              <span className="text-[#E5E5E5]">
-                {isEmaBullish ? '9 EMA > 20 EMA (Momentum Alignment)' : '9 EMA < 20 EMA (Downward Pressure)'}
-              </span>
+          ) : (
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-xs sm:text-sm">
+              {engine.reasons.map((reason, idx) => (
+                <div key={idx} className="flex items-center gap-2 p-2.5 bg-[#050505] rounded-lg border border-[#1C1C1C]">
+                  <span className="text-[#22C55E] font-bold text-base">✓</span>
+                  <span className="text-[#E5E5E5] font-mono text-xs">{reason}</span>
+                </div>
+              ))}
             </div>
-
-            <div className="flex items-center gap-2 p-2.5 bg-[#050505] rounded-lg border border-[#1C1C1C]">
-              <span className="text-[#22C55E] font-bold text-base">✓</span>
-              <span className="text-[#E5E5E5]">QQQ outperforming SPY (Tech Leadership)</span>
-            </div>
-
-            <div className="flex items-center gap-2 p-2.5 bg-[#050505] rounded-lg border border-[#1C1C1C]">
-              <span className="text-[#22C55E] font-bold text-base">✓</span>
-              <span className="text-[#E5E5E5]">
-                {isBreadthPositive ? 'Market breadth improving (A/D Ratio > 1.2)' : 'Market breadth stabilizing'}
-              </span>
-            </div>
-
-            <div className="flex items-center gap-2 p-2.5 bg-[#050505] rounded-lg border border-[#1C1C1C]">
-              <span className="text-[#22C55E] font-bold text-base">✓</span>
-              <span className="text-[#E5E5E5]">VIX declining / Volatility compression</span>
-            </div>
-
-            <div className="flex items-center gap-2 p-2.5 bg-[#050505] rounded-lg border border-[#1C1C1C]">
-              <span className="text-[#F2D675] font-bold text-base">⚠</span>
-              <span className="text-[#E5E5E5]">
-                Major resistance nearby ({r1Str})
-              </span>
-            </div>
-          </div>
+          )}
         </div>
 
         {/* CONFIRMATION & INVALIDATION ROW */}
@@ -367,7 +379,11 @@ export const MarketMindSummaryCard: React.FC<MarketMindSummaryCardProps> = ({
               <span>{t('dashboard.confirmation')}</span>
             </div>
             <div className="text-[#E5E5E5] font-bold text-xs sm:text-sm">
-              Above <strong className="text-white">${confirmationLevel}</strong> with strong volume
+              {engine.confirmationLevel !== 'UNAVAILABLE' ? (
+                <>Above <strong className="text-white">{engine.confirmationLevel}</strong> with strong volume</>
+              ) : (
+                <span className="text-[#9CA3AF]">Unavailable</span>
+              )}
             </div>
           </div>
 
@@ -378,16 +394,71 @@ export const MarketMindSummaryCard: React.FC<MarketMindSummaryCardProps> = ({
               <span>{t('dashboard.invalidation')}</span>
             </div>
             <div className="text-[#E5E5E5] font-bold text-xs sm:text-sm">
-              Below <strong className="text-white">${invalidationLevel}</strong>
+              {engine.invalidationLevel !== 'UNAVAILABLE' ? (
+                <>Below <strong className="text-white">{engine.invalidationLevel}</strong></>
+              ) : (
+                <span className="text-[#9CA3AF]">Unavailable</span>
+              )}
             </div>
           </div>
+        </div>
+
+        {/* PROVENANCE & DATA COVERAGE BAR */}
+        <div className="bg-[#101010] border border-[#242424] rounded-xl p-3.5 font-mono text-xs">
+          <div className="flex flex-wrap justify-between items-center gap-2">
+            <div className="flex items-center gap-2">
+              <span className="text-[#D4AF37] font-bold">Data Coverage: {engine.coveragePercent}%</span>
+              <span className="text-[#9CA3AF] text-[11px]">
+                ({engine.validatedFactorCount} Validated Inputs / {engine.missingFactorCount} Missing)
+              </span>
+            </div>
+
+            <button
+              onClick={() => setShowDiagnostics(!showDiagnostics)}
+              className="text-[11px] text-[#D4AF37] hover:underline flex items-center gap-1 cursor-pointer"
+            >
+              <span>{showDiagnostics ? 'Hide Input Diagnostics' : 'View Input Diagnostics'}</span>
+              {showDiagnostics ? <ChevronUp className="w-3 h-3" /> : <ChevronDown className="w-3 h-3" />}
+            </button>
+          </div>
+
+          {showDiagnostics && (
+            <div className="mt-3 pt-3 border-t border-[#1C1C1C] space-y-2">
+              <div className="text-[10px] text-[#9CA3AF] uppercase tracking-wider font-bold">
+                REAL-TIME INTELLIGENCE FACTOR BREAKDOWN
+              </div>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-[11px]">
+                {engine.factors.map((f) => (
+                  <div
+                    key={f.id}
+                    className={`p-2 rounded border flex justify-between items-center ${
+                      f.available
+                        ? 'bg-[#050505] border-[#22C55E]/30 text-[#E5E5E5]'
+                        : 'bg-[#050505] border-amber-500/30 text-[#9CA3AF]'
+                    }`}
+                  >
+                    <div>
+                      <span className="font-bold block">{f.name}</span>
+                      <span className="text-[10px] text-[#6B7280]">Provider: {f.provider}</span>
+                    </div>
+                    <div className="text-right">
+                      <span className={`font-bold block ${f.available ? 'text-[#22C55E]' : 'text-amber-400'}`}>
+                        {f.available ? f.value : 'Unavailable'}
+                      </span>
+                      <span className="text-[10px] text-[#6B7280]">Weight: {f.weight} pts</span>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
         </div>
 
         {/* DISCLAIMER FOOTER */}
         <div className="pt-2 border-t border-[#1C1C1C] flex items-start gap-2 text-[10px] text-[#6B7280] leading-relaxed">
           <Info className="w-3.5 h-3.5 text-[#D4AF37] shrink-0 mt-0.5" />
           <p>
-            <strong className="text-[#9CA3AF]">MarketMind Intelligence Disclaimer:</strong> The MarketMind Intelligence Score (0–100) is a quantitative multi-factor analytical metric synthesizing 14 technical, volume, sentiment, breadth, macro, and options inputs. It is provided for educational and analytical purposes only, and does not constitute financial advice or a guaranteed probability of profit.
+            <strong className="text-[#9CA3AF]">MarketMind Intelligence Disclaimer:</strong> The MarketMind Intelligence Score (0–100) is a quantitative multi-factor analytical metric synthesizing 10 verified technical, volume, sentiment, breadth, macro, and options inputs. It is calculated strictly when minimum validated coverage exists.
           </p>
         </div>
       </div>

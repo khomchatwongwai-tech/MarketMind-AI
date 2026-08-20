@@ -33,7 +33,7 @@ importers:
         specifier: ^14.2.0
         version: 14.2.0(@firebase/app-compat@0.5.16)(@firebase/app@0.16.0)
       jose:
-        specifier: ^5.9.6
+        specifier: 5.10.0
         version: 5.10.0
       lightweight-charts:
         specifier: ^5.2.1

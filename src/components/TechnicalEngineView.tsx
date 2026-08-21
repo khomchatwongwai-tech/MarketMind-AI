@@ -1,4 +1,5 @@
 import React, { useEffect, useRef, useState } from 'react';
+import { useI18n } from '../i18n/I18nContext';
 import { LineChart, Sliders, Layers, Activity, ChevronDown, ChevronUp, Info, AlertCircle, RefreshCw } from 'lucide-react';
 import { ComprehensiveMarketData } from '../services/marketDataService.js';
 import { isFiniteMarketNumber, formatPrice } from '../utils/formatters.js';
@@ -15,6 +16,7 @@ interface TechnicalEngineViewProps {
 }
 
 export const TechnicalEngineView: React.FC<TechnicalEngineViewProps> = ({ data }) => {
+  const { t } = useI18n();
   const { quote, supportResistance } = data;
   const ticker = quote.ticker || 'SPY';
 
@@ -254,7 +256,7 @@ export const TechnicalEngineView: React.FC<TechnicalEngineViewProps> = ({ data }
           <div className="flex items-center gap-2">
             <LineChart className="w-4 h-4 text-[#818cf8]" />
             <h3 className="text-sm font-bold text-white uppercase tracking-wider">
-              {ticker} High-Resolution Quant Chart
+              {ticker} {t('technicalEngine.quantChart')}
             </h3>
             <span className="text-[10px] text-slate-400 font-mono">
               VWAP: {calc.vwap.value !== null ? `$${calc.vwap.value.toFixed(2)}` : 'N/A'} &bull; RSI:{' '}
@@ -265,7 +267,7 @@ export const TechnicalEngineView: React.FC<TechnicalEngineViewProps> = ({ data }
           <div className="flex flex-wrap items-center gap-2 text-xs font-mono">
             {isLoading && (
               <span className="text-[11px] text-[#D4AF37] flex items-center gap-1 animate-pulse">
-                <RefreshCw className="w-3 h-3 animate-spin" /> Fetching Bars...
+                <RefreshCw className="w-3 h-3 animate-spin" /> {t('technicalEngine.fetchingBars')}
               </span>
             )}
 
@@ -298,16 +300,16 @@ export const TechnicalEngineView: React.FC<TechnicalEngineViewProps> = ({ data }
       <div className="bg-[#15171a] border border-[#2d3139] rounded-lg p-2.5 font-mono text-xs flex justify-between items-center">
         <div className="flex items-center gap-2 text-slate-400 text-[11px]">
           <Info className="w-3.5 h-3.5 text-[#818cf8]" />
-          <span>Provider: <strong className="text-white">{providerSource}</strong></span>
-          <span>&bull; Timeframe: <strong className="text-white">{selectedTimeframe}</strong></span>
-          <span>&bull; Bars Evaluated: <strong className="text-white">{calc.barsUsed}</strong></span>
+          <span>{t('technicalEngine.provider')} <strong className="text-white">{providerSource}</strong></span>
+          <span>&bull; {t('technicalEngine.timeframe')} <strong className="text-white">{selectedTimeframe}</strong></span>
+          <span>&bull; {t('technicalEngine.barsEvaluated')} <strong className="text-white">{calc.barsUsed}</strong></span>
         </div>
 
         <button
           onClick={() => setShowMetadata(!showMetadata)}
           className="text-[11px] text-[#818cf8] hover:underline flex items-center gap-1 cursor-pointer"
         >
-          <span>{showMetadata ? 'Hide Indicator Diagnostics' : 'View Indicator Diagnostics'}</span>
+          <span>{showMetadata ? t('technicalEngine.hideDiagnostics') : t('technicalEngine.viewDiagnostics')}</span>
           {showMetadata ? <ChevronUp className="w-3 h-3" /> : <ChevronDown className="w-3 h-3" />}
         </button>
       </div>
@@ -315,7 +317,7 @@ export const TechnicalEngineView: React.FC<TechnicalEngineViewProps> = ({ data }
       {showMetadata && (
         <div className="bg-[#15171a] border border-[#2d3139] rounded-lg p-3 font-mono text-xs space-y-2">
           <div className="text-[10px] text-slate-400 uppercase tracking-wider font-bold">
-            TECHNICAL ENGINE DIAGNOSTICS & PROVENANCE
+            {t('technicalEngine.diagnosticsTitle')}
           </div>
           <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-2 text-[11px]">
             <div className="p-2 bg-[#0d0e11] rounded border border-[#22262d]">
@@ -352,7 +354,7 @@ export const TechnicalEngineView: React.FC<TechnicalEngineViewProps> = ({ data }
         <div className="bg-[#15171a] border border-[#2d3139] rounded-lg p-3">
           <div className="text-[10px] font-bold uppercase tracking-widest text-slate-400 pb-2 border-b border-[#2d3139] flex items-center gap-1.5">
             <Activity className="w-3 h-3 text-[#6366f1]" />
-            Moving Averages Array
+            {t('technicalEngine.movingAveragesArray')}
           </div>
           <div className="divide-y divide-[#22262d] text-xs mt-1">
             <div className="py-1.5 flex justify-between items-center">
@@ -393,7 +395,7 @@ export const TechnicalEngineView: React.FC<TechnicalEngineViewProps> = ({ data }
         <div className="bg-[#15171a] border border-[#2d3139] rounded-lg p-3">
           <div className="text-[10px] font-bold uppercase tracking-widest text-slate-400 pb-2 border-b border-[#2d3139] flex items-center gap-1.5">
             <Sliders className="w-3 h-3 text-[#6366f1]" />
-            Oscillators & Momentum
+            {t('technicalEngine.oscillatorsMomentum')}
           </div>
           <div className="divide-y divide-[#22262d] text-xs mt-1">
             <div className="py-1.5 flex justify-between items-center">
@@ -429,7 +431,7 @@ export const TechnicalEngineView: React.FC<TechnicalEngineViewProps> = ({ data }
         <div className="bg-[#15171a] border border-[#2d3139] rounded-lg p-3">
           <div className="text-[10px] font-bold uppercase tracking-widest text-slate-400 pb-2 border-b border-[#2d3139] flex items-center gap-1.5">
             <Layers className="w-3 h-3 text-[#6366f1]" />
-            Volatility & Session Ranges
+            {t('technicalEngine.volatilitySessionRanges')}
           </div>
           <div className="divide-y divide-[#22262d] text-xs mt-1">
             <div className="py-1.5 flex justify-between items-center">

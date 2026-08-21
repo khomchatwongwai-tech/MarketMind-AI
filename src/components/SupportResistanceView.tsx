@@ -1,3 +1,4 @@
+import { useI18n } from '../i18n/I18nContext.js';
 import React from 'react';
 import { Target, ArrowUpRight, ArrowDownRight } from 'lucide-react';
 import { ComprehensiveMarketData } from '../services/marketDataService';
@@ -8,6 +9,7 @@ interface SupportResistanceViewProps {
 }
 
 export const SupportResistanceView: React.FC<SupportResistanceViewProps> = ({ data }) => {
+  const { t, formatDate, formatCurrency, formatNumber, formatPercent } = useI18n();
   const { quote, technicals, supportResistance } = data;
   const currentPrice = quote.price;
 

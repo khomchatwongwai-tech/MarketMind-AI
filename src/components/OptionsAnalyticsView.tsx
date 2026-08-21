@@ -1,3 +1,4 @@
+import { useI18n } from '../i18n/I18nContext.js';
 import React from 'react';
 import { Layers, Zap, ShieldCheck, Crosshair } from 'lucide-react';
 import { ComprehensiveMarketData } from '../services/marketDataService';
@@ -8,6 +9,7 @@ interface OptionsAnalyticsViewProps {
 }
 
 export const OptionsAnalyticsView: React.FC<OptionsAnalyticsViewProps> = ({ data }) => {
+  const { t, formatDate, formatCurrency, formatNumber, formatPercent } = useI18n();
   const { quote, options } = data;
 
   const pcrStr = isFiniteMarketNumber(options?.putCallRatio) ? options.putCallRatio.toFixed(2) : 'N/A';

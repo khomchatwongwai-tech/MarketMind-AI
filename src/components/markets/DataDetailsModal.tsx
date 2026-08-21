@@ -1,3 +1,4 @@
+import { useI18n } from '../../i18n/I18nContext.js';
 import React from 'react';
 import { X, ShieldCheck, Clock, Activity, Zap, Info, CheckCircle2, AlertCircle } from 'lucide-react';
 import { NormalizedQuote, ProviderConnectionStatus, RealTimeDataMode } from '../../types/realtime';
@@ -18,6 +19,7 @@ export const DataDetailsModal: React.FC<DataDetailsModalProps> = ({
   quote,
   status,
 }) => {
+  const { t, formatDate, formatCurrency, formatNumber, formatPercent } = useI18n();
   if (!isOpen) return null;
 
   const session = MarketSessionEngine.getSessionForSymbol(symbol);

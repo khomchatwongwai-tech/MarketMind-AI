@@ -1,3 +1,4 @@
+import { useI18n } from '../i18n/I18nContext.js';
 import React from 'react';
 import {
   TradingViewChart,
@@ -14,6 +15,7 @@ export const getTradingViewSymbol = (sym: string) => formatTradingViewSymbol(sym
 export const getTradingViewInterval = formatTradingViewInterval;
 
 export const TradingViewAdvancedChart: React.FC<TradingViewAdvancedChartProps> = (props) => {
+  const { t, formatDate, formatCurrency, formatNumber, formatPercent } = useI18n();
   return <TradingViewChart {...props} className={props.containerClassName || props.className} />;
 };
 

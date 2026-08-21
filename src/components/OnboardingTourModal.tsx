@@ -1,3 +1,4 @@
+import { useI18n } from '../i18n/I18nContext.js';
 import React, { useState } from 'react';
 import {
   X,
@@ -23,6 +24,7 @@ export const OnboardingTourModal: React.FC<OnboardingTourModalProps> = ({
   isOpen,
   onClose,
 }) => {
+  const { t, formatDate, formatCurrency, formatNumber, formatPercent } = useI18n();
   const [step, setStep] = useState(0);
 
   if (!isOpen) return null;

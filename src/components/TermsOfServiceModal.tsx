@@ -1,3 +1,4 @@
+import { useI18n } from '../i18n/I18nContext.js';
 import React from 'react';
 import { X, FileText, AlertTriangle, Scale, ShieldCheck } from 'lucide-react';
 
@@ -10,6 +11,7 @@ export const TermsOfServiceModal: React.FC<TermsOfServiceModalProps> = ({
   isOpen,
   onClose,
 }) => {
+  const { t, formatDate, formatCurrency, formatNumber, formatPercent } = useI18n();
   if (!isOpen) return null;
 
   return (

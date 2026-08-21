@@ -1,3 +1,4 @@
+import { useI18n } from '../../i18n/I18nContext.js';
 import React from 'react';
 import {
   TrendingUp,
@@ -21,6 +22,7 @@ export const MobileNavigationBar: React.FC<MobileNavigationBarProps> = ({
   onSelectTab,
   watchlistCount = 0,
 }) => {
+  const { t, formatDate, formatCurrency, formatNumber, formatPercent } = useI18n();
   const tabs: Array<{ id: MobileTab; label: string; icon: React.ComponentType<{ className?: string }>; badge?: number }> = [
     { id: 'MARKETS', label: 'Markets', icon: TrendingUp },
     { id: 'SEARCH', label: 'Search 5K+', icon: Search },

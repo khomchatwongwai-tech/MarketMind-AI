@@ -1,3 +1,4 @@
+import { useI18n } from '../i18n/I18nContext.js';
 import React, { useState } from 'react';
 import {
   X,
@@ -95,6 +96,7 @@ export const FastOnboardingModal: React.FC<FastOnboardingModalProps> = ({
   onUserUpdate,
   onComplete,
 }) => {
+  const { t, formatDate, formatCurrency, formatNumber, formatPercent } = useI18n();
   const [step, setStep] = useState<number>(1);
   const [selectedMarkets, setSelectedMarkets] = useState<string[]>(['stocks', 'etfs', 'crypto']);
   const [experienceLevel, setExperienceLevel] = useState<string>('intermediate');

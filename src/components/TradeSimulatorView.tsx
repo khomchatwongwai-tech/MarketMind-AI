@@ -1,3 +1,4 @@
+import { useI18n } from '../i18n/I18nContext.js';
 import React, { useState } from 'react';
 import { Calculator, AlertTriangle, TrendingUp, TrendingDown, ArrowRight, ShieldAlert, Sparkles } from 'lucide-react';
 import { ComprehensiveMarketData } from '../services/marketDataService';
@@ -8,6 +9,7 @@ interface TradeSimulatorViewProps {
 }
 
 export const TradeSimulatorView: React.FC<TradeSimulatorViewProps> = ({ data }) => {
+  const { t, formatDate, formatCurrency, formatNumber, formatPercent } = useI18n();
   const { quote, supportResistance, technicals } = data;
 
   const [optionType, setOptionType] = useState<'CALL' | 'PUT'>('CALL');

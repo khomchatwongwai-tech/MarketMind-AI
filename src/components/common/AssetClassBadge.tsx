@@ -1,3 +1,4 @@
+import { useI18n } from '../../i18n/I18nContext.js';
 import React from 'react';
 import { UniversalAssetClass, RealTimeDataTier } from '../../types/instrument';
 
@@ -12,6 +13,7 @@ export const AssetClassBadge: React.FC<AssetClassBadgeProps> = ({
   size = 'md',
   showLabel = true,
 }) => {
+  const { t, formatDate, formatCurrency, formatNumber, formatPercent } = useI18n();
   const getBadgeStyle = (cls: string) => {
     switch (cls) {
       case 'STOCK':

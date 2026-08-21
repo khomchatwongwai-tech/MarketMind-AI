@@ -1,3 +1,4 @@
+import { useI18n } from '../../i18n/I18nContext.js';
 import React from 'react';
 import { AlertTriangle, ShieldAlert, CheckCircle2, X } from 'lucide-react';
 import { OptionContract } from '../../types/optionsTrader';
@@ -15,6 +16,7 @@ export const ZeroDteRiskModal: React.FC<ZeroDteRiskModalProps> = ({
   onClose,
   onAcknowledge,
 }) => {
+  const { t, formatDate, formatCurrency, formatNumber, formatPercent } = useI18n();
   if (!isOpen) return null;
 
   return (

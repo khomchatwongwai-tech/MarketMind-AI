@@ -1,3 +1,4 @@
+import { useI18n } from '../i18n/I18nContext.js';
 import React from 'react';
 import {
   Activity,
@@ -48,6 +49,7 @@ export const MassiveLiveFeedBar: React.FC<MassiveLiveFeedBarProps> = ({
   technicals,
   onRequestAiInsight,
 }) => {
+  const { t, formatDate, formatCurrency, formatNumber, formatPercent } = useI18n();
   // 1. Resolve Active Provider Metadata & Live Trade Price
   const activeProvider = quote?.metadata?.provider || quote?.dataSource || (status === 'LIVE' ? 'Massive WebSocket' : 'Alpaca IEX');
   const isRealTimeMode = quote?.metadata?.mode === 'REAL_TIME' || quote?.dataStatus === 'REAL_TIME' || status === 'LIVE';

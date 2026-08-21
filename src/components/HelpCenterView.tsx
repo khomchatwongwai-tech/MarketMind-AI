@@ -1,3 +1,4 @@
+import { useI18n } from '../i18n/I18nContext.js';
 import React, { useState } from 'react';
 import {
   HelpCircle,
@@ -24,6 +25,7 @@ export const HelpCenterView: React.FC<HelpCenterViewProps> = ({
   onOpenContact,
   onOpenTour,
 }) => {
+  const { t, formatDate, formatCurrency, formatNumber, formatPercent } = useI18n();
   const [searchQuery, setSearchQuery] = useState('');
   const [activeCategory, setActiveCategory] = useState<'all' | 'glossary' | 'indicators' | 'faqs' | 'tutorials'>('all');
   const [expandedFaq, setExpandedFaq] = useState<number | null>(0);

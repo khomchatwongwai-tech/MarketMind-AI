@@ -1,3 +1,4 @@
+import { useI18n } from '../../i18n/I18nContext.js';
 import React from 'react';
 import {
   AlertTriangle,
@@ -11,6 +12,7 @@ import {
 } from 'lucide-react';
 
 export const SkeletonQuoteCard: React.FC = () => {
+  const { t, formatDate, formatCurrency, formatNumber, formatPercent } = useI18n();
   return (
     <div className="p-4 bg-[#121217] border border-[#202026] rounded-xl animate-pulse space-y-3">
       <div className="flex items-center justify-between">

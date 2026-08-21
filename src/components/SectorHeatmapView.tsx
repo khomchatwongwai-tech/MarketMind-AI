@@ -1,3 +1,4 @@
+import { useI18n } from '../i18n/I18nContext.js';
 import React from 'react';
 import { PieChart, TrendingUp, TrendingDown, Award, Flame, BarChart3 } from 'lucide-react';
 import { ComprehensiveMarketData } from '../services/marketDataService';
@@ -7,6 +8,7 @@ interface SectorHeatmapViewProps {
 }
 
 export const SectorHeatmapView: React.FC<SectorHeatmapViewProps> = ({ data }) => {
+  const { t, formatDate, formatCurrency, formatNumber, formatPercent } = useI18n();
   const { sectors, strongestSector, weakestSector } = data;
 
   return (

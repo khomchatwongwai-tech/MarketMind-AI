@@ -1,3 +1,4 @@
+import { useI18n } from '../i18n/I18nContext.js';
 import React, { useState } from 'react';
 import {
   X,
@@ -45,6 +46,7 @@ export const NotificationCenterModal: React.FC<NotificationCenterModalProps> = (
   onClose,
   onSelectSymbol,
 }) => {
+  const { t, formatDate, formatCurrency, formatNumber, formatPercent } = useI18n();
   const [notifications, setNotifications] = useState<SmartNotification[]>(() =>
     SmartAlertEngine.getNotifications()
   );

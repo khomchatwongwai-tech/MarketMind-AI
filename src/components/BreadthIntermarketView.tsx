@@ -1,3 +1,4 @@
+import { useI18n } from '../i18n/I18nContext.js';
 import React from 'react';
 import { Globe2, Activity, TrendingUp, TrendingDown, Layers, Scale, Sparkles } from 'lucide-react';
 import { ComprehensiveMarketData } from '../services/marketDataService';
@@ -7,6 +8,7 @@ interface BreadthIntermarketViewProps {
 }
 
 export const BreadthIntermarketView: React.FC<BreadthIntermarketViewProps> = ({ data }) => {
+  const { t, formatDate, formatCurrency, formatNumber, formatPercent } = useI18n();
   const { breadth, intermarket, quote } = data;
 
   return (

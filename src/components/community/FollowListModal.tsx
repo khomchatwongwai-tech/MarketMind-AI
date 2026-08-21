@@ -1,3 +1,4 @@
+import { useI18n } from '../../i18n/I18nContext.js';
 import React, { useState } from 'react';
 import { X, Search, CheckCircle2, UserCheck, UserPlus, Lock } from 'lucide-react';
 import { CommunityUserProfile, FollowRelationship } from '../../types/community';
@@ -18,6 +19,7 @@ export const FollowListModal: React.FC<FollowListModalProps> = ({
   onClose,
   onSelectUser,
 }) => {
+  const { t, formatDate, formatCurrency, formatNumber, formatPercent } = useI18n();
   const [searchQuery, setSearchQuery] = useState('');
 
   // Check privacy

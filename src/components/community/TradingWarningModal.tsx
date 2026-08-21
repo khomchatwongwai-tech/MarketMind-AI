@@ -1,3 +1,4 @@
+import { useI18n } from '../../i18n/I18nContext.js';
 import React from 'react';
 import { ShieldAlert, AlertTriangle, ArrowRight, X } from 'lucide-react';
 import { TickerSymbol } from '../../types/market';
@@ -14,6 +15,7 @@ export const TradingWarningModal: React.FC<TradingWarningModalProps> = ({
   onClose,
   onConfirm,
 }) => {
+  const { t, formatDate, formatCurrency, formatNumber, formatPercent } = useI18n();
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/85 backdrop-blur-sm">
       <div className="bg-[#0f1013] border border-[#2d2d2d] rounded-2xl w-full max-w-md overflow-hidden shadow-2xl flex flex-col">

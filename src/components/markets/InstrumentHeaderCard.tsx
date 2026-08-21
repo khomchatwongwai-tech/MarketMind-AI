@@ -1,3 +1,4 @@
+import { useI18n } from '../../i18n/I18nContext.js';
 import React from 'react';
 import {
   TrendingUp,
@@ -37,6 +38,7 @@ export const InstrumentHeaderCard: React.FC<InstrumentHeaderCardProps> = ({
   onOpenAiAnalysis,
   onOpenSearch,
 }) => {
+  const { t, formatDate, formatCurrency, formatNumber, formatPercent } = useI18n();
   const quote = quoteResponse?.quote;
   const isAvailable = quoteResponse?.entitlementStatus?.isAvailable !== false;
   const isPositive = (quote?.changePercent || instrument.changePercent || 0) >= 0;

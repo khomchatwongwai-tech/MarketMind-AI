@@ -1,3 +1,4 @@
+import { useI18n } from '../i18n/I18nContext.js';
 import React, { useState } from 'react';
 import { History, CheckCircle2, XCircle, Clock, ShieldCheck, BarChart2, TrendingUp, Sparkles } from 'lucide-react';
 import { ComprehensiveMarketData } from '../services/marketDataService';
@@ -8,6 +9,7 @@ interface PredictionsBacktestViewProps {
 }
 
 export const PredictionsBacktestView: React.FC<PredictionsBacktestViewProps> = ({ data }) => {
+  const { t, formatDate, formatCurrency, formatNumber, formatPercent } = useI18n();
   const { quote, probabilities } = data;
 
   const [activeHorizon, setActiveHorizon] = useState<'ALL' | '15M' | '1H' | 'EOD' | '1D' | '5D'>('ALL');

@@ -1,3 +1,4 @@
+import { useI18n } from '../../i18n/I18nContext.js';
 import React from 'react';
 import { AlertTriangle, ShieldCheck, Cpu, Database, Calculator, Info } from 'lucide-react';
 
@@ -16,6 +17,7 @@ export const FinancialResearchDisclaimer: React.FC<FinancialResearchDisclaimerPr
   className = '',
   sourceAttribution,
 }) => {
+  const { t, formatDate, formatCurrency, formatNumber, formatPercent } = useI18n();
   const getBadgeStyle = (badge: InferenceBadgeType) => {
     switch (badge) {
       case 'VERIFIED':

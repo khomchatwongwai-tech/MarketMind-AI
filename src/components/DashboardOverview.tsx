@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { useI18n } from '../i18n/I18nContext';
 import {
   TrendingUp,
   TrendingDown,
@@ -50,6 +51,7 @@ export const DashboardOverview: React.FC<DashboardOverviewProps> = ({
   onAskQuestion,
   onSelectTicker,
 }) => {
+  const { t } = useI18n();
   const { quote, technicals, supportResistance, trends, sectors, economicEvents, news, options, scenarios } = data;
   const isPositive = quote.change >= 0;
   const [isExplainSimplyOpen, setIsExplainSimplyOpen] = useState(false);
@@ -160,10 +162,10 @@ export const DashboardOverview: React.FC<DashboardOverviewProps> = ({
             <div>
               <div className="flex items-center gap-2">
                 <span className="text-sm font-black text-white font-mono tracking-tight">
-                  MARKET INTELLIGENCE CENTER
+                  {t('dashboard.marketIntelligenceCenter') || 'MARKET INTELLIGENCE CENTER'}
                 </span>
                 <span className="px-2 py-0.5 bg-[#151515] text-[#F2D675] border border-[#D4AF37]/40 text-[10px] font-bold rounded-md font-mono">
-                  GLOBAL MACRO
+                  {t('dashboard.globalMacro') || 'GLOBAL MACRO'}
                 </span>
               </div>
               <p className="text-[11px] text-[#9CA3AF] font-mono">
@@ -174,7 +176,7 @@ export const DashboardOverview: React.FC<DashboardOverviewProps> = ({
 
           <div className="flex items-center gap-2">
             <div className="text-[10px] text-[#9CA3AF] font-mono hidden sm:block">
-              Market Status: <span className="text-[#22C55E] font-bold">REGULAR LIVE</span> &bull; Session ET
+              {t('dashboard.marketStatus')}  <span className="text-[#22C55E] font-bold">{t('dashboard.regularLive')}</span> &bull; Session ET
             </div>
           </div>
         </div>
@@ -233,7 +235,7 @@ export const DashboardOverview: React.FC<DashboardOverviewProps> = ({
         <div className="flex items-center gap-2.5">
           <span className="text-[10px] font-bold uppercase tracking-wider text-[#9CA3AF] flex items-center gap-1.5">
             <Sparkles className="w-3.5 h-3.5 text-[#D4AF37]" />
-            Terminal View:
+            {t('dashboard.terminalView')} 
           </span>
           <div className="flex items-center bg-[#101010] p-0.5 rounded-lg border border-[#242424] text-[10px] font-semibold">
             <button
@@ -245,7 +247,7 @@ export const DashboardOverview: React.FC<DashboardOverviewProps> = ({
               }`}
             >
               <LayoutGrid className="w-3 h-3 text-[#D4AF37]" />
-              Unified Terminal
+              {t('dashboard.unifiedTerminal')}
             </button>
             <button
               onClick={() => setViewMode('executive')}
@@ -256,7 +258,7 @@ export const DashboardOverview: React.FC<DashboardOverviewProps> = ({
               }`}
             >
               <FileText className="w-3 h-3 text-[#D4AF37]" />
-              MarketMind AI Card
+              {t('dashboard.executiveCard')}
             </button>
             <button
               onClick={() => setViewMode('grid')}
@@ -267,7 +269,7 @@ export const DashboardOverview: React.FC<DashboardOverviewProps> = ({
               }`}
             >
               <BarChart2 className="w-3 h-3 text-[#D4AF37]" />
-              Multi-Factor Grid
+              {t('dashboard.multiFactorGrid')}
             </button>
           </div>
         </div>
@@ -279,7 +281,7 @@ export const DashboardOverview: React.FC<DashboardOverviewProps> = ({
             title="Explain Like I'm a Beginner"
           >
             <BookOpen className="w-3.5 h-3.5 text-[#D4AF37]" />
-            <span>Explain Simply</span>
+            <span>{t('dashboard.explainSimply')}</span>
           </button>
 
           <div className="text-[10px] text-[#9CA3AF] font-mono hidden sm:block">
@@ -301,20 +303,20 @@ export const DashboardOverview: React.FC<DashboardOverviewProps> = ({
       {/* 2. THREE-COLUMN MARKET ENGINE & QUANT DASHBOARD GRID (When viewMode is 'both' or 'grid') */}
       {(viewMode === 'both' || viewMode === 'grid') && (
         <div className="grid grid-cols-1 md:grid-cols-12 gap-3">
-          {/* LEFT COLUMN: Technical Engine, S/R, Multi-Timeframe Trends (Col span 3) */}
+          {/* LEFT COLUMN: {t('market.technicalEngine')}, S/R, Multi-Timeframe Trends (Col span 3) */}
           <section className="md:col-span-3 flex flex-col gap-3">
-            {/* Technical Engine Card */}
+            {/* {t('market.technicalEngine')} Card */}
             <div className="bg-[#0A0A0A] border border-[#242424] hover:border-[rgba(212,175,55,0.35)] rounded-xl flex-1 flex flex-col overflow-hidden shadow-lg transition">
               <div className="p-2.5 bg-[#101010] border-b border-[#1C1C1C] flex justify-between items-center text-[10px] font-bold uppercase tracking-widest text-[#9CA3AF]">
                 <span className="flex items-center gap-1.5 text-white">
                   <Zap className="w-3 h-3 text-[#D4AF37]" />
-                  Technical Engine
+                  {t('market.technicalEngine')}
                 </span>
                 <button
                   onClick={() => onNavigateTab('technicals')}
                   className="text-[#F2D675] hover:underline normal-case text-[9px] font-medium"
                 >
-                  Details &rarr;
+                  {t('common.details')} &rarr;
                 </button>
               </div>
 
@@ -374,56 +376,56 @@ export const DashboardOverview: React.FC<DashboardOverviewProps> = ({
                 </div>
               </div>
 
-              {/* Support & Resistance Mini Ladder */}
+              {/* {t('market.supportResistance')} Mini Ladder */}
               <div className="p-3 border-t border-[#1C1C1C] space-y-2 bg-[#050505]">
                 <div className="flex justify-between items-center text-[9px] font-bold text-[#9CA3AF] uppercase tracking-widest">
-                  <span>Support & Resistance</span>
-                  <span className="text-[8px] text-[#F2D675] font-mono">Pivot: {isFiniteMarketNumber(technicals.prevDayHigh) && isFiniteMarketNumber(technicals.prevDayLow) && isFiniteMarketNumber(technicals.prevDayClose) ? `$${((technicals.prevDayHigh + technicals.prevDayLow + technicals.prevDayClose)/3).toFixed(2)}` : 'N/A'}</span>
+                  <span>{t('market.supportResistance')}</span>
+                  <span className="text-[8px] text-[#F2D675] font-mono">{t('market.pivot')}  {isFiniteMarketNumber(technicals.prevDayHigh) && isFiniteMarketNumber(technicals.prevDayLow) && isFiniteMarketNumber(technicals.prevDayClose) ? `$${((technicals.prevDayHigh + technicals.prevDayLow + technicals.prevDayClose)/3).toFixed(2)}` : 'N/A'}</span>
                 </div>
 
                 <div className="space-y-1 font-mono text-[11px]">
                   <div className="flex justify-between items-center text-[#9CA3AF] opacity-60">
-                    <span className="text-[#EF4444]">R3 Target</span>
+                    <span className="text-[#EF4444]">{t('market.r3Target')}</span>
                     <span>{isFiniteMarketNumber(supportResistance.r3) ? `$${supportResistance.r3.toFixed(2)}` : 'N/A'}</span>
                   </div>
                   <div className="flex justify-between items-center text-[#E5E5E5] opacity-80">
-                    <span className="text-[#EF4444]">R2 Area</span>
+                    <span className="text-[#EF4444]">{t('market.r2Area')}</span>
                     <span>{isFiniteMarketNumber(supportResistance.r2) ? `$${supportResistance.r2.toFixed(2)}` : 'N/A'}</span>
                   </div>
                   <div className="flex justify-between items-center font-bold px-2 py-0.5 bg-[#EF4444]/10 border border-[#EF4444]/30 rounded text-[#EF4444]">
-                    <span>R1 Key Level</span>
+                    <span>{t('market.r1KeyLevel')}</span>
                     <span>{isFiniteMarketNumber(supportResistance.r1) ? `$${supportResistance.r1.toFixed(2)}` : 'N/A'}</span>
                   </div>
 
-                  {/* Current Price Line Indicator */}
+                  {/* {t('market.current')} Price Line Indicator */}
                   <div className="py-0.5 flex items-center gap-2">
                     <div className="h-[1px] flex-1 bg-gradient-to-r from-transparent via-[#D4AF37] to-transparent" />
                     <span className="text-[10px] font-bold text-white bg-[#151515] px-2 py-0.2 rounded border border-[#D4AF37]/50 font-mono">
-                      Current {isFiniteMarketNumber(quote.price) ? `$${quote.price.toFixed(2)}` : 'N/A'}
+                      {t('market.current')} {isFiniteMarketNumber(quote.price) ? `$${quote.price.toFixed(2)}` : 'N/A'}
                     </span>
                     <div className="h-[1px] flex-1 bg-gradient-to-r from-transparent via-[#D4AF37] to-transparent" />
                   </div>
 
                   <div className="flex justify-between items-center font-bold px-2 py-0.5 bg-[#22C55E]/10 border border-[#22C55E]/30 rounded text-[#22C55E]">
-                    <span>S1 Key Level</span>
+                    <span>{t('market.s1KeyLevel')}</span>
                     <span>{isFiniteMarketNumber(supportResistance.s1) ? `$${supportResistance.s1.toFixed(2)}` : 'N/A'}</span>
                   </div>
                   <div className="flex justify-between items-center text-[#E5E5E5] opacity-80">
-                    <span className="text-[#22C55E]">S2 Area</span>
+                    <span className="text-[#22C55E]">{t('market.s2Area')}</span>
                     <span>{isFiniteMarketNumber(supportResistance.s2) ? `$${supportResistance.s2.toFixed(2)}` : 'N/A'}</span>
                   </div>
                   <div className="flex justify-between items-center text-[#9CA3AF] opacity-60">
-                    <span className="text-[#22C55E]">S3 Major</span>
+                    <span className="text-[#22C55E]">{t('market.s3Major')}</span>
                     <span>{isFiniteMarketNumber(supportResistance.s3) ? `$${supportResistance.s3.toFixed(2)}` : 'N/A'}</span>
                   </div>
                 </div>
               </div>
             </div>
 
-            {/* Multi-Timeframe Trend Alignment Engine */}
+            {/* Multi-Timeframe {t('market.trendAlignment')} Engine */}
             <div className="bg-[#0A0A0A] border border-[#242424] hover:border-[rgba(212,175,55,0.35)] rounded-xl p-3 transition">
               <div className="flex justify-between items-center text-[9px] font-bold text-[#9CA3AF] uppercase tracking-widest mb-2">
-                <span>Trend Alignment</span>
+                <span>{t('market.trendAlignment')}</span>
                 <span className="text-[#22C55E] font-mono font-bold">
                   {data.trendAlignmentScore}% Bullish
                 </span>
@@ -458,7 +460,7 @@ export const DashboardOverview: React.FC<DashboardOverviewProps> = ({
                   <div className="flex items-center gap-2">
                     <h2 className="text-base md:text-lg font-black text-white flex items-center gap-2 font-mono">
                       <Radio className="w-4 h-4 text-[#D4AF37] animate-pulse" />
-                      Why is {quote.ticker} moving?
+                      {t('market.whyIsTickerMoving', { ticker: quote.ticker })}
                     </h2>
                   </div>
                   <div className="flex items-center gap-1.5">
@@ -471,7 +473,7 @@ export const DashboardOverview: React.FC<DashboardOverviewProps> = ({
                       title="Ask Gemini for a complete institutional analysis"
                     >
                       <Sparkles className="w-3 h-3 text-[#D4AF37]" />
-                      <span>Ask AI Analyst</span>
+                      <span>{t('market.askAiAnalyst')}</span>
                     </button>
                     <button
                       onClick={() => {
@@ -482,7 +484,7 @@ export const DashboardOverview: React.FC<DashboardOverviewProps> = ({
                       title="Ask Assistant why this asset is moving"
                     >
                       <BotMessageSquare className="w-3 h-3 text-[#D4AF37]" />
-                      <span>Chat</span>
+                      <span>{t('market.chat')}</span>
                     </button>
                   </div>
                 </div>
@@ -497,13 +499,13 @@ export const DashboardOverview: React.FC<DashboardOverviewProps> = ({
                   <div className="space-y-1.5">
                     <div className="p-2.5 rounded-lg bg-[#101010] border border-[#242424]">
                       <div className="text-[9px] uppercase font-bold text-[#D4AF37] mb-0.5 flex items-center gap-1">
-                        <Zap className="w-2.5 h-2.5" /> Primary Driver
+                        <Zap className="w-2.5 h-2.5" /> {t('market.primaryDriver')}
                       </div>
                       <div className="text-xs font-semibold text-white">{probabilities.primaryDriver}</div>
                     </div>
                     <div className="p-2.5 rounded-lg bg-[#101010] border border-[#242424]">
                       <div className="text-[9px] uppercase font-bold text-[#EF4444] mb-0.5 flex items-center gap-1">
-                        <AlertTriangle className="w-2.5 h-2.5" /> Main Risk Factor
+                        <AlertTriangle className="w-2.5 h-2.5" /> {t('market.mainRiskFactor')}
                       </div>
                       <div className="text-xs font-semibold text-[#E5E5E5]">{probabilities.mainRisk}</div>
                     </div>
@@ -512,7 +514,7 @@ export const DashboardOverview: React.FC<DashboardOverviewProps> = ({
                   {/* Setup Quality Metric */}
                   <div className="bg-[#101010] border border-[#242424] rounded-lg p-2.5 flex flex-col justify-center items-center text-center">
                     <div className="text-[9px] uppercase font-bold text-[#9CA3AF] mb-1 tracking-wider">
-                      Setup Quality Index
+                      {t('market.setupQualityIndex')}
                     </div>
                     <div className="flex items-baseline gap-1">
                       <span className="text-3xl font-black text-white font-mono">{probabilities.setupScore}</span>
@@ -533,11 +535,11 @@ export const DashboardOverview: React.FC<DashboardOverviewProps> = ({
                 </div>
               </div>
 
-              {/* Bullish Confirmation & Bearish Invalidation Cards */}
+              {/* {t('market.bullishConfirmation')} & {t('market.bearishInvalidation')} Cards */}
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 mt-1">
                 <div className="p-2.5 border border-[#22C55E]/30 bg-[#22C55E]/5 rounded-lg">
                   <div className="text-[10px] font-bold text-[#22C55E] uppercase mb-0.5 flex items-center gap-1">
-                    <TrendingUp className="w-3 h-3" /> Bullish Confirmation
+                    <TrendingUp className="w-3 h-3" /> {t('market.bullishConfirmation')}
                   </div>
                   <div className="text-[11px] text-[#E5E5E5]">
                     Break and 15m candle close above <span className="font-bold text-white font-mono">{isFiniteMarketNumber(scenarios.bullish.confirmationPrice) ? `$${scenarios.bullish.confirmationPrice.toFixed(2)}` : 'N/A'}</span> with relative volume &gt; 1.25x. Targets: {isFiniteMarketNumber(scenarios.bullish.target1) ? `$${scenarios.bullish.target1.toFixed(2)}` : 'N/A'}, {isFiniteMarketNumber(scenarios.bullish.target2) ? `$${scenarios.bullish.target2.toFixed(2)}` : 'N/A'}.
@@ -546,7 +548,7 @@ export const DashboardOverview: React.FC<DashboardOverviewProps> = ({
 
                 <div className="p-2.5 border border-[#EF4444]/30 bg-[#EF4444]/5 rounded-lg">
                   <div className="text-[10px] font-bold text-[#EF4444] uppercase mb-0.5 flex items-center gap-1">
-                    <TrendingDown className="w-3 h-3" /> Bearish Invalidation
+                    <TrendingDown className="w-3 h-3" /> {t('market.bearishInvalidation')}
                   </div>
                   <div className="text-[11px] text-[#E5E5E5]">
                     Loss of VWAP / support at <span className="font-bold text-white font-mono">{isFiniteMarketNumber(scenarios.bearish.confirmationPrice) ? `$${scenarios.bearish.confirmationPrice.toFixed(2)}` : 'N/A'}</span> invalidates current setup. Targets: {isFiniteMarketNumber(scenarios.bearish.target1) ? `$${scenarios.bearish.target1.toFixed(2)}` : 'N/A'}, {isFiniteMarketNumber(scenarios.bearish.target2) ? `$${scenarios.bearish.target2.toFixed(2)}` : 'N/A'}.
@@ -560,12 +562,12 @@ export const DashboardOverview: React.FC<DashboardOverviewProps> = ({
               {/* Options Sentiment */}
               <div>
                 <div className="flex justify-between items-center text-[9px] font-bold text-[#9CA3AF] uppercase tracking-widest mb-1.5">
-                  <span>Options Flow Sentiment</span>
+                  <span>{t('market.optionsFlowSentiment')}</span>
                   <button
                     onClick={() => onNavigateTab('options')}
                     className="text-[#F2D675] hover:underline normal-case text-[9px]"
                   >
-                    Flow Details &rarr;
+                    Flow {t('common.details')} &rarr;
                   </button>
                 </div>
                 <div className="flex items-center gap-3">
@@ -591,7 +593,7 @@ export const DashboardOverview: React.FC<DashboardOverviewProps> = ({
               {/* Risk Meter Gauge */}
               <div className="border-t sm:border-t-0 sm:border-l border-[#1C1C1C] pt-2 sm:pt-0 sm:pl-3">
                 <div className="flex justify-between items-center text-[9px] font-bold text-[#9CA3AF] uppercase tracking-widest mb-1">
-                  <span>System Risk Meter</span>
+                  <span>{t('market.systemRiskMeter')}</span>
                   <span
                     className={`font-bold font-mono ${
                       probabilities.riskLevel === 'LOW RISK'
@@ -619,7 +621,7 @@ export const DashboardOverview: React.FC<DashboardOverviewProps> = ({
             </div>
           </section>
 
-          {/* RIGHT COLUMN: Market Movers, Economic Calendar, Sector Strength, Live News AI (Col span 3) */}
+          {/* RIGHT COLUMN: Market Movers, {t('dashboard.economicCalendar')}, {t('dashboard.sectorStrength')}, {t('dashboard.liveNewsAi')} (Col span 3) */}
           <section className="md:col-span-3 flex flex-col gap-3">
             {/* Real-time Market Movers */}
             <MarketMoversCard
@@ -627,15 +629,15 @@ export const DashboardOverview: React.FC<DashboardOverviewProps> = ({
               onViewAll={() => onNavigateTab('multi_asset_markets')}
             />
 
-            {/* Economic Calendar Mini Timeline */}
+            {/* {t('dashboard.economicCalendar')} Mini Timeline */}
             <div className="bg-[#0A0A0A] border border-[#242424] hover:border-[rgba(212,175,55,0.35)] rounded-xl flex-1 flex flex-col overflow-hidden shadow-lg transition">
               <div className="p-2.5 bg-[#101010] border-b border-[#1C1C1C] flex justify-between items-center text-[10px] font-bold uppercase tracking-widest text-[#9CA3AF]">
-                <span>Economic Calendar</span>
+                <span>{t('dashboard.economicCalendar')}</span>
                 <button
                   onClick={() => onNavigateTab('economic_fed')}
                   className="text-[#F2D675] hover:underline normal-case text-[9px]"
                 >
-                  Full Calendar &rarr;
+                  {t('dashboard.fullCalendar')} &rarr;
                 </button>
               </div>
 
@@ -655,7 +657,7 @@ export const DashboardOverview: React.FC<DashboardOverviewProps> = ({
                     </div>
                     {evt.isApproachingHighVol && (
                       <span className="text-[8px] font-black text-[#EF4444] uppercase tracking-tighter block mt-0.5">
-                        HIGH VOLATILITY RISK
+                        {t('dashboard.highVolRisk')}
                       </span>
                     )}
                     <span
@@ -667,11 +669,11 @@ export const DashboardOverview: React.FC<DashboardOverviewProps> = ({
                 ))}
               </div>
 
-              {/* Sector Strength Matrix Mini */}
+              {/* {t('dashboard.sectorStrength')} Matrix Mini */}
               <div className="p-2.5 bg-[#101010] border-t border-[#1C1C1C]">
                 <div className="flex justify-between items-center text-[9px] font-bold text-[#9CA3AF] uppercase mb-1.5 tracking-widest">
-                  <span>Sector Strength</span>
-                  <span className="text-[8px] text-[#22C55E]">Top: {sectors[0]?.symbol}</span>
+                  <span>{t('dashboard.sectorStrength')}</span>
+                  <span className="text-[8px] text-[#22C55E]">{t('dashboard.top')}  {sectors[0]?.symbol}</span>
                 </div>
                 <div className="grid grid-cols-4 gap-1">
                   {sectors.slice(0, 8).map((sec) => {
@@ -702,15 +704,15 @@ export const DashboardOverview: React.FC<DashboardOverviewProps> = ({
               </div>
             </div>
 
-            {/* Live News AI Snippet */}
+            {/* {t('dashboard.liveNewsAi')} Snippet */}
             <div className="bg-[#0A0A0A] border border-[#242424] hover:border-[rgba(212,175,55,0.35)] rounded-xl p-3 shadow-lg transition">
               <div className="flex justify-between items-center text-[9px] font-bold text-[#9CA3AF] uppercase tracking-widest mb-1.5">
-                <span>Live News AI</span>
+                <span>{t('dashboard.liveNewsAi')}</span>
                 <button
                   onClick={() => onNavigateTab('news')}
                   className="text-[#F2D675] hover:underline normal-case text-[9px]"
                 >
-                  All News &rarr;
+                  {t('dashboard.allNews')} &rarr;
                 </button>
               </div>
               {news[0] && (
@@ -729,7 +731,7 @@ export const DashboardOverview: React.FC<DashboardOverviewProps> = ({
                       {news[0].headline}
                     </span>
                     <span className="text-[9px] text-[#9CA3AF] italic mt-0.5">
-                      Impact: {news[0].impactScore}/10 ({news[0].sentiment}) &bull; {news[0].publishedTime}
+                      {t('dashboard.impact')}  {news[0].impactScore}/10 ({news[0].sentiment}) &bull; {news[0].publishedTime}
                     </span>
                   </div>
                 </div>
@@ -739,7 +741,7 @@ export const DashboardOverview: React.FC<DashboardOverviewProps> = ({
         </div>
       )}
 
-      {/* Explain Simply / Beginner Guide Modal */}
+      {/* {t('dashboard.explainSimply')} / Beginner Guide Modal */}
       {isExplainSimplyOpen && (
         <ExplainSimplyModal
           isOpen={isExplainSimplyOpen}

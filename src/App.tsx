@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
+import { useI18n } from './i18n/I18nContext';
 import { Header } from './components/Header';
 import { MarketTape } from './components/MarketTape';
 import { Navigation, ActiveTab } from './components/Navigation';
@@ -71,6 +72,7 @@ import { FirestoreService } from './services/firestoreService';
 import { ShieldCheck, HelpCircle, Activity, FileText, Lock, MessageSquare } from 'lucide-react';
 
 export default function App() {
+  const { t } = useI18n();
   const [selectedTicker, setSelectedTicker] = useState<TickerSymbol>('SPY');
   const [marketData, setMarketData] = useState<ComprehensiveMarketData>(() =>
     getComprehensiveMarketData('SPY')
@@ -518,7 +520,7 @@ export default function App() {
         <div className="flex flex-wrap items-center gap-3">
           <span className={`px-1.5 py-0.2 rounded font-bold font-mono text-[9px] flex items-center gap-1 border ${isLive ? 'bg-emerald-500/15 text-emerald-400 border-emerald-500/30' : 'bg-rose-500/15 text-rose-400 border-rose-500/30'}`}>
             <span className={`h-1.5 w-1.5 rounded-full ${isLive ? 'bg-emerald-400 animate-pulse' : 'bg-rose-400'}`}></span>
-            {isLive ? 'LIVE MARKET FEED' : 'MARKET DATA UNAVAILABLE'}
+            {isLive ? t('footer.liveMarketFeed') : t('footer.marketDataUnavailable')}
           </span>
           <span>
             Provider: <strong>{marketData.quote.dataSource || 'DATA UNAVAILABLE'}</strong>. Derived analytics remain unavailable until verified inputs are present.
@@ -532,7 +534,7 @@ export default function App() {
             className="text-slate-400 hover:text-white transition flex items-center gap-1 text-[10px]"
           >
             <Lock className="w-3 h-3 text-[#818cf8]" />
-            <span>Privacy Policy</span>
+            <span>{t('footer.privacyPolicy')}</span>
           </button>
 
           <span className="text-slate-600">&bull;</span>
@@ -542,7 +544,7 @@ export default function App() {
             className="text-slate-400 hover:text-white transition flex items-center gap-1 text-[10px]"
           >
             <FileText className="w-3 h-3 text-amber-400" />
-            <span>Terms of Service</span>
+            <span>{t('footer.termsOfService')}</span>
           </button>
 
           <span className="text-slate-600">&bull;</span>
@@ -552,7 +554,7 @@ export default function App() {
             className="text-slate-400 hover:text-white transition flex items-center gap-1 text-[10px]"
           >
             <MessageSquare className="w-3 h-3 text-emerald-400" />
-            <span>Contact Support</span>
+            <span>{t('footer.contactSupport')}</span>
           </button>
 
           <span className="text-slate-600">&bull;</span>
@@ -562,7 +564,7 @@ export default function App() {
             className="text-slate-400 hover:text-white transition flex items-center gap-1 text-[10px]"
           >
             <Activity className="w-3 h-3 text-emerald-400" />
-            <span>Status Page (99.9%)</span>
+            <span>{t('footer.statusPage')}</span>
           </button>
         </div>
       </footer>

@@ -1,7 +1,8 @@
 import React, { useState } from 'react';
 import { TrendingUp, TrendingDown, Activity, ChevronRight, Flame } from 'lucide-react';
-import { TickerSymbol } from '../types/market';
-import { useRealTimeWatchlist } from '../hooks/useRealTimeMarket';
+import { TickerSymbol } from '../types/market.js';
+import { useRealTimeWatchlist } from '../hooks/useRealTimeMarket.js';
+import { isFiniteMarketNumber } from '../utils/formatters.js';
 
 interface MarketMoversCardProps {
   onSelectTicker?: (ticker: TickerSymbol) => void;
@@ -109,10 +110,11 @@ export const MarketMoversCard: React.FC<MarketMoversCardProps> = ({
       <div className="flex flex-col divide-y divide-[#1C1C1C]">
         {filteredMovers.map((item) => {
           const rtQuote = rtQuotes[item.symbol];
-          const price = rtQuote?.price && rtQuote.price > 0 ? rtQuote.price : item.price;
-          const changePct =
-            rtQuote?.changePercent !== undefined ? rtQuote.changePercent : item.changePercent;
-          const isPos = changePct >= 0;
+          const hasValidPrice = isFiniteMarketNumber(rtQuote?.price) && rtQuote!.price > 0;
+          const hasValidChange = isFiniteMarketNumber(rtQuote?.changePercent);
+          const price = hasValidPrice ? rtQuote!.price : null;
+          const changePct = hasValidChange ? rtQuote!.changePercent : null;
+          const isPos = changePct !== null ? changePct >= 0 : true;
 
           return (
             <div
@@ -132,18 +134,22 @@ export const MarketMoversCard: React.FC<MarketMoversCardProps> = ({
 
               <div className="flex flex-col items-end shrink-0">
                 <span className="font-mono font-black text-white text-xs">
-                  {typeof price === 'number' && !isNaN(price) && price > 0 ? `$${price.toFixed(2)}` : 'N/A'}
+                  {hasValidPrice ? `$${price!.toFixed(2)}` : 'Unavailable'}
                 </span>
-                <span
-                  className={`text-[10px] font-mono font-bold px-1.5 py-0.2 rounded mt-0.5 ${
-                    isPos
-                      ? 'bg-[#22C55E]/15 text-[#22C55E]'
-                      : 'bg-[#EF4444]/15 text-[#EF4444]'
-                  }`}
-                >
-                  {isPos ? '+' : ''}
-                  {typeof changePct === 'number' && !isNaN(changePct) ? `${changePct.toFixed(2)}%` : 'N/A'}
-                </span>
+                {hasValidChange ? (
+                  <span
+                    className={`text-[10px] font-mono font-bold px-1.5 py-0.2 rounded mt-0.5 ${
+                      isPos
+                        ? 'bg-[#22C55E]/15 text-[#22C55E]'
+                        : 'bg-[#EF4444]/15 text-[#EF4444]'
+                    }`}
+                  >
+                    {isPos ? '+' : ''}
+                    {changePct!.toFixed(2)}%
+                  </span>
+                ) : (
+                  <span className="text-[10px] font-mono text-[#6B7280] mt-0.5">Unavailable</span>
+                )}
               </div>
             </div>
           );

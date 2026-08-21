@@ -39,11 +39,11 @@ test('Deep Research & Market Intelligence Suite', async (t) => {
     assert.equal(res.mode, 'macro_research');
   });
 
-  await t.test('6. SEC EDGAR Service: resolves official CIK numbers without hallucination', () => {
-    assert.equal(SecEdgarService.getCik('NVDA'), '0001045810');
-    assert.equal(SecEdgarService.getCik('AAPL'), '0000320193');
-    assert.equal(SecEdgarService.getCik('MSFT'), '0000789019');
-    assert.equal(SecEdgarService.getCik('TSLA'), '0001318605');
+  await t.test('6. SEC EDGAR Service: resolves official CIK numbers without hallucination', async () => {
+    assert.equal(await SecEdgarService.getCik('NVDA'), '0001045810');
+    assert.equal(await SecEdgarService.getCik('AAPL'), '0000320193');
+    assert.equal(await SecEdgarService.getCik('MSFT'), '0000789019');
+    assert.equal(await SecEdgarService.getCik('TSLA'), '0001318605');
   });
 
   await t.test('7. SEC EDGAR Service: returns verified filing excerpts with Tier 1 sources', async () => {

@@ -275,6 +275,17 @@ export class ApiClient {
   public async removeFromWatchlist(symbol: string): Promise<{ success: boolean }> {
     return this.delete(`/api/watchlist/${encodeURIComponent(symbol)}`);
   }
+
+  /**
+   * Universal Stock Intelligence Engine API endpoint
+   */
+  public async getUniversalStockIntelligence(
+    ticker: string,
+    options?: { timeframe?: string; language?: string; depth?: string }
+  ): Promise<any> {
+    const cleanTicker = ticker.trim().toUpperCase();
+    return this.post(`/api/stocks/${encodeURIComponent(cleanTicker)}/intelligence`, options || {});
+  }
 }
 
 export const sharedApiClient = ApiClient.getInstance();

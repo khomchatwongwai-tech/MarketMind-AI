@@ -71,13 +71,16 @@
     "completed": "Completed",
     "failed": "Failed",
     "pending": "Pending",
-    "inProgress": "In Progress"
+    "inProgress": "In Progress",
+    "bull": "強気",
+    "bear": "弱気",
+    "neut": "中立"
   },
   "nav": {
-    "overview": "意思決定センター",
-    "research": "ディープリサーチ",
+    "overview": "概要",
+    "research": "リサーチ",
     "multiAsset": "マルチアセット市場",
-    "portfolio": "連携ポートフォリオ",
+    "portfolio": "ポートフォリオ",
     "chart": "プロチャート",
     "technical": "Technical Engine",
     "supportResistance": "Pivots & Key Levels",
@@ -85,18 +88,28 @@
     "heatmap": "Sector Heatmap",
     "options": "Options Flow",
     "economic": "Economic & Fed",
-    "news": "News Intelligence",
-    "community": "Community & Ideas",
+    "news": "ニュース・マクロ",
+    "community": "コミュニティフィード",
     "chat": "AI Market Analyst",
     "simulator": "Trade Simulator",
     "backtest": "Strategy Backtest",
     "watchlists": "Watchlists",
-    "alerts": "Market Alerts",
+    "alerts": "アラート",
     "history": "Prediction History",
     "reports": "Export Reports",
     "help": "Help & Education",
     "systemStatus": "Data Status",
-    "admin": "Admin Center"
+    "admin": "Admin Center",
+    "scanner": "銘柄スキャナー",
+    "deepResearch": "AI深層リサーチ",
+    "connectedAccounts": "連携口座",
+    "optionsTrader": "オプション取引",
+    "signalsMl": "シグナル&ML",
+    "askAi": "AIに質問",
+    "morningReport": "モーニングレポート",
+    "signIn": "ログイン",
+    "home": "ホーム",
+    "menu": "メニュー"
   },
   "dashboard": {
     "marketDecisionCenter": "市場意思決定センター",
@@ -150,7 +163,13 @@
     "latency": "Latency",
     "bias": "BIAS",
     "aiConfidence": "AI Confidence",
-    "matchingSymbols": "MATCHING MARKET SYMBOLS"
+    "matchingSymbols": "MATCHING MARKET SYMBOLS",
+    "marketIntelligenceCenter": "市場インテリジェンスセンター",
+    "institutionalOverview": "機関投資家概要",
+    "whatChanged": "前回訪問からの変更点",
+    "hideBrief": "非表示",
+    "viewChanges": "変更を表示",
+    "noVerifiedDevelopments": "前回の訪問以降、検証済みの市場ニュースはありません。"
   },
   "chart": {
     "title": "Real-Time Institutional Chart",
@@ -409,7 +428,14 @@
       "unavailable": "Feed Offline"
     },
     "searchTape": "LIVE MARKET TAPE",
-    "scanner": "Global Asset Scanner"
+    "scanner": "Global Asset Scanner",
+    "dayHigh": "当日高値",
+    "dayLow": "当日安値",
+    "prevClose": "前日終値",
+    "volume": "出来高",
+    "relVol": "相対出来高",
+    "latency": "レイテンシー",
+    "biasUnavailable": "バイアス利用不可"
   },
   "news": {
     "title": "Financial News & Macro Intelligence",
@@ -533,5 +559,9 @@
     "submitTicket": "Submit Support Ticket",
     "feedback": "Submit Product Feedback",
     "systemStatus": "Live Systems & Data Health"
+  },
+  "marketTape": {
+    "directMultiFeed": "ダイレクトマルチフィード",
+    "subMsRouting": "サブミリ秒ルーティング"
   }
 }

@@ -71,13 +71,16 @@
     "completed": "Completed",
     "failed": "Failed",
     "pending": "Pending",
-    "inProgress": "In Progress"
+    "inProgress": "In Progress",
+    "bull": "牛市",
+    "bear": "熊市",
+    "neut": "中性"
   },
   "nav": {
-    "overview": "决策中心",
-    "research": "深度投研",
+    "overview": "概览",
+    "research": "研究",
     "multiAsset": "多资产市场",
-    "portfolio": "关联投资组合",
+    "portfolio": "投资组合",
     "chart": "专业图表",
     "technical": "Technical Engine",
     "supportResistance": "Pivots & Key Levels",
@@ -85,18 +88,28 @@
     "heatmap": "Sector Heatmap",
     "options": "Options Flow",
     "economic": "Economic & Fed",
-    "news": "News Intelligence",
-    "community": "Community & Ideas",
+    "news": "新闻与宏观情报",
+    "community": "社区动态",
     "chat": "AI Market Analyst",
     "simulator": "Trade Simulator",
     "backtest": "Strategy Backtest",
     "watchlists": "Watchlists",
-    "alerts": "Market Alerts",
+    "alerts": "预警",
     "history": "Prediction History",
     "reports": "Export Reports",
     "help": "Help & Education",
     "systemStatus": "Data Status",
-    "admin": "Admin Center"
+    "admin": "Admin Center",
+    "scanner": "市场扫描",
+    "deepResearch": "深度研究",
+    "connectedAccounts": "已连接账户",
+    "optionsTrader": "期权交易",
+    "signalsMl": "信号与机器学习",
+    "askAi": "询问AI",
+    "morningReport": "早间报告",
+    "signIn": "登录",
+    "home": "首页",
+    "menu": "菜单"
   },
   "dashboard": {
     "marketDecisionCenter": "市场决策中心",
@@ -150,7 +163,13 @@
     "latency": "Latency",
     "bias": "BIAS",
     "aiConfidence": "AI Confidence",
-    "matchingSymbols": "MATCHING MARKET SYMBOLS"
+    "matchingSymbols": "MATCHING MARKET SYMBOLS",
+    "marketIntelligenceCenter": "市场情报中心",
+    "institutionalOverview": "机构概览",
+    "whatChanged": "自上次访问以来有何变化？",
+    "hideBrief": "隐藏简报",
+    "viewChanges": "查看变更",
+    "noVerifiedDevelopments": "自上次访问以来暂无经验证的市场动态。"
   },
   "chart": {
     "title": "Real-Time Institutional Chart",
@@ -409,7 +428,14 @@
       "unavailable": "Feed Offline"
     },
     "searchTape": "LIVE MARKET TAPE",
-    "scanner": "Global Asset Scanner"
+    "scanner": "Global Asset Scanner",
+    "dayHigh": "日内最高",
+    "dayLow": "日内最低",
+    "prevClose": "昨收",
+    "volume": "成交量",
+    "relVol": "相对成交量",
+    "latency": "延迟",
+    "biasUnavailable": "趋势暂不可用"
   },
   "news": {
     "title": "Financial News & Macro Intelligence",
@@ -533,5 +559,9 @@
     "submitTicket": "Submit Support Ticket",
     "feedback": "Submit Product Feedback",
     "systemStatus": "Live Systems & Data Health"
+  },
+  "marketTape": {
+    "directMultiFeed": "直连多源数据",
+    "subMsRouting": "亚毫秒级路由"
   }
 }

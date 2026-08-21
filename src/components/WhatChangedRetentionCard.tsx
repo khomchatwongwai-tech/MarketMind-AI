@@ -1,3 +1,4 @@
+import { useI18n } from '../i18n/I18nContext.js';
 import React, { useState, useEffect, useMemo } from 'react';
 import {
   History,
@@ -33,6 +34,7 @@ export const WhatChangedRetentionCard: React.FC<WhatChangedRetentionCardProps> =
   rawEvents = [],
   className = '',
 }) => {
+  const { t } = useI18n();
   const [lastVisitLabel, setLastVisitLabel] = useState<string>('Earlier today');
   const [lastVisitMs, setLastVisitMs] = useState<number>(0);
   const [isExpanded, setIsExpanded] = useState<boolean>(true);
@@ -85,7 +87,7 @@ export const WhatChangedRetentionCard: React.FC<WhatChangedRetentionCardProps> =
           <div>
             <div className="flex items-center gap-2">
               <h3 className="text-xs font-bold text-white font-mono tracking-tight">
-                WHAT CHANGED SINCE YOUR LAST VISIT?
+                {t('dashboard.whatChanged')}
               </h3>
               <span className="px-2 py-0.5 bg-[#1E1E26] text-[#D4AF37] text-[10px] font-mono rounded font-semibold border border-[#D4AF37]/20">
                 {lastVisitLabel}
@@ -101,7 +103,7 @@ export const WhatChangedRetentionCard: React.FC<WhatChangedRetentionCardProps> =
           onClick={() => setIsExpanded(!isExpanded)}
           className="text-xs text-[#D4AF37] hover:underline font-mono cursor-pointer"
         >
-          {isExpanded ? 'Hide Brief' : 'View Changes'}
+          {isExpanded ? t('dashboard.hideBrief') : t('dashboard.viewChanges')}
         </button>
       </div>
 
@@ -113,7 +115,7 @@ export const WhatChangedRetentionCard: React.FC<WhatChangedRetentionCardProps> =
               <div className="flex flex-col items-center justify-center gap-2">
                 <Info className="w-6 h-6 text-[#9CA3AF] opacity-60" />
                 <span className="text-xs font-bold text-[#E5E5E5]">
-                  No verified market developments since your last visit.
+                  {t('dashboard.noVerifiedDevelopments')}
                 </span>
                 <span className="text-[11px] text-[#6B7280]">
                   MarketMind strictly rejects unverified stories, missing sources, and sample news.

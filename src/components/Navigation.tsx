@@ -101,18 +101,18 @@ export const Navigation: React.FC<NavigationProps> = ({
 
   const tabs: { id: ActiveTab; label: string; icon: React.ElementType; badge?: string; category: string; adminOnly?: boolean }[] = [
     { id: 'overview', label: t('nav.overview'), icon: LayoutDashboard, category: 'Core' },
-    { id: 'scanner', label: 'Market Scanner', icon: Search, badge: '5000+ UNIVERSE', category: 'Markets' },
-    { id: 'research', label: 'Deep Research', icon: Sparkles, badge: 'NEW AI', category: 'Core' },
-    { id: 'multi_asset_markets', label: 'Multi-Asset Markets', icon: Globe2, badge: 'UNIVERSAL', category: 'Markets' },
-    { id: 'connected_portfolio', label: 'Connected Accounts', icon: Briefcase, badge: 'PORTFOLIO', category: 'Portfolio' },
+    { id: 'scanner', label: t('nav.scanner'), icon: Search, badge: '5000+ UNIVERSE', category: 'Markets' },
+    { id: 'research', label: t('nav.deepResearch'), icon: Sparkles, badge: 'NEW AI', category: 'Core' },
+    { id: 'multi_asset_markets', label: t('nav.multiAsset'), icon: Globe2, badge: 'UNIVERSAL', category: 'Markets' },
+    { id: 'connected_portfolio', label: t('nav.connectedAccounts'), icon: Briefcase, badge: 'PORTFOLIO', category: 'Portfolio' },
     { id: 'technicals', label: t('nav.technical'), icon: LineChart, category: 'Quant Engine' },
     { id: 'support_resistance', label: t('nav.supportResistance'), icon: Target, category: 'Quant Engine' },
     { id: 'breadth_intermarket', label: t('nav.breadth'), icon: Globe2, badge: breadthStatus.split(' ')[0], category: 'Markets' },
     { id: 'sectors', label: t('nav.heatmap'), icon: PieChart, category: 'Markets' },
-    { id: 'options', label: 'Options Trader', icon: Layers, badge: 'AI TRADER', category: 'Quant Engine' },
+    { id: 'options', label: t('nav.optionsTrader'), icon: Layers, badge: 'AI TRADER', category: 'Quant Engine' },
     { id: 'economic_fed', label: t('nav.economic'), icon: Calendar, category: 'Macro' },
-    { id: 'news', label: 'News & Macro Intelligence', icon: Newspaper, badge: '17 FEEDS', category: 'Macro' },
-    { id: 'community', label: 'Community Feed', icon: Users, badge: 'Social', category: 'Social' },
+    { id: 'news', label: t('nav.news'), icon: Newspaper, badge: '17 FEEDS', category: 'Macro' },
+    { id: 'community', label: t('nav.community'), icon: Users, badge: 'Social', category: 'Social' },
     { id: 'chat', label: t('nav.chat'), icon: BotMessageSquare, badge: 'AI', category: 'AI Intelligence' },
     { id: 'watchlists', label: t('nav.watchlists'), icon: ListPlus, category: 'Portfolio' },
     { id: 'saved_alerts', label: t('nav.alerts'), icon: Bell, category: 'Signals' },
@@ -120,7 +120,7 @@ export const Navigation: React.FC<NavigationProps> = ({
     { id: 'export_reports', label: t('nav.reports'), icon: FileText, badge: 'PDF', category: 'Tools' },
     { id: 'simulator', label: t('nav.simulator'), icon: Calculator, category: 'Tools' },
     { id: 'backtest', label: t('nav.backtest'), icon: History, category: 'Tools' },
-    { id: 'alerts_ml', label: 'Signals & ML Store', icon: ShieldAlert, category: 'Signals' },
+    { id: 'alerts_ml', label: t('nav.signalsMl'), icon: ShieldAlert, category: 'Signals' },
     { id: 'help_center', label: t('nav.help'), icon: HelpCircle, category: 'System' },
     { id: 'status_page', label: t('nav.systemStatus'), icon: Activity, badge: 'HEALTH', category: 'System' },
     ...(isAdminUser ? [{ id: 'admin' as ActiveTab, label: t('nav.admin'), icon: ShieldCheck, badge: 'ADMIN', category: 'Admin' }] : []),
@@ -188,7 +188,7 @@ export const Navigation: React.FC<NavigationProps> = ({
               activeTab === 'overview' && !isMenuOpen ? 'text-[#D4AF37]' : 'text-[#9CA3AF]'
             }`}
           />
-          <span className="tracking-tight uppercase">HOME</span>
+          <span className="tracking-tight uppercase">{t('nav.home')}</span>
         </button>
 
         {/* PORTFOLIO */}
@@ -210,7 +210,7 @@ export const Navigation: React.FC<NavigationProps> = ({
                 : 'text-[#9CA3AF]'
             }`}
           />
-          <span className="tracking-tight uppercase">PORTFOLIO</span>
+          <span className="tracking-tight uppercase">{t('nav.portfolio')}</span>
         </button>
 
         {/* RESEARCH */}
@@ -230,7 +230,7 @@ export const Navigation: React.FC<NavigationProps> = ({
               activeTab === 'research' && !isMenuOpen ? 'text-[#D4AF37]' : 'text-[#9CA3AF]'
             }`}
           />
-          <span className="tracking-tight uppercase">RESEARCH</span>
+          <span className="tracking-tight uppercase">{t('nav.research')}</span>
         </button>
 
         {/* ALERTS */}
@@ -250,7 +250,7 @@ export const Navigation: React.FC<NavigationProps> = ({
               activeTab === 'saved_alerts' && !isMenuOpen ? 'text-[#D4AF37]' : 'text-[#9CA3AF]'
             }`}
           />
-          <span className="tracking-tight uppercase">ALERTS</span>
+          <span className="tracking-tight uppercase">{t('nav.alerts')}</span>
         </button>
 
         {/* MENU */}
@@ -261,7 +261,7 @@ export const Navigation: React.FC<NavigationProps> = ({
           }`}
         >
           <Menu className={`w-4 h-4 ${isMenuOpen ? 'text-[#D4AF37]' : 'text-[#9CA3AF]'}`} />
-          <span className="tracking-tight uppercase">MENU</span>
+          <span className="tracking-tight uppercase">{t('nav.menu')}</span>
         </button>
       </div>
 

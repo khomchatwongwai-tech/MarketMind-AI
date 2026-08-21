@@ -32,6 +32,8 @@ const enMap = getNestedKeysAndValues(enData);
 test('AUDIT 1: Locale Completeness - 100% key match across all 8 target languages', () => {
   assert.ok(enMap.size >= 400, `Expected at least 400 translation keys in en.json, found ${enMap.size}`);
 
+  const completenessReport: Record<string, string> = {};
+
   for (const locale of targetLocales) {
     const filePath = path.join(localesDir, `${locale}.json`);
     assert.ok(fs.existsSync(filePath), `Missing required locale file: ${locale}.json`);
@@ -45,6 +47,9 @@ test('AUDIT 1: Locale Completeness - 100% key match across all 8 target language
         missingKeys.push(key);
       }
     });
+
+    const matchedPercent = (((enMap.size - missingKeys.length) / enMap.size) * 100).toFixed(1);
+    completenessReport[locale] = `${matchedPercent}%`;
 
     assert.equal(
       missingKeys.length,
@@ -66,6 +71,17 @@ test('AUDIT 1: Locale Completeness - 100% key match across all 8 target language
       `Locale "${locale}" has ${extraKeys.length} extra orphan keys not in English: ${extraKeys.slice(0, 5).join(', ')}`
     );
   }
+
+  console.log('--- CI LOCALE COMPLETENESS REPORT ---');
+  console.log(`English: 100%`);
+  console.log(`Spanish: ${completenessReport['es']}`);
+  console.log(`Chinese: ${completenessReport['zh-CN']}`);
+  console.log(`Thai: ${completenessReport['th']}`);
+  console.log(`Korean: ${completenessReport['ko']}`);
+  console.log(`Japanese: ${completenessReport['ja']}`);
+  console.log(`Vietnamese: ${completenessReport['vi']}`);
+  console.log(`French: ${completenessReport['fr']}`);
+  console.log('------------------------------------');
 });
 
 test('AUDIT 2: Interpolation Variable Parity - variables match across all languages', () => {
@@ -132,4 +148,36 @@ test('AUDIT 5: Financial Market Data Integrity & Ticker Immutability', () => {
 
   const jaDirective = getLanguageInstruction('ja');
   assert.ok(jaDirective.includes('Japanese'), 'Japanese AI instruction missing target language name');
+});
+
+test('AUDIT 6: Production Hardcoded String Exclusion Check', () => {
+  const targetComponents = [
+    'src/components/Header.tsx',
+    'src/components/Navigation.tsx',
+    'src/components/MarketMindSummaryCard.tsx',
+    'src/components/WhatChangedRetentionCard.tsx',
+    'src/components/MarketTape.tsx',
+  ];
+
+  const bannedLiterals = [
+    'MARKET INTELLIGENCE CENTER',
+    'WHAT CHANGED SINCE YOUR LAST VISIT?',
+    'INSTITUTIONAL OVERVIEW',
+    'DIRECT MULTI-FEED',
+    'Sub-millisecond Routing',
+  ];
+
+  for (const compPath of targetComponents) {
+    const fullPath = path.resolve(process.cwd(), compPath);
+    assert.ok(fs.existsSync(fullPath), `Component file missing: ${compPath}`);
+    const code = fs.readFileSync(fullPath, 'utf8');
+
+    for (const banned of bannedLiterals) {
+      const containsLiteral = code.includes(`>${banned}<`) || code.includes(`"${banned}"`) || code.includes(`'${banned}'`);
+      assert.ok(
+        !containsLiteral,
+        `Hardcoded production UI string "${banned}" found in ${compPath}. Use translation keys instead.`
+      );
+    }
+  }
 });

@@ -1,3 +1,4 @@
+import { useI18n } from '../i18n/I18nContext.js';
 import React, { useEffect, useState, useMemo } from 'react';
 import { fetchLiveTape } from '../services/marketDataService';
 import { TrendingUp, TrendingDown, Radio, Zap, Menu } from 'lucide-react';
@@ -48,6 +49,7 @@ export const MarketTape: React.FC<MarketTapeProps> = ({
   isLive,
   onOpenMenu,
 }) => {
+  const { t } = useI18n();
   const [tapeQuotes, setTapeQuotes] = useState<TapeQuote[]>(() =>
     DEFAULT_SYMBOLS.map((sym) => ({
       symbol: sym,
@@ -100,7 +102,7 @@ export const MarketTape: React.FC<MarketTapeProps> = ({
           </span>
           <span className="font-mono text-[10px] font-extrabold text-[#E5E5E5] uppercase tracking-wider flex items-center gap-1">
             <Radio className="w-3 h-3 text-[#D4AF37]" />
-            DIRECT MULTI-FEED
+            {t('marketTape.directMultiFeed')}
           </span>
         </div>
 
@@ -152,7 +154,7 @@ export const MarketTape: React.FC<MarketTapeProps> = ({
         </span>
         <span className="font-mono text-[10px] font-extrabold text-[#E5E5E5] uppercase tracking-widest flex items-center gap-1">
           <Radio className="w-3 h-3 text-[#D4AF37]" />
-          Direct Multi-Feed
+          {t('marketTape.directMultiFeed')}
         </span>
         <span className="text-[9px] text-[#6B7280] font-mono hidden md:inline">
           {lastSync}
@@ -207,7 +209,7 @@ export const MarketTape: React.FC<MarketTapeProps> = ({
 
       <div className="hidden lg:flex items-center gap-1.5 pl-3 border-l border-[#242424] shrink-0 text-[10px] font-mono text-[#9CA3AF]">
         <Zap className="w-3 h-3 text-[#D4AF37]" />
-        <span>Sub-millisecond Routing</span>
+        <span>{t('marketTape.subMsRouting')}</span>
       </div>
     </div>
   );

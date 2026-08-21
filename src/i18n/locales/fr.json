@@ -71,13 +71,16 @@
     "completed": "Completed",
     "failed": "Failed",
     "pending": "Pending",
-    "inProgress": "In Progress"
+    "inProgress": "In Progress",
+    "bull": "HAUSSIER",
+    "bear": "BAISSIER",
+    "neut": "NEUTRE"
   },
   "nav": {
-    "overview": "Centre de Décision",
-    "research": "Recherche Approfondie",
-    "multiAsset": "Marchés Multi-Actifs",
-    "portfolio": "Portefeuille Connecté",
+    "overview": "Aperçu",
+    "research": "RECHERCHE",
+    "multiAsset": "Marchés multi-actifs",
+    "portfolio": "PORTEFEUILLE",
     "chart": "Graphique Pro",
     "technical": "Technical Engine",
     "supportResistance": "Pivots & Key Levels",
@@ -85,18 +88,28 @@
     "heatmap": "Sector Heatmap",
     "options": "Options Flow",
     "economic": "Economic & Fed",
-    "news": "News Intelligence",
-    "community": "Community & Ideas",
+    "news": "Actualités & Macro",
+    "community": "Fil de la communauté",
     "chat": "AI Market Analyst",
     "simulator": "Trade Simulator",
     "backtest": "Strategy Backtest",
     "watchlists": "Watchlists",
-    "alerts": "Market Alerts",
+    "alerts": "ALERTES",
     "history": "Prediction History",
     "reports": "Export Reports",
     "help": "Help & Education",
     "systemStatus": "Data Status",
-    "admin": "Admin Center"
+    "admin": "Admin Center",
+    "scanner": "Scanner de marché",
+    "deepResearch": "Recherche approfondie AI",
+    "connectedAccounts": "Comptes connectés",
+    "optionsTrader": "Trading d'options",
+    "signalsMl": "Signaux & ML",
+    "askAi": "Demander à l'IA",
+    "morningReport": "Rapport du matin",
+    "signIn": "Se connecter",
+    "home": "ACCUEIL",
+    "menu": "MENU"
   },
   "dashboard": {
     "marketDecisionCenter": "CENTRE DE DÉCISION DU MARCHÉ",
@@ -150,7 +163,13 @@
     "latency": "Latency",
     "bias": "BIAS",
     "aiConfidence": "AI Confidence",
-    "matchingSymbols": "MATCHING MARKET SYMBOLS"
+    "matchingSymbols": "MATCHING MARKET SYMBOLS",
+    "marketIntelligenceCenter": "CENTRE D'INTELLIGENCE DE MARCHÉ",
+    "institutionalOverview": "APERÇU INSTITUTIONNEL",
+    "whatChanged": "QU'EST-CE QUI A CHANGÉ DEPUIS VOTRE DERNIÈRE VISITE ?",
+    "hideBrief": "Masquer le brief",
+    "viewChanges": "Voir les changements",
+    "noVerifiedDevelopments": "Aucune actualité de marché vérifiée depuis votre dernière visite."
   },
   "chart": {
     "title": "Real-Time Institutional Chart",
@@ -409,7 +428,14 @@
       "unavailable": "Feed Offline"
     },
     "searchTape": "LIVE MARKET TAPE",
-    "scanner": "Global Asset Scanner"
+    "scanner": "Global Asset Scanner",
+    "dayHigh": "Plus haut du jour",
+    "dayLow": "Plus bas du jour",
+    "prevClose": "Clôture précédente",
+    "volume": "Volume",
+    "relVol": "Volume relatif",
+    "latency": "Latence",
+    "biasUnavailable": "BIAIS INDISPONIBLE"
   },
   "news": {
     "title": "Financial News & Macro Intelligence",
@@ -533,5 +559,9 @@
     "submitTicket": "Submit Support Ticket",
     "feedback": "Submit Product Feedback",
     "systemStatus": "Live Systems & Data Health"
+  },
+  "marketTape": {
+    "directMultiFeed": "FLUX MULTIPLES DIRECTS",
+    "subMsRouting": "Routage inférieur à la milliseconde"
   }
 }

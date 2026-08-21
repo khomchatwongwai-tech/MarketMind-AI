@@ -71,13 +71,16 @@
     "completed": "Completed",
     "failed": "Failed",
     "pending": "Pending",
-    "inProgress": "In Progress"
+    "inProgress": "In Progress",
+    "bull": "강세",
+    "bear": "약세",
+    "neut": "중립"
   },
   "nav": {
-    "overview": "의사결정 센터",
-    "research": "딥 리서치",
-    "multiAsset": "멀티 에셋 시장",
-    "portfolio": "연결된 포트폴리오",
+    "overview": "개요",
+    "research": "연구",
+    "multiAsset": "다중 자산 시장",
+    "portfolio": "포트폴리오",
     "chart": "프로 차트",
     "technical": "Technical Engine",
     "supportResistance": "Pivots & Key Levels",
@@ -85,18 +88,28 @@
     "heatmap": "Sector Heatmap",
     "options": "Options Flow",
     "economic": "Economic & Fed",
-    "news": "News Intelligence",
-    "community": "Community & Ideas",
+    "news": "뉴스 및 매크로 정보",
+    "community": "커뮤니티 피드",
     "chat": "AI Market Analyst",
     "simulator": "Trade Simulator",
     "backtest": "Strategy Backtest",
     "watchlists": "Watchlists",
-    "alerts": "Market Alerts",
+    "alerts": "알림",
     "history": "Prediction History",
     "reports": "Export Reports",
     "help": "Help & Education",
     "systemStatus": "Data Status",
-    "admin": "Admin Center"
+    "admin": "Admin Center",
+    "scanner": "시장 스캐너",
+    "deepResearch": "AI 심층 연구",
+    "connectedAccounts": "연결된 계정",
+    "optionsTrader": "옵션 트레이더",
+    "signalsMl": "시그널 및 ML",
+    "askAi": "AI에게 질문",
+    "morningReport": "모닝 리포트",
+    "signIn": "로그인",
+    "home": "홈",
+    "menu": "메뉴"
   },
   "dashboard": {
     "marketDecisionCenter": "시장 의사결정 센터",
@@ -150,7 +163,13 @@
     "latency": "Latency",
     "bias": "BIAS",
     "aiConfidence": "AI Confidence",
-    "matchingSymbols": "MATCHING MARKET SYMBOLS"
+    "matchingSymbols": "MATCHING MARKET SYMBOLS",
+    "marketIntelligenceCenter": "시장 인텔리전스 센터",
+    "institutionalOverview": "기관 개요",
+    "whatChanged": "지난 방문 이후 변경된 사항",
+    "hideBrief": "요약 숨기기",
+    "viewChanges": "변경 사항 보기",
+    "noVerifiedDevelopments": "지난 방문 이후 검증된 시장 뉴스 업데이트가 없습니다."
   },
   "chart": {
     "title": "Real-Time Institutional Chart",
@@ -409,7 +428,14 @@
       "unavailable": "Feed Offline"
     },
     "searchTape": "LIVE MARKET TAPE",
-    "scanner": "Global Asset Scanner"
+    "scanner": "Global Asset Scanner",
+    "dayHigh": "일일 최고",
+    "dayLow": "일일 최저",
+    "prevClose": "이전 종가",
+    "volume": "거래량",
+    "relVol": "상대 거래량",
+    "latency": "지연 시간",
+    "biasUnavailable": "바이어스 이용 불가"
   },
   "news": {
     "title": "Financial News & Macro Intelligence",
@@ -533,5 +559,9 @@
     "submitTicket": "Submit Support Ticket",
     "feedback": "Submit Product Feedback",
     "systemStatus": "Live Systems & Data Health"
+  },
+  "marketTape": {
+    "directMultiFeed": "직접 멀티 피드",
+    "subMsRouting": "밀리초 미만 라우팅"
   }
 }

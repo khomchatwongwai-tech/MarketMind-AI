@@ -71,13 +71,16 @@
     "completed": "Completed",
     "failed": "Failed",
     "pending": "Pending",
-    "inProgress": "In Progress"
+    "inProgress": "In Progress",
+    "bull": "TĂNG",
+    "bear": "GIẢM",
+    "neut": "TRUNG LẬP"
   },
   "nav": {
-    "overview": "Trung tâm Quyết định",
-    "research": "Nghiên cứu Chuyên sâu",
-    "multiAsset": "Thị trường Đa Tài sản",
-    "portfolio": "Danh mục Đã kết nối",
+    "overview": "Tổng quan",
+    "research": "NGHIÊN CỨU",
+    "multiAsset": "Thị trường đa tài sản",
+    "portfolio": "DANH MỤC",
     "chart": "Biểu đồ Chuyên nghiệp",
     "technical": "Technical Engine",
     "supportResistance": "Pivots & Key Levels",
@@ -85,18 +88,28 @@
     "heatmap": "Sector Heatmap",
     "options": "Options Flow",
     "economic": "Economic & Fed",
-    "news": "News Intelligence",
-    "community": "Community & Ideas",
+    "news": "Tin tức & Vĩ mô",
+    "community": "Cộng đồng",
     "chat": "AI Market Analyst",
     "simulator": "Trade Simulator",
     "backtest": "Strategy Backtest",
     "watchlists": "Watchlists",
-    "alerts": "Market Alerts",
+    "alerts": "CẢNH BÁO",
     "history": "Prediction History",
     "reports": "Export Reports",
     "help": "Help & Education",
     "systemStatus": "Data Status",
-    "admin": "Admin Center"
+    "admin": "Admin Center",
+    "scanner": "Quét thị trường",
+    "deepResearch": "Nghiên cứu sâu AI",
+    "connectedAccounts": "Tài khoản đã kết nối",
+    "optionsTrader": "Giao dịch quyền chọn",
+    "signalsMl": "Tín hiệu & ML",
+    "askAi": "Hỏi AI",
+    "morningReport": "Báo cáo buổi sáng",
+    "signIn": "Đăng nhập",
+    "home": "TRANG CHỦ",
+    "menu": "DANH MỤC"
   },
   "dashboard": {
     "marketDecisionCenter": "TRUNG TÂM QUYẾT ĐỊNH THỊ TRƯỜNG",
@@ -150,7 +163,13 @@
     "latency": "Latency",
     "bias": "BIAS",
     "aiConfidence": "AI Confidence",
-    "matchingSymbols": "MATCHING MARKET SYMBOLS"
+    "matchingSymbols": "MATCHING MARKET SYMBOLS",
+    "marketIntelligenceCenter": "TRUNG TÂM TRÍ TUỆ THỊ TRƯỜNG",
+    "institutionalOverview": "TỔNG QUAN TỔ CHỨC",
+    "whatChanged": "CÓ GÌ THAY ĐỔI KỂ TỪ LẦN TRUY CẬP TRƯỚC?",
+    "hideBrief": "Ẩn tóm tắt",
+    "viewChanges": "Xem thay đổi",
+    "noVerifiedDevelopments": "Không có diễn biến thị trường nào được xác minh kể từ lần truy cập trước."
   },
   "chart": {
     "title": "Real-Time Institutional Chart",
@@ -409,7 +428,14 @@
       "unavailable": "Feed Offline"
     },
     "searchTape": "LIVE MARKET TAPE",
-    "scanner": "Global Asset Scanner"
+    "scanner": "Global Asset Scanner",
+    "dayHigh": "Cao nhất ngày",
+    "dayLow": "Thấp nhất ngày",
+    "prevClose": "Giá đóng cửa trước",
+    "volume": "Khối lượng",
+    "relVol": "Khối lượng tương đối",
+    "latency": "Độ trễ",
+    "biasUnavailable": "KHÔNG CÓ TÍN HIỆU"
   },
   "news": {
     "title": "Financial News & Macro Intelligence",
@@ -533,5 +559,9 @@
     "submitTicket": "Submit Support Ticket",
     "feedback": "Submit Product Feedback",
     "systemStatus": "Live Systems & Data Health"
+  },
+  "marketTape": {
+    "directMultiFeed": "NGUỒN DỮ LIỆU ĐA KÊNH TRỰC TIẾP",
+    "subMsRouting": "Định tuyến dưới một mili giây"
   }
 }

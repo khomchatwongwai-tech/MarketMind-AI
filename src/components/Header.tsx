@@ -546,7 +546,7 @@ export const Header: React.FC<HeaderProps> = ({
                 Low: <span className="text-white font-bold">{isFiniteMarketNumber(quote.dayLow) ? `$${quote.dayLow.toFixed(2)}` : 'N/A'}</span>
               </div>
               <div>
-                Vol:{' '}
+                {t('market.volume')}:{' '}
                 <span className="text-white font-bold">
                   {formatVolume(quote.volume)}
                 </span>
@@ -559,25 +559,25 @@ export const Header: React.FC<HeaderProps> = ({
           {/* Desktop Session Metrics Bar */}
           <div className="hidden sm:grid xl:grid grid-cols-3 gap-x-4 gap-y-0.5 text-[10px] text-[#9CA3AF] uppercase tracking-wider pl-2 border-l border-[#242424]">
             <div>
-              Day High: <span className="text-white font-mono font-semibold">{isFiniteMarketNumber(quote.dayHigh) ? `$${quote.dayHigh.toFixed(2)}` : 'N/A'}</span>
+              {t('market.dayHigh')}: <span className="text-white font-mono font-semibold">{isFiniteMarketNumber(quote.dayHigh) ? `$${quote.dayHigh.toFixed(2)}` : 'N/A'}</span>
             </div>
             <div>
-              Day Low: <span className="text-white font-mono font-semibold">{isFiniteMarketNumber(quote.dayLow) ? `$${quote.dayLow.toFixed(2)}` : 'N/A'}</span>
+              {t('market.dayLow')}: <span className="text-white font-mono font-semibold">{isFiniteMarketNumber(quote.dayLow) ? `$${quote.dayLow.toFixed(2)}` : 'N/A'}</span>
             </div>
             <div>
-              Prev Close: <span className="text-white font-mono font-semibold">{isFiniteMarketNumber(quote.previousClose) ? `$${quote.previousClose.toFixed(2)}` : 'N/A'}</span>
+              {t('market.prevClose')}: <span className="text-white font-mono font-semibold">{isFiniteMarketNumber(quote.previousClose) ? `$${quote.previousClose.toFixed(2)}` : 'N/A'}</span>
             </div>
             <div>
-              Vol:{' '}
+              {t('market.volume')}:{' '}
               <span className="text-white font-mono font-semibold">
                 {formatVolume(quote.volume)}
               </span>
             </div>
             <div>
-              Rel Vol: <span className="text-[#D4AF37] font-mono font-semibold">{isFiniteMarketNumber(quote.relativeVolume) ? `${quote.relativeVolume}x` : 'N/A'}</span>
+              Rel {t('market.volume')}: <span className="text-[#D4AF37] font-mono font-semibold">{isFiniteMarketNumber(quote.relativeVolume) ? `${quote.relativeVolume}x` : 'N/A'}</span>
             </div>
             <div>
-              Latency: <span className="text-[#F2D675] font-mono font-semibold">{isFiniteMarketNumber(quote.latencyMs) ? `${quote.latencyMs}ms` : 'N/A'}</span>
+              {t('market.latency')}: <span className="text-[#F2D675] font-mono font-semibold">{isFiniteMarketNumber(quote.latencyMs) ? `${quote.latencyMs}ms` : 'N/A'}</span>
             </div>
           </div>
         </div>
@@ -599,7 +599,7 @@ export const Header: React.FC<HeaderProps> = ({
               {bias === 'BEARISH' && <TrendingDown className="w-3.5 h-3.5" />}
               {bias === 'NEUTRAL' && <Minus className="w-3.5 h-3.5" />}
               {bias === 'UNAVAILABLE' && <AlertTriangle className="w-3.5 h-3.5" />}
-              {bias === 'UNAVAILABLE' ? 'BIAS UNAVAILABLE' : `${bias} BIAS`}
+              {bias === 'UNAVAILABLE' ? t('market.biasUnavailable') : `${bias} BIAS`}
             </div>
             <div className="text-[10px] text-[#9CA3AF] uppercase tracking-wider font-mono">
               AI: <span className="font-bold text-[#F2D675]">{isFiniteMarketNumber(probabilities.aiConfidence) ? `${probabilities.aiConfidence}%` : 'N/A'}</span>
@@ -609,9 +609,9 @@ export const Header: React.FC<HeaderProps> = ({
           {/* Probabilities Multi-Bar */}
           <div className="flex flex-col bg-[#101010] rounded-lg p-1.5 md:p-2 min-w-[140px] md:min-w-[170px] border border-[#242424]">
             <div className="flex justify-between text-[9px] md:text-[10px] mb-1 font-mono font-bold">
-              <span className="text-[#22C55E]">BULL: {isFiniteMarketNumber(probabilities.bullish) ? `${probabilities.bullish}%` : 'N/A'}</span>
-              <span className="text-[#A3A3A3]">NEUT: {isFiniteMarketNumber(probabilities.neutral) ? `${probabilities.neutral}%` : 'N/A'}</span>
-              <span className="text-[#EF4444]">BEAR: {isFiniteMarketNumber(probabilities.bearish) ? `${probabilities.bearish}%` : 'N/A'}</span>
+              <span className="text-[#22C55E]">{t('common.bull')}: {isFiniteMarketNumber(probabilities.bullish) ? `${probabilities.bullish}%` : 'N/A'}</span>
+              <span className="text-[#A3A3A3]">{t('common.neut')}: {isFiniteMarketNumber(probabilities.neutral) ? `${probabilities.neutral}%` : 'N/A'}</span>
+              <span className="text-[#EF4444]">{t('common.bear')}: {isFiniteMarketNumber(probabilities.bearish) ? `${probabilities.bearish}%` : 'N/A'}</span>
             </div>
             <div className="h-1.5 md:h-2 w-full bg-[#1C1C1C] rounded-full overflow-hidden flex">
               <div
@@ -641,7 +641,7 @@ export const Header: React.FC<HeaderProps> = ({
                 className="px-2.5 md:px-3 py-1.5 gold-gradient-btn text-xs font-extrabold rounded-lg flex items-center gap-1.5 shadow-md transition cursor-pointer"
               >
                 <Sparkles className="w-3.5 h-3.5 text-[#050505]" />
-                <span className="text-[11px] text-[#050505]">Ask AI</span>
+                <span className="text-[11px] text-[#050505]">{t('nav.askAi')}</span>
               </button>
             )}
 
@@ -651,7 +651,7 @@ export const Header: React.FC<HeaderProps> = ({
               className="hidden sm:flex px-2.5 py-1.5 bg-[#101010] hover:bg-[#151515] border border-[#242424] hover:border-[#D4AF37]/50 text-xs font-semibold rounded-lg items-center gap-1 text-[#E5E5E5] hover:text-white transition"
             >
               <FileText className="w-3.5 h-3.5 text-[#D4AF37]" />
-              <span className="hidden sm:inline">Morning Report</span>
+              <span className="hidden sm:inline">{t('nav.morningReport')}</span>
             </button>
 
             <button

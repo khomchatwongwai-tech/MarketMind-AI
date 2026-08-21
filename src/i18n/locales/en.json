@@ -71,13 +71,16 @@
     "completed": "Completed",
     "failed": "Failed",
     "pending": "Pending",
-    "inProgress": "In Progress"
+    "inProgress": "In Progress",
+    "bull": "BULL",
+    "bear": "BEAR",
+    "neut": "NEUT"
   },
   "nav": {
-    "overview": "Decision Center",
-    "research": "Deep Research",
+    "overview": "Overview",
+    "research": "RESEARCH",
     "multiAsset": "Multi-Asset Markets",
-    "portfolio": "Connected Portfolio",
+    "portfolio": "PORTFOLIO",
     "chart": "Pro Chart",
     "technical": "Technical Engine",
     "supportResistance": "Pivots & Key Levels",
@@ -85,18 +88,28 @@
     "heatmap": "Sector Heatmap",
     "options": "Options Flow",
     "economic": "Economic & Fed",
-    "news": "News Intelligence",
-    "community": "Community & Ideas",
+    "news": "News & Macro Intelligence",
+    "community": "Community Feed",
     "chat": "AI Market Analyst",
     "simulator": "Trade Simulator",
     "backtest": "Strategy Backtest",
     "watchlists": "Watchlists",
-    "alerts": "Market Alerts",
+    "alerts": "ALERTS",
     "history": "Prediction History",
     "reports": "Export Reports",
     "help": "Help & Education",
     "systemStatus": "Data Status",
-    "admin": "Admin Center"
+    "admin": "Admin Center",
+    "scanner": "Market Scanner",
+    "deepResearch": "Deep Research",
+    "connectedAccounts": "Connected Accounts",
+    "optionsTrader": "Options Trader",
+    "signalsMl": "Signals & ML Store",
+    "askAi": "Ask AI",
+    "morningReport": "Morning Report",
+    "signIn": "Sign In",
+    "home": "HOME",
+    "menu": "MENU"
   },
   "dashboard": {
     "marketDecisionCenter": "MARKET DECISION CENTER",
@@ -150,7 +163,13 @@
     "latency": "Latency",
     "bias": "BIAS",
     "aiConfidence": "AI Confidence",
-    "matchingSymbols": "MATCHING MARKET SYMBOLS"
+    "matchingSymbols": "MATCHING MARKET SYMBOLS",
+    "marketIntelligenceCenter": "MARKET INTELLIGENCE CENTER",
+    "institutionalOverview": "INSTITUTIONAL OVERVIEW",
+    "whatChanged": "WHAT CHANGED SINCE YOUR LAST VISIT?",
+    "hideBrief": "Hide Brief",
+    "viewChanges": "View Changes",
+    "noVerifiedDevelopments": "No verified market developments since your last visit."
   },
   "chart": {
     "title": "Real-Time Institutional Chart",
@@ -409,7 +428,14 @@
       "unavailable": "Feed Offline"
     },
     "searchTape": "LIVE MARKET TAPE",
-    "scanner": "Global Asset Scanner"
+    "scanner": "Global Asset Scanner",
+    "dayHigh": "Day High",
+    "dayLow": "Day Low",
+    "prevClose": "Prev Close",
+    "volume": "Volume",
+    "relVol": "Rel Vol",
+    "latency": "Latency",
+    "biasUnavailable": "BIAS UNAVAILABLE"
   },
   "news": {
     "title": "Financial News & Macro Intelligence",
@@ -533,5 +559,9 @@
     "submitTicket": "Submit Support Ticket",
     "feedback": "Submit Product Feedback",
     "systemStatus": "Live Systems & Data Health"
+  },
+  "marketTape": {
+    "directMultiFeed": "DIRECT MULTI-FEED",
+    "subMsRouting": "Sub-millisecond Routing"
   }
 }

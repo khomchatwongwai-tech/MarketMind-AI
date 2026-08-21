@@ -13,11 +13,14 @@ import {
   Info,
   ChevronDown,
   ChevronUp,
+  Minus,
+  RefreshCw,
 } from 'lucide-react';
 import { ComprehensiveMarketData } from '../services/marketDataService.js';
 import { Probabilities } from '../types/market.js';
 import { isFiniteMarketNumber, formatPrice, formatPercent } from '../utils/formatters.js';
 import { calculateRealtimeIntelligence } from '../utils/realtimeIntelligenceEngine.js';
+import { evaluateBiasDiagnostics } from '../utils/biasDiagnostics.js';
 
 interface MarketMindSummaryCardProps {
   data: ComprehensiveMarketData;
@@ -41,6 +44,7 @@ export const MarketMindSummaryCard: React.FC<MarketMindSummaryCardProps> = ({
 
   // Run Real-Time Intelligence Engine
   const engine = calculateRealtimeIntelligence(data);
+  const biasDiag = evaluateBiasDiagnostics(probabilities, quote, null, false);
 
   const isScoreValid = engine.status !== 'UNAVAILABLE' && engine.intelligenceScore !== null;
   const isBullish = engine.overallBias === 'BULLISH';
@@ -171,28 +175,61 @@ export const MarketMindSummaryCard: React.FC<MarketMindSummaryCardProps> = ({
                   <Crown className="w-3.5 h-3.5 text-[#D4AF37]" />
                 </div>
                 <div className="flex items-baseline gap-2 mt-0.5">
-                  <span
-                    className={`text-xl sm:text-2xl font-black tracking-wide font-mono flex items-center gap-1.5 ${
-                      isBullish
-                        ? 'text-[#22C55E]'
-                        : isBearish
-                        ? 'text-[#EF4444]'
-                        : 'text-amber-400'
-                    }`}
-                  >
-                    {isBullish ? (
-                      <TrendingUp className="w-5 h-5" />
-                    ) : isBearish ? (
-                      <TrendingDown className="w-5 h-5" />
-                    ) : (
-                      <Zap className="w-5 h-5" />
-                    )}
-                    {primaryOutlook}
-                  </span>
-                  {isScoreValid && (
-                    <span className="text-xs text-[#9CA3AF] font-mono">
-                      Confidence: <strong className="text-white font-bold">{engine.overallConfidence}%</strong>
-                    </span>
+                  {!isScoreValid || biasDiag.bias === 'UNAVAILABLE' || biasDiag.bias === 'LOADING' ? (
+                    <div className="flex flex-col gap-1">
+                      <span
+                        className={`text-xl sm:text-2xl font-black tracking-wide font-mono flex items-center gap-1.5 ${
+                          biasDiag.bias === 'LOADING' ? 'text-[#9CA3AF] animate-pulse' : 'text-amber-400'
+                        }`}
+                      >
+                        {biasDiag.bias === 'LOADING' ? (
+                          <RefreshCw className="w-5 h-5 animate-spin" />
+                        ) : (
+                          <AlertTriangle className="w-5 h-5 text-amber-400" />
+                        )}
+                        {biasDiag.bias === 'LOADING' ? 'LOADING BIAS' : primaryOutlook}
+                      </span>
+                      {biasDiag.reasons.length > 0 && (
+                        <div className="flex flex-wrap gap-1 mt-1">
+                          {biasDiag.reasons.map((reason, idx) => (
+                            <span
+                              key={idx}
+                              className="px-2 py-0.5 bg-amber-950/40 border border-amber-500/30 text-amber-300 rounded text-[10px] font-mono"
+                            >
+                              {reason}
+                            </span>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                  ) : (
+                    <>
+                      <span
+                        className={`text-xl sm:text-2xl font-black tracking-wide font-mono flex items-center gap-1.5 ${
+                          isBullish
+                            ? 'text-[#22C55E]'
+                            : isBearish
+                            ? 'text-[#EF4444]'
+                            : 'text-amber-400'
+                        }`}
+                      >
+                        {isBullish ? (
+                          <TrendingUp className="w-5 h-5" />
+                        ) : isBearish ? (
+                          <TrendingDown className="w-5 h-5" />
+                        ) : engine.overallBias === 'NEUTRAL' ? (
+                          <Minus className="w-5 h-5" />
+                        ) : (
+                          <Zap className="w-5 h-5" />
+                        )}
+                        {primaryOutlook}
+                      </span>
+                      {isScoreValid && (
+                        <span className="text-xs text-[#9CA3AF] font-mono">
+                          Confidence: <strong className="text-white font-bold">{engine.overallConfidence}%</strong>
+                        </span>
+                      )}
+                    </>
                   )}
                 </div>
               </div>

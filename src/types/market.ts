@@ -284,6 +284,8 @@ export interface Probabilities {
   bullishConfirmation: string;
   bearishInvalidation: string;
   aiSummary: string;
+  status?: 'AVAILABLE' | 'UNAVAILABLE' | 'LOADING';
+  unavailableReasons?: string[];
 }
 
 export interface PredictionRecord {

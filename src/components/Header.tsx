@@ -28,6 +28,7 @@ import {
 import { MarketQuote, Probabilities, TickerSymbol } from '../types/market';
 import { UserProfile } from '../types/user';
 import { searchMarketSymbols } from '../services/marketDataService';
+import { evaluateBiasDiagnostics } from '../utils/biasDiagnostics';
 import { useI18n } from '../i18n/I18nContext';
 import { LanguageSelector } from './LanguageSelector';
 import { ThemeToggle } from './ThemeToggle';
@@ -139,18 +140,8 @@ export const Header: React.FC<HeaderProps> = ({
   };
 
   const isPositive = isFiniteMarketNumber(quote.change) && quote.change >= 0;
-  const hasProbabilities = [
-    probabilities.bullish,
-    probabilities.bearish,
-    probabilities.neutral,
-  ].every(isFiniteMarketNumber);
-  const bias = !hasProbabilities
-    ? 'UNAVAILABLE'
-    : probabilities.bullish >= probabilities.bearish && probabilities.bullish >= probabilities.neutral
-      ? 'BULLISH'
-      : probabilities.bearish >= probabilities.bullish && probabilities.bearish >= probabilities.neutral
-      ? 'BEARISH'
-      : 'NEUTRAL';
+  const biasDiag = evaluateBiasDiagnostics(probabilities, quote, null, isLoadingLive);
+  const bias = biasDiag.bias;
 
   // Sub-tabs for stock context (matching mobile reference design)
   const subTabs: { id: ActiveTab; label: string }[] = [
@@ -588,48 +579,86 @@ export const Header: React.FC<HeaderProps> = ({
           <div className="flex items-center lg:flex-col lg:items-end gap-2 lg:gap-0">
             <div
               className={`px-2.5 py-1 rounded-lg text-xs font-black uppercase tracking-wider flex items-center gap-1 border ${
-                bias === 'BULLISH'
+                bias === 'LOADING'
+                  ? 'bg-[#151515] text-[#9CA3AF] border-[#242424] animate-pulse'
+                  : bias === 'BULLISH'
                   ? 'bg-[#22C55E]/10 text-[#22C55E] border-[#22C55E]/40'
                   : bias === 'BEARISH'
                   ? 'bg-[#EF4444]/10 text-[#EF4444] border-[#EF4444]/40'
-                  : 'bg-[#A3A3A3]/10 text-[#A3A3A3] border-[#A3A3A3]/40'
+                  : bias === 'NEUTRAL'
+                  ? 'bg-[#A3A3A3]/10 text-[#A3A3A3] border-[#A3A3A3]/40'
+                  : 'bg-amber-500/10 text-amber-400 border-amber-500/40'
               }`}
             >
+              {bias === 'LOADING' && <RefreshCw className="w-3.5 h-3.5 animate-spin" />}
               {bias === 'BULLISH' && <TrendingUp className="w-3.5 h-3.5" />}
               {bias === 'BEARISH' && <TrendingDown className="w-3.5 h-3.5" />}
               {bias === 'NEUTRAL' && <Minus className="w-3.5 h-3.5" />}
-              {bias === 'UNAVAILABLE' && <AlertTriangle className="w-3.5 h-3.5" />}
+              {bias === 'UNAVAILABLE' && <AlertTriangle className="w-3.5 h-3.5 text-amber-400" />}
               {bias === 'UNAVAILABLE' ? t('market.biasUnavailable') : `${bias} BIAS`}
             </div>
             <div className="text-[10px] text-[#9CA3AF] uppercase tracking-wider font-mono">
-              AI: <span className="font-bold text-[#F2D675]">{isFiniteMarketNumber(probabilities.aiConfidence) ? `${probabilities.aiConfidence}%` : 'N/A'}</span>
+              AI:{' '}
+              <span className="font-bold text-[#F2D675]">
+                {bias === 'UNAVAILABLE' || bias === 'LOADING'
+                  ? 'Unavailable'
+                  : isFiniteMarketNumber(probabilities.aiConfidence)
+                  ? `${probabilities.aiConfidence}%`
+                  : 'Unavailable'}
+              </span>
             </div>
           </div>
 
-          {/* Probabilities Multi-Bar */}
-          <div className="flex flex-col bg-[#101010] rounded-lg p-1.5 md:p-2 min-w-[140px] md:min-w-[170px] border border-[#242424]">
-            <div className="flex justify-between text-[9px] md:text-[10px] mb-1 font-mono font-bold">
-              <span className="text-[#22C55E]">{t('common.bull')}: {isFiniteMarketNumber(probabilities.bullish) ? `${probabilities.bullish}%` : 'N/A'}</span>
-              <span className="text-[#A3A3A3]">{t('common.neut')}: {isFiniteMarketNumber(probabilities.neutral) ? `${probabilities.neutral}%` : 'N/A'}</span>
-              <span className="text-[#EF4444]">{t('common.bear')}: {isFiniteMarketNumber(probabilities.bearish) ? `${probabilities.bearish}%` : 'N/A'}</span>
-            </div>
-            <div className="h-1.5 md:h-2 w-full bg-[#1C1C1C] rounded-full overflow-hidden flex">
-              <div
-                className="bg-[#22C55E] h-full transition-all duration-500"
-                style={{ width: `${isFiniteMarketNumber(probabilities.bullish) ? probabilities.bullish : 0}%` }}
-                title={isFiniteMarketNumber(probabilities.bullish) ? `Bullish: ${probabilities.bullish}%` : 'Bullish probability unavailable'}
-              />
-              <div
-                className="bg-[#A3A3A3] h-full transition-all duration-500"
-                style={{ width: `${isFiniteMarketNumber(probabilities.neutral) ? probabilities.neutral : 0}%` }}
-                title={isFiniteMarketNumber(probabilities.neutral) ? `Neutral: ${probabilities.neutral}%` : 'Neutral probability unavailable'}
-              />
-              <div
-                className="bg-[#EF4444] h-full transition-all duration-500"
-                style={{ width: `${isFiniteMarketNumber(probabilities.bearish) ? probabilities.bearish : 0}%` }}
-                title={isFiniteMarketNumber(probabilities.bearish) ? `Bearish: ${probabilities.bearish}%` : 'Bearish probability unavailable'}
-              />
-            </div>
+          {/* Probabilities Multi-Bar or Missing Data Diagnostics */}
+          <div className="flex flex-col bg-[#101010] rounded-lg p-1.5 md:p-2 min-w-[140px] md:min-w-[180px] border border-[#242424]">
+            {bias === 'UNAVAILABLE' ? (
+              <div className="flex flex-col justify-center gap-1 text-[9px] md:text-[10px] font-mono">
+                <div className="flex items-center gap-1 text-amber-400 font-bold">
+                  <AlertTriangle className="w-3 h-3 shrink-0" />
+                  <span>Missing Input Diagnostics:</span>
+                </div>
+                <div className="flex flex-wrap gap-1 mt-0.5">
+                  {biasDiag.reasons.map((reason, idx) => (
+                    <span
+                      key={idx}
+                      className="px-1.5 py-0.5 bg-amber-950/40 border border-amber-500/30 text-amber-300 rounded text-[9px] font-mono shrink-0"
+                    >
+                      {reason}
+                    </span>
+                  ))}
+                </div>
+              </div>
+            ) : bias === 'LOADING' ? (
+              <div className="flex flex-col justify-center gap-1.5 text-[10px] font-mono text-[#9CA3AF] animate-pulse">
+                <span>Loading Bias Parameters...</span>
+                <div className="h-1.5 w-full bg-[#1C1C1C] rounded-full overflow-hidden" />
+              </div>
+            ) : (
+              <>
+                <div className="flex justify-between text-[9px] md:text-[10px] mb-1 font-mono font-bold">
+                  <span className="text-[#22C55E]">{t('common.bull')}: {isFiniteMarketNumber(probabilities.bullish) ? `${probabilities.bullish}%` : 'N/A'}</span>
+                  <span className="text-[#A3A3A3]">{t('common.neut')}: {isFiniteMarketNumber(probabilities.neutral) ? `${probabilities.neutral}%` : 'N/A'}</span>
+                  <span className="text-[#EF4444]">{t('common.bear')}: {isFiniteMarketNumber(probabilities.bearish) ? `${probabilities.bearish}%` : 'N/A'}</span>
+                </div>
+                <div className="h-1.5 md:h-2 w-full bg-[#1C1C1C] rounded-full overflow-hidden flex">
+                  <div
+                    className="bg-[#22C55E] h-full transition-all duration-500"
+                    style={{ width: `${isFiniteMarketNumber(probabilities.bullish) ? probabilities.bullish : 0}%` }}
+                    title={isFiniteMarketNumber(probabilities.bullish) ? `Bullish: ${probabilities.bullish}%` : 'Bullish probability unavailable'}
+                  />
+                  <div
+                    className="bg-[#A3A3A3] h-full transition-all duration-500"
+                    style={{ width: `${isFiniteMarketNumber(probabilities.neutral) ? probabilities.neutral : 0}%` }}
+                    title={isFiniteMarketNumber(probabilities.neutral) ? `Neutral: ${probabilities.neutral}%` : 'Neutral probability unavailable'}
+                  />
+                  <div
+                    className="bg-[#EF4444] h-full transition-all duration-500"
+                    style={{ width: `${isFiniteMarketNumber(probabilities.bearish) ? probabilities.bearish : 0}%` }}
+                    title={isFiniteMarketNumber(probabilities.bearish) ? `Bearish: ${probabilities.bearish}%` : 'Bearish probability unavailable'}
+                  />
+                </div>
+              </>
+            )}
           </div>
 
           {/* Action Buttons */}

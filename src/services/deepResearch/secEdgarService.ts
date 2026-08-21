@@ -10,6 +10,7 @@ export interface CompanySecProfile {
   filings: SECFilingExcerpt[];
   financialFacts: FinancialMetricRow[];
   sources: ResearchSource[];
+  status: 'VERIFIED' | 'UNAVAILABLE';
 }
 
 // Authoritative CIK mapping for leading public assets
@@ -30,11 +31,12 @@ const CIK_MAP: Record<string, { cik: string; name: string; sic: string; sicDesc:
   JPM: { cik: '0000019617', name: 'JPMORGAN CHASE & CO', sic: '6021', sicDesc: 'National Commercial Banks' },
   V: { cik: '0001403161', name: 'VISA INC.', sic: '7389', sicDesc: 'Services-Business Services, NEC' },
   WMT: { cik: '0000104169', name: 'Walmart Inc.', sic: '5331', sicDesc: 'Retail-Variety Stores' },
+  PLTR: { cik: '0001321655', name: 'Palantir Technologies Inc.', sic: '7372', sicDesc: 'Services-Prepackaged Software' },
   SPY: { cik: '0000884394', name: 'SPDR S&P 500 ETF TRUST', sic: '6798', sicDesc: 'Unit Investment Trusts' },
   QQQ: { cik: '0001067839', name: 'INVESCO QQQ TRUST, SERIES 1', sic: '6798', sicDesc: 'Unit Investment Trusts' },
 };
 
-// Verified SEC Filing Registry to ensure offline robustness and zero data hallucination
+// Verified SEC Filing Registry
 const VERIFIED_FILINGS_DB: Record<string, SECFilingExcerpt[]> = {
   NVDA: [
     {
@@ -71,18 +73,6 @@ const VERIFIED_FILINGS_DB: Record<string, SECFilingExcerpt[]> = {
         'Concentration of cloud service provider capex cycles.',
       ],
     },
-    {
-      filingType: '8-K',
-      filingDate: '2024-11-20',
-      periodEnding: '2024-10-27',
-      accessionNumber: '0001045810-24-000288',
-      description: 'Current Report Disclosing Q3 FY2025 Financial Results and Management Guidance.',
-      link: 'https://www.sec.gov/edgar/browse/?CIK=0001045810',
-      keyChanges: [
-        'Q3 revenue of $35.08B (+94% YoY); gross margin 74.6%.',
-        'Q4 FY2025 revenue guided to $37.5B ± 2%.',
-      ],
-    },
   ],
   AAPL: [
     {
@@ -98,90 +88,8 @@ const VERIFIED_FILINGS_DB: Record<string, SECFilingExcerpt[]> = {
         'Operating cash flow of $118.2B, returning over $95B to shareholders via buybacks and dividends.',
       ],
       materialRiskFactors: [
-        'Regulatory scrutiny under EU Digital Markets Act (DMA) and US DOJ antitrust litigation.',
-        'Supply chain concentration in East Asia and geopolitical tariffs.',
-      ],
-    },
-    {
-      filingType: '10-Q',
-      filingDate: '2024-08-02',
-      periodEnding: '2024-06-29',
-      accessionNumber: '0000320193-24-000081',
-      description: 'Quarterly Report for Period Ended June 29, 2024.',
-      link: 'https://www.sec.gov/edgar/browse/?CIK=0000320193',
-      keyChanges: [
-        'Total net sales of $85.8B (+4.9% YoY); iPad revenue up 23.7% following M4 refresh.',
-      ],
-    },
-  ],
-  MSFT: [
-    {
-      filingType: '10-K',
-      filingDate: '2024-07-30',
-      periodEnding: '2024-06-30',
-      accessionNumber: '0000789019-24-000067',
-      description: 'Annual Report for Fiscal Year Ended June 30, 2024.',
-      link: 'https://www.sec.gov/edgar/browse/?CIK=0000789019',
-      keyChanges: [
-        'Microsoft Cloud revenue surpassed $137B (+23% YoY).',
-        'Intelligent Cloud segment grew 20% to $105.4B led by Azure AI workloads.',
-        'Completed Activision Blizzard integration contributing to Gaming segment.',
-      ],
-      materialRiskFactors: [
-        'Intense cloud competition and large-scale data center infrastructure capital requirements.',
-        'Cybersecurity threats and enterprise data privacy regulations.',
-      ],
-    },
-  ],
-  AMD: [
-    {
-      filingType: '10-Q',
-      filingDate: '2024-10-30',
-      periodEnding: '2024-09-28',
-      accessionNumber: '0000002488-24-000072',
-      description: 'Quarterly Report for Q3 2024 Ended September 28, 2024.',
-      link: 'https://www.sec.gov/edgar/browse/?CIK=0000002488',
-      keyChanges: [
-        'Data Center segment revenue grew 122% YoY to record $3.5B powered by Instinct MI300X accelerators.',
-        'Client segment revenue increased 29% YoY to $1.9B driven by Zen 5 processors.',
-      ],
-      materialRiskFactors: [
-        'Dominant competitor position in AI accelerators and customer software lock-in.',
-      ],
-    },
-  ],
-  AVGO: [
-    {
-      filingType: '10-Q',
-      filingDate: '2024-09-06',
-      periodEnding: '2024-08-04',
-      accessionNumber: '0001730168-24-000038',
-      description: 'Quarterly Report for Q3 Ended August 4, 2024.',
-      link: 'https://www.sec.gov/edgar/browse/?CIK=0001730168',
-      keyChanges: [
-        'AI revenue reached $3.5B across custom XPUs and Ethernet switching fabric.',
-        'VMware integration accelerating with private cloud foundation annual recurring revenue bookings.',
-      ],
-      materialRiskFactors: [
-        'Leverage obligations following VMware acquisition and debt refinancing costs.',
-      ],
-    },
-  ],
-  TSLA: [
-    {
-      filingType: '10-Q',
-      filingDate: '2024-10-24',
-      periodEnding: '2024-09-30',
-      accessionNumber: '0001318605-24-000025',
-      description: 'Quarterly Report for Period Ended September 30, 2024.',
-      link: 'https://www.sec.gov/edgar/browse/?CIK=0001318605',
-      keyChanges: [
-        'Automotive gross margin excluding regulatory credits improved to 17.1%.',
-        'Energy Storage deployment reached 6.9 GWh in Q3, up 73% YoY.',
-        'Cost of goods sold per vehicle decreased to lowest-ever level of ~$35,100.',
-      ],
-      materialRiskFactors: [
-        'Pricing competition in EV markets and autonomous vehicle regulatory milestones.',
+        'Global supply chain concentration and geopolitical trade policy friction.',
+        'Regulatory antitrust scrutinization regarding App Store fee structures.',
       ],
     },
   ],
@@ -190,61 +98,105 @@ const VERIFIED_FILINGS_DB: Record<string, SECFilingExcerpt[]> = {
 export class SecEdgarService {
   private static readonly USER_AGENT = 'MarketMindAI-ResearchEngine/1.0 (research@marketmind.ai)';
   private static readonly SEC_BASE_URL = 'https://data.sec.gov';
+  private static dynamicCikCache = new Map<string, { cik: string; name: string }>();
+  private static dynamicCacheFetchedAt = 0;
+  private static readonly DYNAMIC_CACHE_TTL = 24 * 60 * 60 * 1000; // 24h TTL
 
   /**
-   * Resolves CIK for ticker symbol
+   * Dynamically fetch SEC company tickers list from official SEC EDGAR
    */
-  public static getCik(ticker: string): string | null {
-    const clean = ticker.trim().toUpperCase();
-    return CIK_MAP[clean]?.cik || null;
+  private static async loadSecCompanyTickers(): Promise<void> {
+    const now = Date.now();
+    if (this.dynamicCikCache.size > 0 && now - this.dynamicCacheFetchedAt < this.DYNAMIC_CACHE_TTL) {
+      return;
+    }
+
+    try {
+      const res = await fetch('https://www.sec.gov/files/company_tickers.json', {
+        headers: { 'User-Agent': this.USER_AGENT },
+      });
+      if (res.ok) {
+        const data = await res.json();
+        if (data && typeof data === 'object') {
+          for (const key of Object.keys(data)) {
+            const item = data[key];
+            if (item && item.ticker && item.cik_str) {
+              const ticker = String(item.ticker).toUpperCase().trim();
+              const cikStr = String(item.cik_str).padStart(10, '0');
+              const name = String(item.title || `${ticker} Inc.`);
+              this.dynamicCikCache.set(ticker, { cik: cikStr, name });
+            }
+          }
+          this.dynamicCacheFetchedAt = now;
+        }
+      }
+    } catch {
+      // Dynamic SEC lookup network failure ignored, fallback to static CIK_MAP
+    }
   }
 
   /**
-   * Fetches official SEC filings for a company
+   * Resolves CIK for ticker symbol dynamically or via static map
+   */
+  public static async getCik(ticker: string): Promise<string | null> {
+    const clean = ticker.trim().toUpperCase();
+    if (CIK_MAP[clean]) {
+      return CIK_MAP[clean].cik;
+    }
+
+    await this.loadSecCompanyTickers();
+    const dynamic = this.dynamicCikCache.get(clean);
+    return dynamic?.cik || null;
+  }
+
+  /**
+   * Fetches official SEC filings for a company. Returns status UNAVAILABLE if unverified.
    */
   public static async getCompanyFilings(ticker: string): Promise<CompanySecProfile> {
     const cleanTicker = ticker.trim().toUpperCase();
     const mapped = CIK_MAP[cleanTicker];
-    const cik = mapped?.cik || '0000000000';
-    const companyName = mapped?.name || `${cleanTicker} Corporation`;
     const now = new Date().toISOString();
 
-    // 1. Check verified filing records
-    const verifiedFilings = VERIFIED_FILINGS_DB[cleanTicker] || [
-      {
-        filingType: '10-K',
-        filingDate: '2024-03-15',
-        periodEnding: '2023-12-31',
-        accessionNumber: `000${cik.replace(/^0+/, '') || '100000'}-24-000001`,
-        description: `Official Annual Report for ${companyName}`,
-        link: `https://www.sec.gov/edgar/browse/?CIK=${cik}`,
-        keyChanges: [
-          'Filed consolidated annual audited financial statements with the SEC.',
-          'Disclosed segment operations, executive compensation and primary operational risk factors.',
-        ],
-        materialRiskFactors: [
-          'Macroeconomic volatility, foreign exchange rates and interest rate fluctuations.',
-          'Competitive industry dynamics and technological shifts.',
-        ],
-      },
-      {
-        filingType: '10-Q',
-        filingDate: '2024-08-15',
-        periodEnding: '2024-06-30',
-        accessionNumber: `000${cik.replace(/^0+/, '') || '100000'}-24-000045`,
-        description: `Official Quarterly Report for ${companyName}`,
-        link: `https://www.sec.gov/edgar/browse/?CIK=${cik}`,
-        keyChanges: [
-          'Filed quarterly unaudited financials and management discussion & analysis.',
-        ],
-      },
-    ];
+    let cik = mapped?.cik || null;
+    let companyName = mapped?.name || null;
 
-    // 2. Build verified financial facts from SEC filings
+    if (!cik) {
+      await this.loadSecCompanyTickers();
+      const dynamic = this.dynamicCikCache.get(cleanTicker);
+      if (dynamic) {
+        cik = dynamic.cik;
+        companyName = dynamic.name;
+      }
+    }
+
+    // If ticker CIK cannot be verified via SEC EDGAR, return UNAVAILABLE status
+    if (!cik) {
+      return {
+        cik: 'UNAVAILABLE',
+        name: `${cleanTicker}`,
+        ticker: cleanTicker,
+        filings: [],
+        financialFacts: [
+          {
+            label: 'SEC Reporting Status',
+            value: 'UNAVAILABLE (Unverified CIK)',
+            dataType: 'UNAVAILABLE',
+            source: 'SEC EDGAR',
+            tier: 1,
+          },
+        ],
+        sources: [],
+        status: 'UNAVAILABLE',
+      };
+    }
+
+    // Verified filing records
+    const verifiedFilings = VERIFIED_FILINGS_DB[cleanTicker] || [];
+
     const financialFacts: FinancialMetricRow[] = [
       {
         label: 'SEC Reporting Status',
-        value: 'Accelerated Filer (Form 10-K/10-Q Active)',
+        value: 'Reporting Entity (Form 10-K/10-Q Active)',
         dataType: 'VERIFIED',
         source: 'SEC EDGAR Submissions',
         tier: 1,
@@ -263,26 +215,18 @@ export class SecEdgarService {
         source: 'SEC EDGAR Company Facts',
         tier: 1,
       },
-      {
-        label: 'Latest 10-Q / 10-K Filing Date',
-        value: verifiedFilings[0]?.filingDate || 'Recent',
-        dataType: 'VERIFIED',
-        source: `SEC EDGAR ${verifiedFilings[0]?.accessionNumber || 'Accession'}`,
-        tier: 1,
-      },
     ];
 
-    // 3. Build research source objects
     const sources: ResearchSource[] = verifiedFilings.map((f, idx) => ({
       id: `src_sec_${cleanTicker.toLowerCase()}_${idx + 1}`,
       url: f.link,
-      title: `SEC Form ${f.filingType} - ${companyName} (${f.periodEnding})`,
+      title: `SEC Form ${f.filingType} - ${companyName || cleanTicker} (${f.periodEnding})`,
       publisher: 'U.S. Securities and Exchange Commission (EDGAR)',
       source_type: 'SEC_EDGAR',
       tier: 1,
       published_at: f.filingDate,
       retrieved_at: now,
-      entity: companyName,
+      entity: companyName || cleanTicker,
       symbols: [cleanTicker],
       content_hash: `hash_${f.accessionNumber}`,
       freshness_seconds: Math.floor((Date.now() - new Date(f.filingDate).getTime()) / 1000),
@@ -292,13 +236,14 @@ export class SecEdgarService {
 
     return {
       cik,
-      name: companyName,
+      name: companyName || `${cleanTicker} Corp`,
       ticker: cleanTicker,
       sic: mapped?.sic,
       sicDescription: mapped?.sicDesc,
       filings: verifiedFilings,
       financialFacts,
       sources,
+      status: 'VERIFIED',
     };
   }
 }

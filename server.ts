@@ -42,6 +42,7 @@ import {
   getLiveMarketDataService,
   MarketDataUnavailableError,
 } from './src/server/liveMarketDataService.js';
+import { UniversalStockIntelligenceEngine } from './src/services/stockIntelligence/UniversalStockIntelligenceEngine.js';
 
 dotenv.config();
 
@@ -2679,6 +2680,34 @@ app.post('/api/research/sec/:ticker', async (req, res) => {
     res.json(profile);
   } catch (err: any) {
     res.status(500).json({ error: 'Failed to retrieve SEC profile', message: err.message });
+  }
+});
+
+// Universal Stock Intelligence Engine Endpoint
+app.post('/api/stocks/:ticker/intelligence', async (req: express.Request, res: express.Response) => {
+  const ticker = typeof req.params?.ticker === 'string' ? req.params.ticker.trim().toUpperCase() : '';
+  const timeframe = typeof req.body?.timeframe === 'string' ? req.body.timeframe : '5m';
+  const language = typeof req.body?.language === 'string' ? req.body.language : 'en';
+  const depth = typeof req.body?.depth === 'string' ? req.body.depth : 'full';
+
+  if (!ticker || !/^[A-Z0-9.\-]{1,12}$/.test(ticker)) {
+    return res.status(400).json({ error: 'A valid stock ticker symbol is required.', code: 'INVALID_TICKER' });
+  }
+
+  try {
+    const intelligence = await UniversalStockIntelligenceEngine.analyzeStock(
+      ticker,
+      timeframe as any,
+      language,
+      depth as any
+    );
+    return res.json(intelligence);
+  } catch (error) {
+    if (error instanceof Error && error.message === 'INSTRUMENT_NOT_FOUND') {
+      return res.status(404).json({ error: `Instrument ${ticker} not found or unsupported.`, code: 'INSTRUMENT_NOT_FOUND' });
+    }
+    console.error(`[UNIVERSAL_STOCK_INTELLIGENCE] Failure for ${ticker}:`, error);
+    return res.status(500).json({ error: 'Failed to generate stock intelligence analysis.', code: 'INTELLIGENCE_ENGINE_FAILURE' });
   }
 });
 
